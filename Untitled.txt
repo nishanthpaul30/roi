@@ -1,0 +1,189 @@
+
+Enterprise AI Usage & Cost
+Dashboard, Chart & Insight Design Reference
+Prepared for C-Suite & Leadership Review
+September 2026
+
+Section 1: Dashboards, Charts & Graphs — Buildable Today
+This section catalogs the dashboards, charts, and graphs that can be built directly from the AI usage dataset today, without any additional data inputs. Each suggestion is selected because it maps to a concrete leadership decision or KPI — not included merely to demonstrate a chart type. Every visualization shown below is generated from the actual dataset provided, not placeholder figures.
+1.1  Executive AI Spend Trend
+What does this mean?	A month-by-month view of total AI spend across the organization, broken down by tool (Copilot / ChatGPT / Claude). It answers the first question every CXO asks: “is our AI spend going up, and why?”
+How to generate	Group transaction records by Month_Year and AI Tool Flag, sum Cost in USD, and stack the three tool totals per month. In this dataset, total spend moved from $302.6K-equivalent in March to a low of $182.7 in June before rebounding 37.8% to $277.6 in August.
+KPI it solves	Total AI Spend, Month-over-Month (MoM) Growth Rate, and Spend-by-Tool composition — the primary financial control KPI for AI investment oversight.
+Recommended visualization	Stacked column chart. Preferred over a simple line because it preserves both the total monthly magnitude and the tool-level composition in a single view; a total-cost trend line can be overlaid for boards that want the headline number emphasized.
+ 
+Sample pictorial representation — Executive AI Spend Trend
+
+1.2  Tool Adoption Mix (Active Users)
+What does this mean?	Shows what share of the monthly active-user base is on each tool. This is a fundamentally different question from spend share — it tells leadership whether the organization is consolidating around one platform or fragmenting across three.
+How to generate	For each Month_Year, count distinct User Mail values per AI Tool Flag, then normalize each month's three tool-counts to 100%. Copilot and ChatGPT each carry 32 users overall; Claude's user base grew from 9 users in March to 17 by August — the clearest adoption-trend signal in the dataset.
+KPI it solves	Tool Adoption Share / Vendor Concentration — informs which vendor relationship to prioritize in renewal negotiations and whether a standardization mandate is warranted.
+Recommended visualization	100% stacked bar chart. This form is specifically built to show compositional change over time without total-volume noise distorting the comparison — a plain stacked bar would conflate “more users” with “a different mix of users.”
+ 
+Sample pictorial representation — Tool Adoption Mix (Active Users)
+
+1.3  Cost by Organization Service Line
+What does this mean?	Ranks each business/service line by total AI cost incurred, exposing which parts of the organization are the heaviest AI spenders in absolute terms.
+How to generate	Group all records by Org Service Line and sum Cost in USD. In this dataset, Consulting leads at $450.00 (32.7% of total organizational spend) — more than three times Healthcare's $135.52.
+KPI it solves	Cost Allocation by Business Unit — the foundational input for internal chargeback/showback and for setting next-cycle AI budgets per service line.
+Recommended visualization	Horizontal ranked bar chart. With five categories of materially different magnitude, a bar chart gives far better value-discrimination than a pie chart, whose wedge-angle comparisons are notoriously hard to read past three or four slices.
+ 
+Sample pictorial representation — Cost by Organization Service Line
+
+1.4  Geographic & Regional Spend Distribution
+What does this mean?	Breaks total spend down by Management Region and by Country, revealing where in the world AI cost is concentrated — useful both for regional budget accountability and for spotting geography-specific adoption or governance gaps.
+How to generate	Group by Management Region (3 categories) and separately by Country (8 categories), summing Cost in USD for each. APAC leads at $665.24 (48.3% of total spend), more than triple the Americas at $211.54; at the country level, Australia alone accounts for $385.50.
+KPI it solves	Regional Spend Distribution / Cost-per-Region — supports regional leadership accountability and cross-region benchmarking of AI investment intensity.
+Recommended visualization	Paired bar charts: a simple vertical bar for the three Management Regions (where ranking order matters most), and a horizontal ranked bar for the eight countries. A choropleth map is a strong alternative once a mapping/BI tool is in place.
+ 
+Sample pictorial representation — Geographic & Regional Spend Distribution
+
+1.5  User Engagement Map (Frequency vs. Intensity)
+What does this mean?	Plots every individual user by how often they use AI tools (active days) against how heavily they use them per session (average tokens per active day), with bubble size representing total cost. This separates “frequent light users” from “occasional heavy users” — two populations that need very different governance responses.
+How to generate	Group by User Mail; compute count of distinct Activity Date values (frequency) and Token Consumption ÷ active days (intensity); size each bubble by summed Cost in USD.
+KPI it solves	Engagement Depth / Usage Pattern Segmentation — identifies power users who could become internal champions or trainers, and infrequent users who may need onboarding support or license reallocation.
+Recommended visualization	Bubble/scatter chart. This is the only chart type in the set that encodes three variables — frequency, intensity, and cost — simultaneously, which is exactly the combination leadership needs to distinguish user archetypes.
+ 
+Sample pictorial representation — User Engagement Map (Frequency vs. Intensity)
+
+1.6  Cost Concentration (Pareto Analysis)
+What does this mean?	Tests how evenly (or unevenly) AI cost is spread across the user population. In this dataset, the top 7 users — just 10% of the 70-person base — account for 46.5% of total spend, and the top 14 (20%) account for 69.1%.
+How to generate	Rank all users by total Cost in USD descending; plot each user's individual cost as a bar and overlay a cumulative-percentage-of-total-cost line.
+KPI it solves	Cost Concentration / Key-User Dependency Risk — flags single-point-of-cost exposure and identifies the specific individuals who are strong candidates for a negotiated volume-usage plan or closer usage review.
+Recommended visualization	Pareto chart (combination bar + cumulative line). This is the purpose-built form for 80/20-style concentration analysis and is materially more actionable than a plain ranked bar, because the cumulative line directly answers “how many people drive most of the cost?”
+ 
+Sample pictorial representation — Cost Concentration (Pareto Analysis)
+
+1.7  Tool Cost Efficiency ($ per Million Tokens)
+What does this mean?	A direct unit-economics comparison across the three tools. In this dataset, Claude's effective rate is $18.31 per million tokens, ChatGPT's is $15.28, and Copilot's is $10.13 — an 81% spread between the highest and lowest.
+How to generate	For each tool, divide total Cost in USD by (total Token Consumption ÷ 1,000,000).
+KPI it solves	Effective Unit Cost per Tool — informs vendor negotiation leverage and which tool to steer users toward for token-heavy, lower-complexity tasks.
+Recommended visualization	Simple vertical bar chart — three categories, one metric, no additional dimension needed. A caption/caveat callout should always accompany this chart in the live version, since Copilot's typical flat-seat pricing and ChatGPT/Claude's metered pricing are not always like-for-like once real contract terms are applied.
+ 
+Sample pictorial representation — Tool Cost Efficiency ($ per Million Tokens)
+
+1.8  Project Investment Code Spend (Top 10)
+What does this mean?	Identifies which specific funded projects or initiatives are consuming the most AI spend — the level of granularity Finance and PMO teams actually need to manage budgets. The top code, PRJ-FIN-7570, accounts for $119.00 in this sample.
+How to generate	Group all records by Project Investment Code, sum Cost in USD, sort descending, and display the top 10 of the (70, in this sample) distinct codes present.
+KPI it solves	Project-Level Cost Attribution / Budget Utilization — enables project-manager-level accountability and early identification of projects exceeding their allocated AI budget.
+Recommended visualization	Horizontal ranked bar chart, filtered to the top N codes for readability (a treemap is a good alternative once the number of active codes runs into the hundreds).
+ 
+Sample pictorial representation — Project Investment Code Spend (Top 10)
+
+
+Section 2: Insights Derivable From This Dataset
+This section presents specific, numeric insights already derivable from the dataset. These are not chart designs but standalone findings — the kind of statements a CXO could read directly, or that would populate a dashboard's callout/commentary panel. All figures below are computed directly from the provided AI usage data.
+2.1  Total Spend & Run-Rate
+What does this mean?	The organization incurred $1,376.51 in total AI cost across the six-month window (March–August 2026), averaging roughly $229 per month, with August closing 37.8% higher than July.
+How to generate	Sum Cost in USD across all records for the total; divide by the number of distinct Month_Year values for the monthly average; compare the latest two months for the run-rate trend.
+Value to leadership	Gives leadership a live, single-number read on total AI investment and whether the trend line supports the current budget or requires a mid-cycle re-forecast.
+
+2.2  Tool Preference / Spend Share
+What does this mean?	ChatGPT holds the largest share of spend at 46.2% ($635.89 of $1,376.51) despite having the same number of active users (32) as Copilot — implying ChatGPT users consume materially more tokens per person on average.
+How to generate	Sum Cost in USD grouped by AI Tool Flag; divide each tool's total by the grand total for percentage share; cross-reference against distinct user counts per tool.
+Value to leadership	Signals which vendor relationship is gaining organic traction — directly relevant to renewal timing and negotiation priority.
+
+2.3  Cost Concentration Risk
+What does this mean?	Spend is not evenly distributed: the top 10% of users (7 people) drive 46.5% of all cost, and the top 20% (14 people) drive 69.1%.
+How to generate	Rank users by total Cost in USD; compute the cumulative percentage of total cost contributed by the top 10% and top 20% of the ranked list.
+Value to leadership	Tells leadership that broad, org-wide cost controls will have limited effect — the highest-leverage governance action is a targeted review of a small, identifiable group of heavy users.
+
+2.4  Engagement Health / Stickiness
+What does this mean?	Of the 70 active users, 25 (36%) are “Embedded” users (16+ active days across the window), 40 (57%) are “Regular” (9–15 days), 5 (7%) are “Occasional” (4–8 days), and none fall into a one-off “trial-only” bucket.
+How to generate	Count distinct Activity Date values per User Mail across the full window; bin users into frequency segments (e.g., 1–3, 4–8, 9–15, 16+ days).
+Value to leadership	Indicates the tools have moved past pilot-stage curiosity into genuinely habitual use — a positive signal for continued investment, and a baseline to monitor for erosion over time.
+
+2.5  Regional Spend Imbalance
+What does this mean?	APAC accounts for 48.3% of total AI spend versus 15.4% for the Americas — a three-to-one skew that is large enough to warrant explanation.
+How to generate	Sum Cost in USD grouped by Management Region; express each region's total as a percentage of the grand total.
+Value to leadership	Flags a geographic concentration worth validating against headcount distribution — this dataset alone cannot distinguish “APAC has more staff” from “APAC uses AI more intensively per person” (see Section 3.5).
+
+2.6  Service-Line Spend Skew
+What does this mean?	Consulting is the single largest spending service line at $450.00 (32.7% of total spend), more than three times Healthcare's $135.52.
+How to generate	Sum Cost in USD grouped by Org Service Line; rank descending and compute each line's share of total spend.
+Value to leadership	Prompts leadership to determine whether this reflects genuinely higher AI-intensity work in Consulting, or usage growth that has outpaced governance and needs a spend cap or usage policy.
+
+2.7  Effective Rate Spread Across Tools
+What does this mean?	Claude's effective cost per million tokens ($18.31) is approximately 81% higher than Copilot's ($10.13) in this dataset, with ChatGPT in between at $15.28.
+How to generate	Divide each tool's total Cost in USD by its total Token Consumption (expressed in millions).
+Value to leadership	If task complexity is comparable across tools, this spread suggests real savings are available by steering high-volume, lower-complexity token consumption toward the lower-cost tool — without reducing overall output.
+
+2.8  Monthly Volatility
+What does this mean?	Month-over-month spend swung from −35.1% (March→April) to +37.8% (July→August) within the same six-month window — a wide swing for a cost line leadership typically expects to move gradually.
+How to generate	Compute the percentage change in total Cost in USD between each pair of consecutive months.
+Value to leadership	High volatility complicates annual budgeting and vendor commitment sizing; leadership should investigate whether swings map to known events (project ramp-ups, new hires, seasonal workload) or reflect uncontrolled, unpredictable usage.
+
+2.9  Tool Migration Behavior
+What does this mean?	11 of the 70 users (15.7%) changed their primary AI tool at least once during the six-month window, and every change occurred cleanly at a month boundary — no user was recorded on two tools within the same monthly period.
+How to generate	Group by User Mail and list the distinct AI Tool Flag values used across all months; flag any user with more than one distinct value as a “switcher.”
+Value to leadership	Confirms organic tool evaluation is happening within the workforce — useful input for a tool-rationalization decision, and evidence that usage data can reliably support a migration-tracking dashboard (Section 1.2 / Section 3 extensions).
+
+2.10  Data Governance & Allocation Integrity
+What does this mean?	All 1,000 usage records carry a valid, non-null Project Investment Code and complete organizational attribution, and the “one tool per user per period” business rule holds with zero violations across the full dataset.
+How to generate	Check for null/blank values in Project Investment Code and all organizational dimension fields; group by User Mail and Month_Year and confirm no group contains more than one distinct AI Tool Flag.
+Value to leadership	Confirms that chargeback, showback, and adoption reporting built on this dataset will not be blocked by unallocated or ambiguous records — leadership should still commission this same integrity check against the live production feed, since real operational data is rarely this clean.
+
+
+Section 3: Future Dashboards & Insights — Requiring Additional Team Inputs
+The current dataset captures cost and usage volume well, but it cannot, on its own, answer questions about productivity, quality, true adoption penetration, or return on investment — because it contains no output, effort, headcount, or benefit-side data. This section catalogs the additional dashboards and insights that become possible once specific inputs are sourced from other teams, along with exactly what is missing and where to get it. The charts shown here use illustrative placeholder data to demonstrate the intended visualization — they are not derived from the AI usage feed, and are clearly marked as such.
+3.1  Productivity / Hours-Saved Dashboard
+What does this mean?	Trends the estimated number of work hours saved through AI assistance over time, translating raw usage into a productivity outcome rather than a cost figure.
+How to generate today	Cannot be built from usage data alone — token or cost volume is not a valid proxy for time saved, since a verbose model produces more tokens for identical work.
+Missing piece & source	Time-tracking or timesheet data with a task-type and “AI-assisted vs. manual” flag, sourced from the PM/timesheet system per team, or a periodic self-reported time-saved survey run by each Competency lead.
+KPI it solves	Productivity Uplift / Hours Saved per Dollar Spent — the metric most consistently requested by CXOs evaluating whether AI investment is paying off.
+Recommended visualization	Line or area chart trending hours saved by month, with a secondary axis for cumulative value realized.
+ 
+Illustrative sample only — based on placeholder data, not the AI usage feed — Productivity / Hours-Saved Dashboard
+
+3.2  License / Seat Utilization Dashboard
+What does this mean?	Compares the number of licenses purchased for each tool against the number of users actually active, surfacing paid-but-unused seats.
+How to generate today	This dataset only records who used a tool, never who was provisioned a seat — utilization and waste cannot be computed without a seat-count baseline.
+Missing piece & source	Procurement or contract data: seats purchased per tool, per-seat list price, and contract renewal dates, typically owned by IT Asset Management or the vendor contract owner.
+KPI it solves	License Utilization Rate / Recoverable Seat Waste ($) — a direct, fast-payback cost-recovery lever ahead of the next renewal cycle.
+Recommended visualization	Grouped bar chart comparing purchased vs. active seats per tool, with a callout box stating the dollar amount recoverable.
+ 
+Illustrative sample only — based on placeholder data, not the AI usage feed — License / Seat Utilization Dashboard
+
+3.3  Output Quality / Suggestion Acceptance Dashboard
+What does this mean?	Measures whether AI output is actually being used — e.g., the percentage of Copilot code suggestions accepted, or the percentage of chat responses rated useful — separating genuine value from token consumption that goes nowhere.
+How to generate today	None of the current fields capture acceptance, feedback, or downstream use of AI-generated output; token and cost volume are silent on quality.
+Missing piece & source	Tool-native telemetry: GitHub Copilot's acceptance-rate metrics, and ChatGPT Enterprise / Claude usage analytics (thumbs-up/down, session completion), typically available via each vendor's admin or analytics API and requiring a data-engineering integration to land alongside this dataset.
+KPI it solves	Quality-Adjusted Productivity Index (QAPI) / Suggestion Acceptance Rate — protects the whole dashboard suite from mistaking token volume for real value delivered.
+Recommended visualization	Vertical bar chart comparing acceptance/usefulness rate by tool, trended monthly once sufficient history accumulates.
+ 
+Illustrative sample only — based on placeholder data, not the AI usage feed — Output Quality / Suggestion Acceptance Dashboard
+
+3.4  Net Realized Value / ROI Waterfall
+What does this mean?	Bridges AI spend against the dollar value of time saved and any downstream margin or delivery-speed benefit, to state an actual return figure rather than a cost figure alone.
+How to generate today	The current dataset provides only the cost side of this equation — spend is fully visible, but there is no benefit-side data to bridge against.
+Missing piece & source	(a) A validated fully-loaded hourly cost rate by role/region, to monetize the hours-saved figure from Section 3.1; and (b) project margin or delivery-time data from Finance/PMO, joined via Project Investment Code (already present in this dataset as a ready-made join key), typically sourced from the project financial system.
+KPI it solves	RAROI (Risk-Adjusted ROI) / Net Realized Value — the metric that ultimately justifies, or challenges, continued AI investment at board level.
+Recommended visualization	Waterfall chart — the standard form for bridging a cost baseline through discrete value and cost components to a net outcome.
+ 
+Illustrative sample only — based on placeholder data, not the AI usage feed — Net Realized Value / ROI Waterfall
+
+3.5  Headcount-Normalized Adoption %
+What does this mean?	Expresses active users as a percentage of total eligible headcount per Service Line, rather than as a raw count — 56 active users out of 420 staff (13% penetration) tells a very different story than 56 out of 70.
+How to generate today	This dataset has no denominator: active-user counts only ever answer “how many people used the tool,” never “out of how many people could have.”
+Missing piece & source	HR/roster data: total headcount by Service Line, Sub Service Line, Country, and Region, ideally with an “AI-tool-eligible” flag to exclude non-desk roles — sourced from the HRIS (e.g., Workday, SuccessFactors) via a scheduled extract, joined on Org Service Line and Country.
+KPI it solves	True Adoption Penetration % — the single highest-value enrichment identified in this review; it converts every raw-count adoption chart in Section 1 into a genuine rate metric.
+Recommended visualization	Ranked bar chart of penetration % by Service Line, with a company-average reference line overlaid.
+ 
+Illustrative sample only — based on placeholder data, not the AI usage feed — Headcount-Normalized Adoption %
+
+3.6  Shadow AI / Unsanctioned Usage Discovery
+What does this mean?	Estimates what share of total organizational AI usage happens outside the three sanctioned tools this feed reports on — a structural blind spot, since this dataset can by definition only ever describe tools that are already being monitored.
+How to generate today	Cannot be derived from this dataset under any transformation — the absence of a record is not evidence of no usage; it may equally be evidence of unmonitored usage.
+Missing piece & source	Network / CASB or DLP telemetry (e.g., Zscaler, Netskope) logging SaaS traffic to AI-tool domains organization-wide, or endpoint/browser-extension telemetry — typically owned by the Security/InfoSec team and joined at the user or device level.
+KPI it solves	Shadow AI Exposure % / Unmanaged Data-Risk Surface — a compliance and data-leakage risk metric increasingly required for AI governance audits.
+Recommended visualization	Pie or donut chart showing sanctioned vs. unsanctioned vs. unknown traffic share — one of the few cases where a pie chart is the right choice, since it is a simple two-to-three-category part-of-whole split.
+ 
+Illustrative sample only — based on placeholder data, not the AI usage feed — Shadow AI / Unsanctioned Usage Discovery
+
+
+Summary & Recommended Next Steps
+This reference distinguishes three tiers of maturity for an AI usage and cost analytics program:
+1.	Tier 1 (Section 1 & 2) — buildable today from the operations feed as received: cost, adoption, engagement, and concentration reporting.
+2.	Tier 2 (Section 3) — requires enrichment from HR, Procurement, Finance/PMO, and Security to unlock productivity, ROI, true penetration, and risk reporting.
+3.	Recommended sequencing: prioritize the HR roster join first (Section 3.5) — it is the single enrichment that upgrades every existing adoption chart in Section 1 from a raw count to a genuine rate, at comparatively low integration cost.
+Governance note: User Mail and Display Name are personally identifiable fields. Any production dashboard built on this design should hash or mask individual identifiers by default, apply a minimum group-size threshold (e.g., n ≥ 5) on all people-level visuals, and expose named individuals only within access-controlled finance or anomaly-review views.

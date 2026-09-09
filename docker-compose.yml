@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: copilot_metrics_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: copilot_metrics
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: copilot_metrics_dashboard
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgrespassword@postgres:5432/copilot_metrics?schema=public
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_ENTERPRISE_SLUG=${GITHUB_ENTERPRISE_SLUG}
+      - GITHUB_ORG_SLUG=${GITHUB_ORG_SLUG}
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:
