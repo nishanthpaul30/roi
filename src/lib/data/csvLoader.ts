@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { RAW_CSV_DATA } from './rawCsvData';
 
 export interface CsvUsageRow {
   aiTool: string;               // AI Tool Flag: chatgpt | copilot | claude
@@ -34,8 +35,12 @@ function getCsvFilePath(): string {
   ];
 
   for (const p of possiblePaths) {
-    if (fs.existsSync(/*turbopackIgnore: true*/ p)) {
-      return p;
+    try {
+      if (fs.existsSync && fs.existsSync(/*turbopackIgnore: true*/ p)) {
+        return p;
+      }
+    } catch (_err) {
+      // Ignore fs permission/absence errors in edge runtime
     }
   }
 
@@ -43,14 +48,26 @@ function getCsvFilePath(): string {
 }
 
 /**
- * Load and parse ai_usage_data.csv from the project root or public directory.
+ * Load and parse ai_usage_data.csv from the project root, public directory, or embedded string fallback.
  * Results are cached in-memory for the lifetime of the server process.
  */
 export function loadCsvData(): CsvUsageRow[] {
   if (_cache && process.env.NODE_ENV !== 'development') return _cache;
 
-  const csvPath = getCsvFilePath();
-  const raw = fs.readFileSync(/*turbopackIgnore: true*/ csvPath, 'utf-8');
+  let raw = '';
+  try {
+    const csvPath = getCsvFilePath();
+    if (fs.readFileSync) {
+      raw = fs.readFileSync(/*turbopackIgnore: true*/ csvPath, 'utf-8');
+    }
+  } catch (_err) {
+    // Cloudflare Pages / Workers Edge runtime fallback
+    raw = RAW_CSV_DATA;
+  }
+
+  if (!raw || raw.trim().length === 0) {
+    raw = RAW_CSV_DATA;
+  }
 
   const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   // Skip the header row (line 0)
