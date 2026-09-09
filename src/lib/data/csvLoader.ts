@@ -23,15 +23,34 @@ export interface CsvUsageRow {
 
 let _cache: CsvUsageRow[] | null = null;
 
+function getCsvFilePath(): string {
+  const possiblePaths = [
+    path.join(process.cwd(), 'public', 'ai_usage_data.csv'),
+    path.join(process.cwd(), 'ai_usage_data.csv'),
+    path.join(process.cwd(), '.next', 'standalone', 'public', 'ai_usage_data.csv'),
+    path.join(process.cwd(), '.next', 'standalone', 'ai_usage_data.csv'),
+    path.join(__dirname, '..', '..', '..', 'public', 'ai_usage_data.csv'),
+    path.join(__dirname, '..', '..', '..', 'ai_usage_data.csv'),
+  ];
+
+  for (const p of possiblePaths) {
+    if (fs.existsSync(/*turbopackIgnore: true*/ p)) {
+      return p;
+    }
+  }
+
+  return path.join(process.cwd(), 'public', 'ai_usage_data.csv');
+}
+
 /**
- * Load and parse ai_usage_data.csv from the project root.
+ * Load and parse ai_usage_data.csv from the project root or public directory.
  * Results are cached in-memory for the lifetime of the server process.
  */
 export function loadCsvData(): CsvUsageRow[] {
   if (_cache && process.env.NODE_ENV !== 'development') return _cache;
 
-  const csvPath = path.join(process.cwd(), 'ai_usage_data.csv');
-  const raw = fs.readFileSync(csvPath, 'utf-8');
+  const csvPath = getCsvFilePath();
+  const raw = fs.readFileSync(/*turbopackIgnore: true*/ csvPath, 'utf-8');
 
   const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   // Skip the header row (line 0)
