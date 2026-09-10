@@ -50,7 +50,7 @@ export default function RoiPage() {
           </div>
           <div className="flex items-center space-x-2 text-xs bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2 text-emerald-300 shrink-0 self-start sm:self-center">
             <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="font-mono text-[11px]">Columns: <strong>Token Consumption</strong> · <strong>Daily Billable Tokens</strong> · <strong>Cost in USD</strong></span>
+            <span className="font-mono text-[11px]">Columns: <strong>Token Consumption</strong> · <strong>Cost in USD</strong></span>
           </div>
         </div>
 
@@ -60,8 +60,8 @@ export default function RoiPage() {
           </div>
         ) : (
           <>
-            {/* Row 1: Core three CSV fields */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <KpiCard
                 title="Total Token Consumption"
                 delta={makeDelta(summary.totalTokenConsumption, summary.prevTotalTokenConsumption)}
@@ -70,25 +70,14 @@ export default function RoiPage() {
                 comparisonLabel="vs prev period"
               />
               <KpiCard
-                title="Total Billable Tokens"
-                delta={makeDelta(summary.totalBillableTokens, summary.prevTotalBillableTokens)}
-                unit="tokens"
-                description="Daily Billable Tokens column — billable quota usage"
-                comparisonLabel="vs prev period"
-              />
-              <KpiCard
-                title="Total API Cost"
+                title="Total API Spend"
                 delta={makeDelta(summary.totalCost, summary.prevTotalCost)}
                 formatType="currency"
                 description="Cost in USD column — actual billed cost"
                 comparisonLabel="vs prev period"
               />
-            </div>
-
-            {/* Row 2: Derived efficiency metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <KpiCard
-                title="Avg Daily Cost"
+                title="Avg Daily API Cost"
                 delta={data.metrics.avgDailyCost.summary}
                 formatType="currency"
                 description="Total cost ÷ unique activity days"
@@ -97,13 +86,7 @@ export default function RoiPage() {
                 title="Cost per 1K Tokens"
                 delta={data.metrics.costPer1kTokens.summary}
                 formatType="currency"
-                description="cost ÷ (billable_tokens / 1,000)"
-              />
-              <KpiCard
-                title="Billable Utilization Rate"
-                delta={data.metrics.billableUtilizationRate.summary}
-                formatType="percentage"
-                description="Daily Billable Tokens ÷ Token Consumption"
+                description="cost ÷ (token_consumption / 1,000)"
               />
             </div>
 
@@ -173,13 +156,10 @@ export default function RoiPage() {
                 {[
                   { label: 'Token Consumption (total)', value: summary.totalTokenConsumption.toLocaleString(), sub: 'tokens', color: 'text-ey-light' },
                   { label: 'Token Consumption (prev)', value: summary.prevTotalTokenConsumption.toLocaleString(), sub: 'tokens', color: 'text-ey-muted' },
-                  { label: 'Daily Billable Tokens (total)', value: summary.totalBillableTokens.toLocaleString(), sub: 'tokens', color: 'text-ey-light' },
-                  { label: 'Daily Billable Tokens (prev)', value: summary.prevTotalBillableTokens.toLocaleString(), sub: 'tokens', color: 'text-ey-muted' },
                   { label: 'Cost in USD (total)', value: `$${summary.totalCost.toLocaleString()}`, sub: 'USD', color: 'text-emerald-400' },
                   { label: 'Cost in USD (prev)', value: `$${summary.prevTotalCost.toLocaleString()}`, sub: 'USD', color: 'text-ey-muted' },
                   { label: 'Avg daily cost', value: `$${summary.avgDailyCost.toFixed(4)}`, sub: '/ active day', color: 'text-ey-light' },
                   { label: 'Cost per 1K tokens', value: `$${summary.costPer1kTokens.toFixed(6)}`, sub: '/ 1K tokens', color: 'text-ey-yellow' },
-                  { label: 'Billable utilization', value: `${summary.billableUtilizationRate.toFixed(1)}%`, sub: 'of total tokens', color: 'text-emerald-400' },
                 ].map((item) => (
                   <div key={item.label} className="bg-ey-black border border-ey-border rounded-lg p-3">
                     <p className="text-ey-muted text-[10px] mb-1 font-mono">{item.label}</p>
