@@ -23,6 +23,9 @@ export interface CsvUsageRow {
 }
 
 let _cache: CsvUsageRow[] | null = null;
+let _customOverrideRaw: string | null = null;
+let _isCustomActive: boolean = false;
+let _customFileName: string = 'ai_usage_data.csv';
 
 function getCsvFilePath(): string {
   const possiblePaths = [
@@ -47,32 +50,11 @@ function getCsvFilePath(): string {
   return path.join(process.cwd(), 'public', 'ai_usage_data.csv');
 }
 
-/**
- * Load and parse ai_usage_data.csv from the project root, public directory, or embedded string fallback.
- * Results are cached in-memory for the lifetime of the server process.
- */
-export function loadCsvData(): CsvUsageRow[] {
-  if (_cache && process.env.NODE_ENV !== 'development') return _cache;
-
-  let raw = '';
-  try {
-    const csvPath = getCsvFilePath();
-    if (fs.readFileSync) {
-      raw = fs.readFileSync(/*turbopackIgnore: true*/ csvPath, 'utf-8');
-    }
-  } catch (_err) {
-    // Cloudflare Pages / Workers Edge runtime fallback
-    raw = RAW_CSV_DATA;
-  }
-
-  if (!raw || raw.trim().length === 0) {
-    raw = RAW_CSV_DATA;
-  }
-
+export function parseRawCsvText(raw: string): CsvUsageRow[] {
   const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-  // Skip the header row (line 0)
   const rows: CsvUsageRow[] = [];
 
+  // Skip header line (0)
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(',');
     if (cols.length < 17) continue;
@@ -98,8 +80,71 @@ export function loadCsvData(): CsvUsageRow[] {
     });
   }
 
-  _cache = rows;
   return rows;
+}
+
+/**
+ * Load and parse ai_usage_data.csv from memory override, file system, or embedded string fallback.
+ * Results are cached in-memory for the lifetime of the server process.
+ */
+export function loadCsvData(): CsvUsageRow[] {
+  if (_cache && process.env.NODE_ENV !== 'development' && !_isCustomActive) return _cache;
+
+  if (_isCustomActive && _customOverrideRaw) {
+    _cache = parseRawCsvText(_customOverrideRaw);
+    return _cache;
+  }
+
+  let raw = '';
+  try {
+    const csvPath = getCsvFilePath();
+    if (fs.readFileSync) {
+      raw = fs.readFileSync(/*turbopackIgnore: true*/ csvPath, 'utf-8');
+    }
+  } catch (_err) {
+    // Cloudflare Pages / Workers Edge runtime fallback
+    raw = RAW_CSV_DATA;
+  }
+
+  if (!raw || raw.trim().length === 0) {
+    raw = RAW_CSV_DATA;
+  }
+
+  _cache = parseRawCsvText(raw);
+  return _cache;
+}
+
+/** Set custom raw CSV content dynamically */
+export function setCustomCsvData(raw: string, fileName = 'custom_uploaded.csv'): { success: boolean; rowsParsed: number } {
+  const parsed = parseRawCsvText(raw);
+  if (parsed.length === 0) {
+    return { success: false, rowsParsed: 0 };
+  }
+  _customOverrideRaw = raw;
+  _isCustomActive = true;
+  _customFileName = fileName;
+  _cache = parsed;
+  return { success: true, rowsParsed: parsed.length };
+}
+
+/** Reset to default embedded CSV dataset */
+export function resetCustomCsvData() {
+  _customOverrideRaw = null;
+  _isCustomActive = false;
+  _customFileName = 'ai_usage_data.csv';
+  _cache = null;
+}
+
+/** Get metadata about active dataset */
+export function getDatasetMetadata() {
+  const rows = loadCsvData();
+  return {
+    isCustom: _isCustomActive,
+    fileName: _customFileName,
+    rowCount: rows.length,
+    totalCost: Number(rows.reduce((sum, r) => sum + r.cost, 0).toFixed(2)),
+    totalTokens: Math.round(rows.reduce((sum, r) => sum + r.tokenConsumption, 0)),
+  };
 }
 
 /** Return distinct values for a given dimension — used to populate filter dropdowns */
@@ -117,3 +162,4 @@ export function getDistinctValues(field: keyof CsvUsageRow): string[] {
 export function clearCsvCache() {
   _cache = null;
 }
+

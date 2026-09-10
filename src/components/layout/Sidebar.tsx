@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -14,6 +15,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   BookOpen,
+  Database,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -23,6 +25,7 @@ const NAV_ITEMS = [
   { name: 'Org & Regional Analytics', href: '/dashboard/teams', icon: Building2 },
   { name: 'User Usage & Spend', href: '/dashboard/users', icon: Users },
   { name: 'Metrics Derivation Guide', href: '/dashboard/metrics-derivation', icon: BookOpen },
+  { name: 'Admin & Data Upload', href: '/dashboard/admin', icon: Database },
 ];
 
 interface SidebarProps {
@@ -40,6 +43,20 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const { logout } = useAuth();
+  const [datasetName, setDatasetName] = useState<string>('ai_usage_data.csv');
+  const [isCustom, setIsCustom] = useState<boolean>(false);
+
+  useEffect(() => {
+    fetch('/api/admin/dataset')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.fileName) {
+          setDatasetName(data.fileName);
+          setIsCustom(!!data.isCustom);
+        }
+      })
+      .catch(() => {});
+  }, [pathname]);
 
   return (
     <>
@@ -86,7 +103,7 @@ export function Sidebar({
                 </div>
                 <div className="min-w-0">
                   <h1 className="font-bold text-ey-light text-sm tracking-wide truncate">AI Usage Analytics</h1>
-                  <p className="text-xs text-ey-yellow font-semibold truncate">CSV Token & Cost Engine</p>
+                  <p className="text-xs text-ey-yellow font-semibold truncate">CSV Token &amp; Cost Engine</p>
                 </div>
               </div>
 
@@ -173,8 +190,12 @@ export function Sidebar({
           {(!isDesktopCollapsed || isMobileOpen) && (
             <div className="text-[10px] text-ey-muted flex items-center justify-between px-1">
               <span>CSV Engine</span>
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                ai_usage_data.csv
+              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium border truncate max-w-[120px] ${
+                isCustom
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                  : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+              }`}>
+                {datasetName}
               </span>
             </div>
           )}
@@ -183,3 +204,4 @@ export function Sidebar({
     </>
   );
 }
+
