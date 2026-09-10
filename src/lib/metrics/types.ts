@@ -60,7 +60,27 @@ export interface TokenCostSummary {
   prevTotalTokenConsumption: number;
   prevTotalBillableTokens: number;
   // Dimension breakdowns
-  byAiTool: { tool: string; tokens: number; cost: number }[];
+  byAiTool: {
+    tool: string;
+    tokens: number;
+    cost: number;
+    userCount: number;
+    avgCostPerUser: number;
+    costPer1kTokens: number;
+    spendSharePercent: number;
+    tokenSharePercent: number;
+  }[];
+  multiToolOverlap?: {
+    dualToolUserCount: number;
+    totalDualToolSpend: number;
+    multiToolUserList: {
+      userMail: string;
+      displayName?: string;
+      tools: string[];
+      totalCost: number;
+      totalTokens: number;
+    }[];
+  };
   byManagementRegion: { region: string; tokens: number; cost: number }[];
   byCountry: { country: string; tokens: number; cost: number }[];
   byServiceLine: { serviceLine: string; tokens: number; cost: number }[];

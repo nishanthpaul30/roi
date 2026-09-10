@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Filter, Calendar, LogOut, Bot, Globe2, BarChart3, User, RotateCcw } from 'lucide-react';
+import { Filter, Calendar, LogOut, Bot, Globe2, BarChart3, User, RotateCcw, FileText } from 'lucide-react';
 import { GlobalFilterState, ComparisonPeriod } from '@/lib/metrics/types';
 import { subDays, format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
@@ -77,7 +77,7 @@ export function GlobalFilterBar({
   ].filter(Boolean).length;
 
   return (
-    <div className="bg-ey-card border-b border-ey-border p-4 sticky top-0 z-20 shadow-md">
+    <div className="bg-ey-card border-b border-ey-border p-4 sticky top-0 z-20 shadow-md no-print">
       <div className="flex items-center justify-between gap-3 overflow-x-auto custom-scrollbar flex-nowrap whitespace-nowrap">
         {/* Date Range + Presets */}
         <div className="flex items-center gap-2 shrink-0 flex-nowrap">

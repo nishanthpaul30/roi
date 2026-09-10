@@ -54,15 +54,79 @@ export async function calculateTokenCostSummary(
   const costPer1kTokens = totalBillableTokens > 0 ? (totalCost / (totalBillableTokens / 1000)) : 0;
   const billableUtilizationRate = totalTokenConsumption > 0 ? (totalBillableTokens / totalTokenConsumption) * 100 : 0;
 
-  // By AI Tool breakdown
+  // By AI Tool breakdown with Unit Economics
   const byToolMap = groupBy(currentRows, r => r.aiTool);
   const byAiTool = Array.from(byToolMap.entries())
-    .map(([tool, rows]) => ({
-      tool,
-      tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
-      cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
-    }))
-    .sort((a, b) => b.tokens - a.tokens);
+    .map(([tool, rows]) => {
+      const tokens = rows.reduce((s, r) => s + r.tokenConsumption, 0);
+      const cost = Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4));
+      const userSet = new Set(rows.map(r => r.userMail.toLowerCase()));
+      const userCount = userSet.size;
+      const avgCostPerUser = userCount > 0 ? Number((cost / userCount).toFixed(2)) : 0;
+      const toolCostPer1k = tokens > 0 ? Number((cost / (tokens / 1000)).toFixed(6)) : 0;
+      const spendSharePercent = totalCost > 0 ? Number(((cost / totalCost) * 100).toFixed(1)) : 0;
+      const tokenSharePercent = totalTokenConsumption > 0 ? Number(((tokens / totalTokenConsumption) * 100).toFixed(1)) : 0;
+
+      return {
+        tool,
+        tokens,
+        cost,
+        userCount,
+        avgCostPerUser,
+        costPer1kTokens: toolCostPer1k,
+        spendSharePercent,
+        tokenSharePercent,
+      };
+    })
+    .sort((a, b) => b.cost - a.cost);
+
+  // Multi-Tool User Overlap Detection
+  const userToolsMap = new Map<string, { displayName: string; tools: Set<string>; spend: number; tokens: number }>();
+  for (const r of currentRows) {
+    const email = r.userMail.toLowerCase();
+    if (!userToolsMap.has(email)) {
+      userToolsMap.set(email, {
+        displayName: r.displayName || r.userMail,
+        tools: new Set(),
+        spend: 0,
+        tokens: 0,
+      });
+    }
+    const item = userToolsMap.get(email)!;
+    item.tools.add(r.aiTool);
+    item.spend += r.cost;
+    item.tokens += r.tokenConsumption;
+  }
+
+  let dualToolUserCount = 0;
+  let totalDualToolSpend = 0;
+  const multiToolUserList: {
+    userMail: string;
+    displayName?: string;
+    tools: string[];
+    totalCost: number;
+    totalTokens: number;
+  }[] = [];
+
+  for (const [email, data] of userToolsMap.entries()) {
+    if (data.tools.size > 1) {
+      dualToolUserCount++;
+      totalDualToolSpend += data.spend;
+      multiToolUserList.push({
+        userMail: email,
+        displayName: data.displayName,
+        tools: Array.from(data.tools),
+        totalCost: Number(data.spend.toFixed(2)),
+        totalTokens: Math.round(data.tokens),
+      });
+    }
+  }
+
+  const multiToolOverlap = {
+    dualToolUserCount,
+    totalDualToolSpend: Number(totalDualToolSpend.toFixed(2)),
+    multiToolUserList: multiToolUserList.sort((a, b) => b.totalCost - a.totalCost),
+  };
 
   // By Management Region breakdown
   const byRegionMap = groupBy(currentRows, r => r.managementRegion);
@@ -116,6 +180,7 @@ export async function calculateTokenCostSummary(
     prevTotalTokenConsumption: Math.round(prevTotalTokenConsumption),
     prevTotalBillableTokens: Math.round(prevTotalBillableTokens),
     byAiTool,
+    multiToolOverlap,
     byManagementRegion,
     byCountry,
     byServiceLine,

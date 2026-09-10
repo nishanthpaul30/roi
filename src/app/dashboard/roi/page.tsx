@@ -5,7 +5,9 @@ import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { KpiCard } from '@/components/ui/KpiCard';
 import { MetricChart } from '@/components/ui/MetricChart';
 import { DataTable } from '@/components/ui/DataTable';
-import { Coins, Zap, ShieldCheck } from 'lucide-react';
+import { MultiToolComparisonPanel } from '@/components/ui/MultiToolComparisonPanel';
+import { ExecutivePrintTemplate } from '@/components/reports/ExecutivePrintTemplate';
+import { Coins, Zap, ShieldCheck, Printer } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
 
 const TOOL_LABELS: Record<string, string> = {
@@ -32,7 +34,7 @@ export default function RoiPage() {
     <div className="flex-1 flex flex-col">
       <GlobalFilterBar filters={filters} onFilterChange={setFilters} filterOptions={data?.filterOptions} />
 
-      <main className="p-6 space-y-6 max-w-7xl mx-auto w-full">
+      <main className="p-6 space-y-6 max-w-7xl mx-auto w-full no-print">
         {/* Header Title Block */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-ey-card/50 border border-ey-border rounded-xl p-4 shadow-sm">
           <div className="flex items-center space-x-3">
@@ -48,9 +50,21 @@ export default function RoiPage() {
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-2 text-xs bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2 text-emerald-300 shrink-0 self-start sm:self-center">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="font-mono text-[11px]">Columns: <strong>Token Consumption</strong> · <strong>Cost in USD</strong></span>
+
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center space-x-2 px-4 py-2 bg-ey-yellow text-ey-black font-bold text-xs rounded-xl shadow-lg shadow-yellow-500/10 hover:bg-yellow-400 transition-all duration-150 shrink-0"
+              title="Open System Print Window to Print or Save as PDF"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Print / Save as PDF</span>
+            </button>
+
+            <div className="hidden md:flex items-center space-x-2 text-xs bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2 text-emerald-300 shrink-0">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="font-mono text-[11px]">Columns: <strong>Token Consumption</strong> · <strong>Cost in USD</strong></span>
+            </div>
           </div>
         </div>
 
@@ -107,6 +121,9 @@ export default function RoiPage() {
                 series={[{ key: 'value', name: 'Token Consumption', color: '#6366f1' }]}
               />
             </div>
+
+            {/* Multi-Tool Spend & Efficiency Comparison (ChatGPT vs Copilot vs Claude) */}
+            <MultiToolComparisonPanel summary={summary} />
 
             {/* Top Users Table */}
             {summary.topUsers?.length > 0 && (
@@ -172,6 +189,9 @@ export default function RoiPage() {
           </>
         )}
       </main>
+
+      {/* Clean PDF/Print Executive Report Template (Hidden on screen, active on print) */}
+      <ExecutivePrintTemplate data={data} filters={filters} />
     </div>
   );
 }
