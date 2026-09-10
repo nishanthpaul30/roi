@@ -52,14 +52,14 @@ export default function RoiPage() {
           </div>
 
           <div className="flex items-center space-x-3">
-            <button
+            {/* <button
               onClick={() => window.print()}
               className="flex items-center space-x-2 px-4 py-2 bg-ey-yellow text-ey-black font-bold text-xs rounded-xl shadow-lg shadow-yellow-500/10 hover:bg-yellow-400 transition-all duration-150 shrink-0"
               title="Open System Print Window to Print or Save as PDF"
             >
               <Printer className="w-4 h-4" />
               <span>Print / Save as PDF</span>
-            </button>
+            </button> */}
 
             <div className="hidden md:flex items-center space-x-2 text-xs bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2 text-emerald-300 shrink-0">
               <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
