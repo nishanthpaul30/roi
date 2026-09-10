@@ -48,6 +48,7 @@ const TOOL_CONFIG: Record<
 };
 
 export function MultiToolComparisonPanel({ summary }: MultiToolComparisonPanelProps) {
+  const [isExpanded, setIsExpanded] = useState(true);
   const [showOverlapUsers, setShowOverlapUsers] = useState(false);
 
   if (!summary || !summary.byAiTool || summary.byAiTool.length === 0) {
@@ -60,35 +61,47 @@ export function MultiToolComparisonPanel({ summary }: MultiToolComparisonPanelPr
   const minCostPer1k = Math.min(...byAiTool.map((t) => t.costPer1kTokens || 0));
 
   return (
-    <div className="bg-ey-card border border-ey-border rounded-xl p-6 shadow-lg space-y-6">
+    <div className="bg-ey-card border border-ey-border rounded-xl p-5 shadow-lg space-y-4">
       {/* Panel Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-ey-border/60 pb-4">
+      <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${isExpanded ? 'border-b border-ey-border/60 pb-3' : ''}`}>
         <div className="flex items-center space-x-3">
-          <div className="p-2.5 bg-ey-yellow/15 border border-ey-yellow/30 rounded-xl text-ey-yellow shrink-0">
+          <div className="p-2 bg-ey-yellow/20 border border-ey-yellow/40 rounded-lg text-ey-yellow shrink-0 flex items-center justify-center">
             <Layers className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center space-x-2">
-              <h2 className="text-lg font-bold text-ey-light tracking-tight">
-                Multi-Tool Spend &amp; Efficiency Comparison
-              </h2>
-              <span className="px-2 py-0.5 text-[10px] font-semibold bg-ey-yellow/10 text-ey-yellow border border-ey-yellow/30 rounded-full font-mono">
+            <h2 className="text-base font-bold text-ey-light tracking-tight flex items-center gap-2">
+              <span>Multi-Tool Spend &amp; Efficiency Comparison</span>
+              <span className="px-2 py-0.5 text-[10px] font-semibold bg-ey-yellow/10 text-ey-yellow border border-ey-yellow/30 rounded-full font-mono hidden md:inline-block">
                 ChatGPT vs Copilot vs Claude
               </span>
-            </div>
+            </h2>
             <p className="text-xs text-ey-muted mt-0.5">
               Unit economics, user spend density, token cost efficiency ($/1K tokens), and seat overlap detection.
             </p>
           </div>
         </div>
 
-        {/* Quick summary tag */}
-        <div className="flex items-center space-x-3 text-xs font-mono bg-ey-black border border-ey-border rounded-lg px-3 py-2 shrink-0">
-          <Cpu className="w-4 h-4 text-ey-yellow" />
-          <span className="text-ey-muted">Active Platforms:</span>
-          <span className="text-ey-light font-bold">{byAiTool.length} AI Tools</span>
+        {/* Quick summary tag & Collapse Toggle */}
+        <div className="flex items-center space-x-3 shrink-0 self-start sm:self-center">
+          <div className="hidden sm:flex items-center space-x-1.5 bg-ey-black/60 border border-ey-border px-2.5 py-1.5 rounded-lg text-xs font-mono">
+            <Cpu className="w-3.5 h-3.5 text-ey-yellow" />
+            <span className="text-ey-muted">Platforms:</span>
+            <span className="text-ey-light font-bold">{byAiTool.length}</span>
+          </div>
+
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center space-x-1.5 text-xs font-semibold text-ey-yellow hover:text-ey-light bg-ey-black/60 border border-ey-border px-3 py-1.5 rounded-lg transition shrink-0"
+            title={isExpanded ? "Collapse insights" : "Expand insights"}
+          >
+            <span>{isExpanded ? 'Collapse Insights' : 'Expand Insights'}</span>
+            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
         </div>
       </div>
+
+      {isExpanded && (
+        <>
 
       {/* Tool Comparison Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -363,6 +376,8 @@ export function MultiToolComparisonPanel({ summary }: MultiToolComparisonPanelPr
             )}
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
