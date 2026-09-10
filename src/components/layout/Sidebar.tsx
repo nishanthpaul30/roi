@@ -64,7 +64,7 @@ export function Sidebar({
             /* Collapsed Header layout (Desktop) */
             <div className="hidden lg:flex flex-col items-center justify-center p-3 space-y-2">
               <div
-                title="Copilot Analytics"
+                title="AI Usage Analytics"
                 className="p-2 bg-ey-yellow rounded-lg text-ey-black shadow-lg shadow-yellow-500/10 shrink-0"
               >
                 <Zap className="w-5 h-5 fill-current" />
@@ -85,7 +85,7 @@ export function Sidebar({
                   <Zap className="w-5 h-5 fill-current" />
                 </div>
                 <div className="min-w-0">
-                  <h1 className="font-bold text-ey-light text-sm tracking-wide truncate">Copilot Analytics</h1>
+                  <h1 className="font-bold text-ey-light text-sm tracking-wide truncate">AI Usage Analytics</h1>
                   <p className="text-xs text-ey-yellow font-semibold truncate">CSV Token & Cost Engine</p>
                 </div>
               </div>

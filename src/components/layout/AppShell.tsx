@@ -5,13 +5,22 @@ import { usePathname } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { useAuth } from '@/context/AuthContext';
 import { Zap, Menu } from 'lucide-react';
+import { OnboardingModal } from '@/components/ui/OnboardingModal';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isAuthenticated, loading } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const isLoginPage = pathname === '/login';
+
+  // Show modal on every fresh login (state resets on re-mount / logout)
+  useEffect(() => {
+    if (isAuthenticated && !loading) {
+      setShowOnboarding(true);
+    }
+  }, [isAuthenticated, loading]);
 
   // Automatically close mobile menu on route changes
   useEffect(() => {
@@ -24,7 +33,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="p-3 bg-ey-yellow rounded-xl text-ey-black animate-bounce shadow-lg shadow-yellow-500/20">
           <Zap className="w-8 h-8 fill-current" />
         </div>
-        <p className="text-ey-muted text-xs tracking-wide">Authenticating Copilot Analytics...</p>
+        <p className="text-ey-muted text-xs tracking-wide">Authenticating AI Analytics...</p>
       </div>
     );
   }
@@ -60,7 +69,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="p-1.5 bg-ey-yellow rounded-md text-ey-black shadow-md shadow-yellow-500/10">
                 <Zap className="w-4 h-4 fill-current" />
               </div>
-              <span className="font-bold text-xs tracking-wide text-ey-light">Copilot Analytics</span>
+              <span className="font-bold text-xs tracking-wide text-ey-light">AI Analytics</span>
             </div>
           </div>
           <span className="text-[10px] text-ey-yellow font-semibold px-2 py-0.5 rounded bg-ey-yellow/10 border border-ey-yellow/20">
@@ -72,6 +81,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      {/* Onboarding modal — shown after every login */}
+      {showOnboarding && (
+        <OnboardingModal onClose={() => setShowOnboarding(false)} />
+      )}
     </div>
   );
 }
