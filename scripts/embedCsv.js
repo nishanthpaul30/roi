@@ -12,7 +12,10 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const CSV_PATH = path.join(ROOT, 'ai_usage_data.csv');
+let CSV_PATH = path.join(ROOT, 'ai_usage_data.csv');
+if (!fs.existsSync(CSV_PATH)) {
+  CSV_PATH = path.join(ROOT, 'public', 'ai_usage_data.csv');
+}
 const OUT_PATH = path.join(ROOT, 'src', 'lib', 'data', 'rawCsvData.ts');
 
 if (!fs.existsSync(CSV_PATH)) {

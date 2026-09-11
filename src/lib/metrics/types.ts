@@ -85,4 +85,23 @@ export interface TokenCostSummary {
   byCountry: { country: string; tokens: number; cost: number }[];
   byServiceLine: { serviceLine: string; tokens: number; cost: number }[];
   topUsers: { displayName: string; userMail: string; tokens: number; cost: number; aiTools?: string[] }[];
+  // Financial ROI Governance & Capacity Waste metrics
+  totalWasteCost: number;
+  totalOverageCost: number;
+  licenseEfficiencyRate: number;
+  ceilingRiskCount: number;
+  userCapacityBreakdown: UserCapacityRow[];
+}
+
+export interface UserCapacityRow {
+  userMail: string;
+  displayName: string;
+  aiTools: string[];
+  actualCost: number;
+  usageLimit: number;
+  wasteCost: number;
+  overageCost: number;
+  tokenConsumption: number;
+  ceilingPercent: number;
+  zone: 'zone1_under' | 'zone2_over' | 'zone_balanced';
 }

@@ -20,6 +20,9 @@ export interface CsvUsageRow {
   region: string;               // Region: Middle East, ANZ, Europe, etc.
   managementRegion: string;     // Management Region: EMEA | APAC | Americas
   projectCode: string;          // Project Investment Code: PRJ-XXX-XXXX
+  licenseCost: number;          // License Cost in USD
+  usageLimit: number;           // Usage Limit in USD
+  extraUsage: number;           // Extra Usage in USD
 }
 
 let _cache: CsvUsageRow[] | null = null;
@@ -77,6 +80,9 @@ export function parseRawCsvText(raw: string): CsvUsageRow[] {
       region: cols[14].trim(),
       managementRegion: cols[15].trim(),
       projectCode: cols[16].trim(),
+      licenseCost: cols.length >= 18 ? (parseFloat(cols[17].trim()) || 100.0) : 100.0,
+      usageLimit: cols.length >= 19 ? (parseFloat(cols[18].trim()) || 80.0) : 80.0,
+      extraUsage: cols.length >= 20 ? (parseFloat(cols[19].trim()) || 0.0) : 0.0,
     });
   }
 

@@ -173,6 +173,64 @@ export async function calculateTokenCostSummary(
     })
     .sort((a, b) => b.tokens - a.tokens);
 
+  // Users capacity & waste breakdown
+  const DEFAULT_USER_USAGE_LIMIT = 80.0; // Default $80 usage limit per license period
+  const HARD_TOKEN_CEILING = 100000; // Hard cap per user
+
+  let totalWasteCost = 0;
+  let totalOverageCost = 0;
+  let totalUsageLimitsSum = 0;
+  let ceilingRiskCount = 0;
+
+  const userCapacityBreakdown = Array.from(byUserMap.entries()).map(([userMail, rows]) => {
+    const displayName = rows[0].displayName || userMail;
+    const toolsSet = new Set(rows.map(r => r.aiTool).filter(Boolean));
+    const aiTools = Array.from(toolsSet);
+    const actualCost = Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4));
+    const tokenConsumption = Math.round(rows.reduce((s, r) => s + r.tokenConsumption, 0));
+    
+    // Usage limit (reads directly from CSV row field or default $80 allocation)
+    const usageLimit = rows[0]?.usageLimit ? rows[0].usageLimit : DEFAULT_USER_USAGE_LIMIT;
+    const rowExtraUsageSum = rows.reduce((s, r) => s + (r.extraUsage || 0), 0);
+    totalUsageLimitsSum += usageLimit;
+
+    let wasteCost = 0;
+    let overageCost = 0;
+    let zone: 'zone1_under' | 'zone2_over' | 'zone_balanced' = 'zone_balanced';
+
+    if (actualCost < usageLimit) {
+      wasteCost = Number((usageLimit - actualCost).toFixed(4));
+      zone = 'zone1_under';
+      totalWasteCost += wasteCost;
+    } else if (actualCost > usageLimit || rowExtraUsageSum > 0) {
+      overageCost = Number((Math.max(actualCost - usageLimit, rowExtraUsageSum)).toFixed(4));
+      zone = 'zone2_over';
+      totalOverageCost += overageCost;
+    }
+
+    const ceilingPercent = Number(((tokenConsumption / HARD_TOKEN_CEILING) * 100).toFixed(1));
+    if (tokenConsumption >= 90000) {
+      ceilingRiskCount++;
+    }
+
+    return {
+      userMail,
+      displayName,
+      aiTools,
+      actualCost,
+      usageLimit,
+      wasteCost,
+      overageCost,
+      tokenConsumption,
+      ceilingPercent,
+      zone,
+    };
+  }).sort((a, b) => b.wasteCost - a.wasteCost || b.actualCost - a.actualCost);
+
+  const licenseEfficiencyRate = totalUsageLimitsSum > 0
+    ? Number(((totalCost / totalUsageLimitsSum) * 100).toFixed(1))
+    : 0;
+
   return {
     totalTokenConsumption: Math.round(totalTokenConsumption),
     totalBillableTokens: Math.round(totalBillableTokens),
@@ -189,5 +247,10 @@ export async function calculateTokenCostSummary(
     byCountry,
     byServiceLine,
     topUsers,
+    totalWasteCost: Number(totalWasteCost.toFixed(2)),
+    totalOverageCost: Number(totalOverageCost.toFixed(2)),
+    licenseEfficiencyRate,
+    ceilingRiskCount,
+    userCapacityBreakdown,
   };
 }
