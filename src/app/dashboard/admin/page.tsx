@@ -273,7 +273,7 @@ claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/0
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          {/* <button
             onClick={handleDownloadActiveDataset}
             className="flex items-center space-x-1.5 text-xs font-semibold px-3 py-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-lg hover:bg-emerald-500/25 transition-colors shadow-sm"
             title="Download Active Source CSV File"
@@ -289,7 +289,7 @@ claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/0
           >
             <Download className="w-4 h-4" />
             <span>Download CSV Template</span>
-          </button>
+          </button> */}
 
           <button
             onClick={() => setShowSchemaHelp(!showSchemaHelp)}
@@ -388,11 +388,10 @@ claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/0
       {/* Notifications */}
       {statusMessage && (
         <div
-          className={`p-4 rounded-xl border flex items-center space-x-3 text-xs font-medium ${
-            statusMessage.type === 'success'
+          className={`p-4 rounded-xl border flex items-center space-x-3 text-xs font-medium ${statusMessage.type === 'success'
               ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
               : 'bg-red-500/15 border-red-500/30 text-red-300'
-          }`}
+            }`}
         >
           {statusMessage.type === 'success' ? (
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
@@ -423,17 +422,15 @@ claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/0
           <div className="flex items-center bg-ey-black/50 border border-ey-border p-1 rounded-lg">
             <button
               onClick={() => setActiveTab('upload')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                activeTab === 'upload' ? 'bg-ey-yellow text-ey-black font-semibold' : 'text-ey-muted hover:text-ey-light'
-              }`}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${activeTab === 'upload' ? 'bg-ey-yellow text-ey-black font-semibold' : 'text-ey-muted hover:text-ey-light'
+                }`}
             >
               Upload File
             </button>
             <button
               onClick={() => setActiveTab('paste')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                activeTab === 'paste' ? 'bg-ey-yellow text-ey-black font-semibold' : 'text-ey-muted hover:text-ey-light'
-              }`}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${activeTab === 'paste' ? 'bg-ey-yellow text-ey-black font-semibold' : 'text-ey-muted hover:text-ey-light'
+                }`}
             >
               Paste CSV
             </button>
