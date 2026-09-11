@@ -123,7 +123,7 @@ export default function RoiPage() {
             </div>
 
             {/* Top Users Table */}
-            {summary.topUsers?.length > 0 && (
+            {/* {summary.topUsers?.length > 0 && (
               <DataTable
                 title="Top Users by Token Consumption"
                 data={summary.topUsers.map((u) => ({
@@ -139,7 +139,7 @@ export default function RoiPage() {
                   { header: 'Cost (USD)', accessorKey: 'cost' },
                 ]}
               />
-            )}
+            )} */}
 
             {/* AI Tool Breakdown */}
             {summary.byAiTool?.length > 0 && (
