@@ -35,8 +35,7 @@ const REQUIRED_HEADERS = [
   'Management Region',
   'Project Investment Code',
   'License Cost in USD',
-  'Usage Limit in USD',
-  'Extra Usage in USD',
+  'Usage Free Token Limit',
 ];
 
 interface DatasetMeta {
@@ -81,10 +80,10 @@ export default function AdminPage() {
   }, []);
 
   const handleDownloadTemplate = () => {
-    const templateCsv = `AI Tool Flag,User Mail,Display Name,Activity Date,Month_Year,Month Id,Period Start Date,Period End Date,Token Consumption,Daily Billable Tokens,Cost in USD,Org Service Line,Org Sub Service Line,Country,Region,Management Region,Project Investment Code,License Cost in USD,Usage Limit in USD,Extra Usage in USD
-copilot,john.doe@enterprise-corp.com,John Doe,2026-03-01,March_2026,202603,01/03/2026,31/03/2026,25000,25000,0.35,Consulting,Strategy,United States,North America,Americas,PRJ-CNS-1234,100.00,80.00,0.0000
-chatgpt,jane.smith@enterprise-corp.com,Jane Smith,2026-03-02,March_2026,202603,01/03/2026,31/03/2026,42000,42000,0.65,Technology,Data & AI,United Kingdom,Europe,EMEA,PRJ-TCH-5678,100.00,80.00,0.0000
-claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/03/2026,31/03/2026,18000,18000,0.28,Financial Services,Banking,Singapore,Southeast Asia,APAC,PRJ-FIN-9012,100.00,80.00,0.0000`;
+    const templateCsv = `AI Tool Flag,User Mail,Display Name,Activity Date,Month_Year,Month Id,Period Start Date,Period End Date,Token Consumption,Daily Billable Tokens,Cost in USD,Org Service Line,Org Sub Service Line,Country,Region,Management Region,Project Investment Code,License Cost in USD,Usage Free Token Limit
+copilot,john.doe@enterprise-corp.com,John Doe,2026-03-01,March_2026,202603,01/03/2026,31/03/2026,25000,25000,0.35,Consulting,Strategy,United States,North America,Americas,PRJ-CNS-1234,100.00,80.00
+chatgpt,jane.smith@enterprise-corp.com,Jane Smith,2026-03-02,March_2026,202603,01/03/2026,31/03/2026,42000,42000,0.65,Technology,Data & AI,United Kingdom,Europe,EMEA,PRJ-TCH-5678,100.00,80.00
+claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/03/2026,31/03/2026,18000,18000,0.28,Financial Services,Banking,Singapore,Southeast Asia,APAC,PRJ-FIN-9012,100.00,80.00`;
 
     const blob = new Blob([templateCsv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -273,23 +272,7 @@ claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/0
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* <button
-            onClick={handleDownloadActiveDataset}
-            className="flex items-center space-x-1.5 text-xs font-semibold px-3 py-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-lg hover:bg-emerald-500/25 transition-colors shadow-sm"
-            title="Download Active Source CSV File"
-          >
-            <Download className="w-4 h-4" />
-            <span>Download Active Data Source CSV</span>
-          </button>
 
-          <button
-            onClick={handleDownloadTemplate}
-            className="flex items-center space-x-1.5 text-xs font-semibold px-3 py-2 bg-ey-yellow/15 border border-ey-yellow/30 text-ey-yellow rounded-lg hover:bg-ey-yellow/25 transition-colors"
-            title="Download Blank CSV Schema Template"
-          >
-            <Download className="w-4 h-4" />
-            <span>Download CSV Template</span>
-          </button> */}
 
           <button
             onClick={() => setShowSchemaHelp(!showSchemaHelp)}
@@ -389,8 +372,8 @@ claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/0
       {statusMessage && (
         <div
           className={`p-4 rounded-xl border flex items-center space-x-3 text-xs font-medium ${statusMessage.type === 'success'
-              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
-              : 'bg-red-500/15 border-red-500/30 text-red-300'
+            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+            : 'bg-red-500/15 border-red-500/30 text-red-300'
             }`}
         >
           {statusMessage.type === 'success' ? (

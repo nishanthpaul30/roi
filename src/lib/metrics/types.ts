@@ -99,6 +99,7 @@ export interface UserCapacityRow {
   displayName: string;
   aiTools: string[];
   actualCost: number;
+  usageFreeTokenLimit: number;
   usageLimit: number;
   wasteCost: number;
   overageCost: number;

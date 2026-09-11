@@ -189,9 +189,9 @@ export async function calculateTokenCostSummary(
     const actualCost = Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4));
     const tokenConsumption = Math.round(rows.reduce((s, r) => s + r.tokenConsumption, 0));
     
-    // Usage limit (reads directly from CSV row field or default $80 allocation)
-    const usageLimit = rows[0]?.usageLimit ? rows[0].usageLimit : DEFAULT_USER_USAGE_LIMIT;
-    const rowExtraUsageSum = rows.reduce((s, r) => s + (r.extraUsage || 0), 0);
+    // Usage free token limit (reads directly from CSV row field or default allocation)
+    const usageFreeTokenLimit = rows[0]?.usageFreeTokenLimit ? rows[0].usageFreeTokenLimit : (rows[0]?.usageLimit ? rows[0].usageLimit : DEFAULT_USER_USAGE_LIMIT);
+    const usageLimit = usageFreeTokenLimit;
     totalUsageLimitsSum += usageLimit;
 
     let wasteCost = 0;
@@ -202,8 +202,8 @@ export async function calculateTokenCostSummary(
       wasteCost = Number((usageLimit - actualCost).toFixed(4));
       zone = 'zone1_under';
       totalWasteCost += wasteCost;
-    } else if (actualCost > usageLimit || rowExtraUsageSum > 0) {
-      overageCost = Number((Math.max(actualCost - usageLimit, rowExtraUsageSum)).toFixed(4));
+    } else if (actualCost > usageLimit) {
+      overageCost = Number((actualCost - usageLimit).toFixed(4));
       zone = 'zone2_over';
       totalOverageCost += overageCost;
     }
@@ -218,6 +218,7 @@ export async function calculateTokenCostSummary(
       displayName,
       aiTools,
       actualCost,
+      usageFreeTokenLimit,
       usageLimit,
       wasteCost,
       overageCost,

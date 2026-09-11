@@ -175,7 +175,7 @@ export function RoiCapacityPanel({
                 <th className="px-4 py-3">User &amp; Email</th>
                 <th className="px-4 py-3">AI Tools</th>
                 <th className="px-4 py-3 text-right">Actual Cost ($)</th>
-                <th className="px-4 py-3 text-right">Usage Limit ($)</th>
+                <th className="px-4 py-3 text-right">Free Limit ($)</th>
                 <th className="px-4 py-3 text-right">Wasted Capacity</th>
                 <th className="px-4 py-3 text-right">Overage Fee</th>
                 <th className="px-4 py-3 text-center">100K Cap Proximity</th>
