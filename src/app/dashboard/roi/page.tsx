@@ -6,6 +6,7 @@ import { KpiCard } from '@/components/ui/KpiCard';
 import { MetricChart } from '@/components/ui/MetricChart';
 import { DataTable } from '@/components/ui/DataTable';
 import { RoiCapacityPanel } from '@/components/ui/RoiCapacityPanel';
+import { ProjectBillabilityPanel } from '@/components/ui/ProjectBillabilityPanel';
 import { ExecutivePrintTemplate } from '@/components/reports/ExecutivePrintTemplate';
 import { Coins, ShieldCheck, Zap } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
@@ -120,6 +121,9 @@ export default function RoiPage() {
               licenseEfficiencyRate={summary.licenseEfficiencyRate}
               ceilingRiskCount={summary.ceilingRiskCount}
             />
+
+            {/* Project Code Telemetry & Billability Panel */}
+            <ProjectBillabilityPanel summary={summary} />
 
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

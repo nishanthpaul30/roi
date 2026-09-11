@@ -1,6 +1,4 @@
-'use client';
-
-import { TrendingUp, TrendingDown, Minus, Info } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Info, ArrowUpRight } from 'lucide-react';
 import { MetricDelta } from '@/lib/metrics/types';
 
 interface KpiCardProps {
@@ -10,6 +8,7 @@ interface KpiCardProps {
   formatType?: 'number' | 'percentage' | 'currency' | 'duration';
   description?: string;
   comparisonLabel?: string;
+  onClick?: () => void;
 }
 
 export function KpiCard({
@@ -19,7 +18,10 @@ export function KpiCard({
   formatType = 'number',
   description,
   comparisonLabel = 'vs prev period',
+  onClick,
 }: KpiCardProps) {
+  if (!delta) return null;
+
   const { current, previous, absoluteDelta, percentageDelta, percentagePointDelta, trend, isRateMetric } = delta;
 
   const formatVal = (val: number) => {
@@ -33,14 +35,23 @@ export function KpiCard({
   const isNegativeTrend = trend === 'down';
 
   return (
-    <div className="bg-ey-card border border-ey-border rounded-xl p-5 shadow-sm hover:border-ey-yellow/40 transition duration-200 flex flex-col justify-between">
+    <div
+      onClick={onClick}
+      className={`bg-ey-card border border-ey-border rounded-xl p-5 shadow-sm transition-all duration-200 flex flex-col justify-between group ${
+        onClick ? 'cursor-pointer hover:border-ey-yellow/60 hover:shadow-lg hover:shadow-yellow-500/5 active:scale-[0.99]' : ''
+      }`}
+    >
       {/* Title & Info Header */}
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-ey-muted">{title}</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-ey-muted group-hover:text-ey-yellow transition-colors flex items-center gap-1.5">
+          <span>{title}</span>
+          {onClick && <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow" />}
+        </span>
+
         {description && (
-          <div className="group relative cursor-pointer">
+          <div className="group/info relative cursor-pointer" onClick={(e) => e.stopPropagation()}>
             <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
-            <div className="absolute right-0 top-6 hidden group-hover:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50">
+            <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50">
               {description}
             </div>
           </div>
@@ -49,7 +60,7 @@ export function KpiCard({
 
       {/* Main KPI Value */}
       <div className="my-1 flex items-baseline justify-between">
-        <span className="text-2xl lg:text-3xl font-extrabold text-ey-light tracking-tight">
+        <span className="text-2xl lg:text-3xl font-extrabold text-ey-light tracking-tight group-hover:text-white transition-colors">
           {formatVal(current)} {unit && <span className="text-sm font-normal text-ey-muted">{unit}</span>}
         </span>
 
@@ -83,12 +94,13 @@ export function KpiCard({
         <div>
           Prev: <span className="font-medium text-ey-light">{formatVal(previous)}</span>
         </div>
-        <div className="text-ey-muted">
-          Delta:{' '}
-          <span className={`font-semibold ${absoluteDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {absoluteDelta > 0 ? `+${formatVal(absoluteDelta)}` : formatVal(absoluteDelta)}
-          </span>{' '}
-          <span className="text-[10px] text-ey-muted">({comparisonLabel})</span>
+        <div className="flex items-center space-x-2">
+          <span>
+            Delta:{' '}
+            <span className={`font-semibold ${absoluteDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {absoluteDelta > 0 ? `+${formatVal(absoluteDelta)}` : formatVal(absoluteDelta)}
+            </span>
+          </span>
         </div>
       </div>
     </div>

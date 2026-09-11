@@ -36,6 +36,9 @@ const REQUIRED_HEADERS = [
   'Project Investment Code',
   'License Cost in USD',
   'Usage Free Token Limit',
+  'Billable/Non-Billable',
+  'ProjectType',
+  'ProjectCode',
 ];
 
 interface DatasetMeta {
@@ -80,10 +83,10 @@ export default function AdminPage() {
   }, []);
 
   const handleDownloadTemplate = () => {
-    const templateCsv = `AI Tool Flag,User Mail,Display Name,Activity Date,Month_Year,Month Id,Period Start Date,Period End Date,Token Consumption,Daily Billable Tokens,Cost in USD,Org Service Line,Org Sub Service Line,Country,Region,Management Region,Project Investment Code,License Cost in USD,Usage Free Token Limit
-copilot,john.doe@enterprise-corp.com,John Doe,2026-03-01,March_2026,202603,01/03/2026,31/03/2026,25000,25000,0.35,Consulting,Strategy,United States,North America,Americas,PRJ-CNS-1234,100.00,80.00
-chatgpt,jane.smith@enterprise-corp.com,Jane Smith,2026-03-02,March_2026,202603,01/03/2026,31/03/2026,42000,42000,0.65,CBS,Data & AI,United Kingdom,Europe,EMEA,PRJ-TCH-5678,100.00,80.00
-claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/03/2026,31/03/2026,18000,18000,0.28,Assurance,Banking,Singapore,Southeast Asia,APAC,PRJ-FIN-9012,100.00,80.00`;
+    const templateCsv = `AI Tool Flag,User Mail,Display Name,Activity Date,Month_Year,Month Id,Period Start Date,Period End Date,Token Consumption,Daily Billable Tokens,Cost in USD,Org Service Line,Org Sub Service Line,Country,Region,Management Region,Project Investment Code,License Cost in USD,Usage Free Token Limit,Billable/Non-Billable,ProjectType,ProjectCode
+copilot,john.doe@enterprise-corp.com,John Doe,2026-03-01,March_2026,202603,01/03/2026,31/03/2026,25000,25000,0.35,Consulting,Strategy,United States,North America,Americas,PRJ-CNS-1234,100.00,80.00,True,External,E-481920
+chatgpt,jane.smith@enterprise-corp.com,Jane Smith,2026-03-02,March_2026,202603,01/03/2026,31/03/2026,42000,42000,0.65,CBS,Data & AI,United Kingdom,Europe,EMEA,PRJ-TCH-5678,100.00,80.00,True,External,E-719302
+claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/03/2026,31/03/2026,18000,18000,0.28,Assurance,Reporting,Singapore,Southeast Asia,APAC,PRJ-FIN-9012,100.00,80.00,False,Internal,I-304918`;
 
     const blob = new Blob([templateCsv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

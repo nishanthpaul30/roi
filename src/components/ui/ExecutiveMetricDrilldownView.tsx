@@ -1,0 +1,654 @@
+'use client';
+
+import { useState, useMemo, useEffect } from 'react';
+import {
+  ArrowLeft,
+  Zap,
+  DollarSign,
+  Users,
+  Coins,
+  Building2,
+  Globe2,
+  Layers,
+  ShieldCheck,
+  FolderKanban,
+  CheckCircle2,
+  AlertCircle,
+  Briefcase,
+  Search,
+  ChevronRight,
+  Filter,
+  FileSpreadsheet,
+  ArrowUpRight,
+  Database,
+  Calendar,
+  X,
+} from 'lucide-react';
+import { MetricChart } from '@/components/ui/MetricChart';
+import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
+import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
+
+interface SubDrilldownState {
+  type: 'tool' | 'service_line' | 'region' | 'project_code' | 'user';
+  id: string;
+  name: string;
+  subtitle?: string;
+}
+
+interface ExecutiveMetricDrilldownViewProps {
+  data: DrilldownMetricData;
+  onBack: () => void;
+}
+
+export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDrilldownViewProps) {
+  const { id, title, subtitle, currentValue, deltaText, trend, series, summaryData } = data;
+
+  // Level 3 Deep-Dive Sub-Drilldown State
+  const [subDrilldown, setSubDrilldown] = useState<SubDrilldownState | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [inspectingRow, setInspectingRow] = useState<CsvUsageRow | null>(null);
+
+  // Listen for Escape key to go back intuitively
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (inspectingRow) {
+          setInspectingRow(null);
+        } else if (subDrilldown) {
+          setSubDrilldown(null);
+          setSearchTerm('');
+          setCurrentPage(1);
+        } else {
+          onBack();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [inspectingRow, subDrilldown, onBack]);
+
+  // Load all CSV rows synchronously from memory for Level 3 filtering
+  const allRows = useMemo(() => {
+    try {
+      return loadCsvData();
+    } catch (_err) {
+      return [];
+    }
+  }, []);
+
+  // Filter raw rows for Level 3 Granular Record View
+  const granularRows = useMemo(() => {
+    if (!subDrilldown) return [];
+    const { type, name } = subDrilldown;
+    const lowerName = name.toLowerCase();
+
+    return allRows.filter((r) => {
+      if (type === 'tool') return r.aiTool.toLowerCase() === lowerName;
+      if (type === 'service_line') return r.orgServiceLine.toLowerCase() === lowerName;
+      if (type === 'region') return r.managementRegion.toLowerCase() === lowerName;
+      if (type === 'project_code') return (r.projectCode || '').toLowerCase() === lowerName;
+      if (type === 'user') return r.userMail.toLowerCase() === lowerName || r.displayName.toLowerCase() === lowerName;
+      return true;
+    });
+  }, [allRows, subDrilldown]);
+
+  // Level 3 Granular Search & Pagination
+  const filteredGranularRows = useMemo(() => {
+    if (!searchTerm.trim()) return granularRows;
+    const s = searchTerm.toLowerCase();
+    return granularRows.filter(
+      (r) =>
+        r.displayName.toLowerCase().includes(s) ||
+        r.userMail.toLowerCase().includes(s) ||
+        r.aiTool.toLowerCase().includes(s) ||
+        (r.projectCode || '').toLowerCase().includes(s) ||
+        r.orgServiceLine.toLowerCase().includes(s) ||
+        r.activityDate.includes(s)
+    );
+  }, [granularRows, searchTerm]);
+
+  const totalPages = Math.ceil(filteredGranularRows.length / itemsPerPage) || 1;
+  const paginatedGranularRows = filteredGranularRows.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Level 3 Granular Aggregates
+  const level3TotalCost = useMemo(() => granularRows.reduce((acc, r) => acc + r.cost, 0), [granularRows]);
+  const level3TotalTokens = useMemo(() => granularRows.reduce((acc, r) => acc + r.tokenConsumption, 0), [granularRows]);
+  const level3BillableRows = useMemo(
+    () => granularRows.filter((r) => r.billableFlag === 'True' || r.billableFlag === 'true').length,
+    [granularRows]
+  );
+
+  const byTool = summaryData?.byAiTool || [];
+  const byRegion = summaryData?.byManagementRegion || [];
+  const byServiceLine = summaryData?.byServiceLine || [];
+  const topUsers = summaryData?.topUsers || [];
+  const byProjectCode = summaryData?.byProjectCode || [];
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* ========================================================================= */}
+      {/* BREADCRUMB CONTEXT HEADER                                                 */}
+      {/* ========================================================================= */}
+      <div className="bg-ey-card border border-ey-border rounded-2xl px-4 py-3 shadow-sm flex flex-wrap items-center justify-between gap-3 animate-fade-in">
+        {/* Breadcrumb Trail */}
+        <nav className="flex items-center flex-wrap gap-1.5 text-xs font-mono">
+          <button
+            onClick={onBack}
+            className="text-ey-muted hover:text-ey-yellow transition-colors font-semibold flex items-center gap-1 cursor-pointer"
+          >
+            <span>Overview</span>
+          </button>
+          <ChevronRight className="w-3.5 h-3.5 text-ey-border shrink-0" />
+
+          <button
+            onClick={() => {
+              if (subDrilldown) {
+                setSubDrilldown(null);
+                setSearchTerm('');
+                setCurrentPage(1);
+              }
+            }}
+            className={`${
+              subDrilldown ? 'text-ey-muted hover:text-ey-yellow cursor-pointer' : 'text-ey-yellow font-bold'
+            } transition-colors flex items-center gap-1`}
+          >
+            <span>Level 1: {title}</span>
+          </button>
+
+          {subDrilldown && (
+            <>
+              <ChevronRight className="w-3.5 h-3.5 text-ey-border shrink-0" />
+              <span className="text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded flex items-center gap-1">
+                <span>{subDrilldown.name}</span>
+                <span className="text-[10px] text-emerald-300/80 font-normal">
+                  ({subDrilldown.type.replace('_', ' ')})
+                </span>
+              </span>
+            </>
+          )}
+        </nav>
+      </div>
+
+      {/* Metric Context Card */}
+      <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-3">
+
+        {/* Title & Highlight */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-ey-border/40">
+          <div>
+            <h1 className="text-xl font-bold text-ey-light tracking-tight flex items-center gap-3">
+              <span>{subDrilldown ? `End-Level Telemetry: ${subDrilldown.name}` : title}</span>
+              <span className="text-xl font-extrabold text-ey-yellow font-mono">
+                {subDrilldown ? `$${level3TotalCost.toFixed(2)}` : currentValue}
+              </span>
+            </h1>
+            <p className="text-xs text-ey-muted mt-0.5">
+              {subDrilldown
+                ? `Inspecting ${granularRows.length} raw usage log entries in ai_usage_data.csv for ${subDrilldown.name}`
+                : `${subtitle} — Click any card or row below for end-level record telemetry.`}
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-2 text-xs font-mono bg-ey-black/60 border border-ey-border px-3 py-1.5 rounded-xl shrink-0">
+            <span className="text-ey-muted">Status:</span>
+            <span className="text-emerald-400 font-bold flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              {subDrilldown ? `${granularRows.length} Log Entries` : 'Level 1 Telemetry Active'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* LEVEL 3: END-LEVEL GRANULAR USAGE LOGS VIEW (When an entity is selected)  */}
+      {/* ========================================================================= */}
+      {subDrilldown ? (
+        <div className="space-y-6">
+          {/* Level 3 KPI Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
+            <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
+              <span className="text-ey-muted text-[10px] uppercase font-bold">Total Billed Spend</span>
+              <p className="text-xl font-bold text-ey-yellow">${level3TotalCost.toFixed(4)}</p>
+              <p className="text-[10px] text-ey-muted">{granularRows.length} usage events</p>
+            </div>
+
+            <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
+              <span className="text-ey-muted text-[10px] uppercase font-bold">Total Token Volume</span>
+              <p className="text-xl font-bold text-ey-light">{level3TotalTokens.toLocaleString()}</p>
+              <p className="text-[10px] text-ey-muted">Prompt + Completion</p>
+            </div>
+
+            <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
+              <span className="text-ey-muted text-[10px] uppercase font-bold">Billable Log Entries</span>
+              <p className="text-xl font-bold text-emerald-400">{level3BillableRows} / {granularRows.length}</p>
+              <p className="text-[10px] text-emerald-300">
+                {granularRows.length > 0 ? ((level3BillableRows / granularRows.length) * 100).toFixed(1) : 0}% Billable
+              </p>
+            </div>
+
+            <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
+              <span className="text-ey-muted text-[10px] uppercase font-bold">Entity Type</span>
+              <p className="text-xl font-bold text-cyan-300 capitalize">{subDrilldown.type.replace('_', ' ')}</p>
+              <p className="text-[10px] text-ey-muted truncate">{subDrilldown.name}</p>
+            </div>
+          </div>
+
+          {/* Granular Usage Log Entries Table */}
+          <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-ey-light flex items-center space-x-2">
+                  <FileSpreadsheet className="w-5 h-5 text-ey-yellow" />
+                  <span>End-Level Usage Log Telemetry Records</span>
+                </h3>
+                <p className="text-xs text-ey-muted mt-0.5">
+                  Raw row-level CSV usage records matching <strong className="text-ey-light">{subDrilldown.name}</strong>.
+                </p>
+              </div>
+
+              {/* Search input */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-ey-muted absolute left-2.5 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Filter records..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="bg-ey-black border border-ey-border text-ey-light text-xs rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:border-ey-yellow w-56"
+                />
+              </div>
+            </div>
+
+            {/* Granular Table */}
+            <div className="overflow-x-auto border border-ey-border rounded-xl">
+              <table className="w-full text-left text-xs font-mono">
+                <thead className="bg-ey-black/60 text-ey-muted uppercase tracking-wider border-b border-ey-border">
+                  <tr>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">User &amp; Email</th>
+                    <th className="px-4 py-3">AI Tool</th>
+                    <th className="px-4 py-3">Project Code</th>
+                    <th className="px-4 py-3">Service Line</th>
+                    <th className="px-4 py-3 text-center">Billable</th>
+                    <th className="px-4 py-3 text-right">Tokens</th>
+                    <th className="px-4 py-3 text-right">Cost (USD)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-ey-border">
+                  {paginatedGranularRows.length > 0 ? (
+                    paginatedGranularRows.map((r, idx) => (
+                      <tr key={idx} className="hover:bg-ey-card-hover/80 transition">
+                        <td className="px-4 py-3 text-ey-muted whitespace-nowrap">{r.activityDate}</td>
+                        <td className="px-4 py-3 font-medium text-ey-light">
+                          <div>{r.displayName}</div>
+                          <div className="text-[10px] text-ey-muted">{r.userMail}</div>
+                        </td>
+                        <td className="px-4 py-3 capitalize text-ey-yellow">{r.aiTool}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] border ${
+                            (r.projectCode || '').startsWith('E-') ? 'bg-blue-500/10 text-blue-300 border-blue-500/30' : 'bg-purple-500/10 text-purple-300 border-purple-500/30'
+                          }`}>
+                            {r.projectCode || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-ey-muted">{r.orgServiceLine}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            r.billableFlag === 'True' ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                          }`}>
+                            {r.billableFlag}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right text-ey-light">{r.tokenConsumption.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right font-bold text-ey-yellow">${r.cost.toFixed(4)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-ey-muted">
+                        No usage records found for {subDrilldown.name}.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2 text-xs text-ey-muted font-mono">
+                <div>
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredGranularRows.length)} of {filteredGranularRows.length} records
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 bg-ey-black border border-ey-border rounded-lg hover:bg-ey-card-hover disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <span>Page {currentPage} of {totalPages}</span>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 bg-ey-black border border-ey-border rounded-lg hover:bg-ey-card-hover disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* ========================================================================= */
+        /* LEVEL 2: MIDDLE TELEMETRY BREAKDOWN VIEW (Click any card/row to Level 3)  */
+        /* ========================================================================= */
+        <div className="space-y-6">
+          {/* Main Time Series Trend Chart */}
+          <div className="bg-ey-card border border-ey-border rounded-2xl p-6 shadow-sm space-y-3">
+            <div className="flex items-center justify-between border-b border-ey-border/60 pb-3">
+              <h3 className="text-base font-bold text-ey-light flex items-center gap-2">
+                <Zap className="w-5 h-5 text-ey-yellow" />
+                <span>Daily Telemetry Movement &amp; Run-Rate</span>
+              </h3>
+              <span className="text-xs font-mono text-ey-muted">Source: ai_usage_data.csv</span>
+            </div>
+
+            <MetricChart
+              title={`${title} Trend Over Filtered Range`}
+              subtitle="Daily aggregated telemetry data points"
+              data={series}
+              chartType="area"
+              series={[{ key: 'value', name: title, color: '#FFE600' }]}
+            />
+          </div>
+
+          {/* Metric Specific Deep-Dive Panels with Level 3 Click Triggers */}
+          {id === 'token_consumption' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Tool Token Volume Shares -> Level 3 Trigger */}
+              <div className="bg-ey-card border border-ey-border rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-ey-border pb-3">
+                  <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-ey-yellow" />
+                    <span>Token Share by AI Tool</span>
+                  </h3>
+                  <span className="text-[10px] font-mono text-ey-yellow">Click tool for log records 🔍</span>
+                </div>
+                <div className="space-y-3 text-xs font-mono">
+                  {byTool.map((t: any) => {
+                    const pct = summaryData?.totalTokenConsumption ? ((t.tokens / summaryData.totalTokenConsumption) * 100).toFixed(1) : 0;
+                    return (
+                      <div
+                        key={t.tool}
+                        onClick={() =>
+                          setSubDrilldown({
+                            type: 'tool',
+                            id: t.tool,
+                            name: t.tool,
+                            subtitle: `Raw usage records for ${t.tool}`,
+                          })
+                        }
+                        className="space-y-1.5 bg-ey-black/40 border border-ey-border/60 hover:border-ey-yellow/60 p-3 rounded-xl cursor-pointer transition group"
+                      >
+                        <div className="flex justify-between items-center text-ey-light group-hover:text-ey-yellow">
+                          <span className="capitalize font-bold text-sm flex items-center gap-1.5">
+                            <span>{t.tool}</span>
+                            <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </span>
+                          <span>{t.tokens.toLocaleString()} tokens ({pct}%)</span>
+                        </div>
+                        <div className="w-full bg-ey-black rounded-full h-2 overflow-hidden border border-ey-border">
+                          <div className="bg-ey-yellow h-full transition-all duration-300" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Service Line Token Volume -> Level 3 Trigger */}
+              <div className="bg-ey-card border border-ey-border rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-ey-border pb-3">
+                  <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-cyan-400" />
+                    <span>Service Line Token Allocation</span>
+                  </h3>
+                  <span className="text-[10px] font-mono text-cyan-400">Click unit for log records 🔍</span>
+                </div>
+                <div className="space-y-3 text-xs font-mono">
+                  {byServiceLine.map((s: any) => (
+                    <div
+                      key={s.serviceLine}
+                      onClick={() =>
+                        setSubDrilldown({
+                          type: 'service_line',
+                          id: s.serviceLine,
+                          name: s.serviceLine,
+                          subtitle: `Raw usage records for ${s.serviceLine}`,
+                        })
+                      }
+                      className="flex items-center justify-between p-3 bg-ey-black/40 border border-ey-border/60 hover:border-cyan-400/60 rounded-xl cursor-pointer transition group"
+                    >
+                      <span className="text-ey-light font-bold text-sm group-hover:text-cyan-300 flex items-center gap-1.5">
+                        <span>{s.serviceLine}</span>
+                        <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </span>
+                      <span className="text-cyan-300 font-bold">{s.tokens.toLocaleString()} tokens</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {id === 'total_investment' && (
+            <div className="space-y-6">
+              {/* Billability KPI Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
+                <div className="bg-ey-card border border-emerald-500/30 p-4 rounded-2xl space-y-1 shadow-sm">
+                  <div className="flex items-center justify-between text-ey-muted">
+                    <span>Billable Client Spend</span>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <p className="text-2xl font-extrabold text-emerald-400">${(summaryData?.billableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-emerald-300">{summaryData?.billableSpendPercent}% of total AI investment</p>
+                </div>
+
+                <div className="bg-ey-card border border-amber-500/30 p-4 rounded-2xl space-y-1 shadow-sm">
+                  <div className="flex items-center justify-between text-ey-muted">
+                    <span>Non-Billable Overhead</span>
+                    <AlertCircle className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <p className="text-2xl font-extrabold text-amber-400">${(summaryData?.nonBillableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-amber-300">{(100 - (summaryData?.billableSpendPercent || 0)).toFixed(1)}% operational cost</p>
+                </div>
+
+                <div className="bg-ey-card border border-blue-500/30 p-4 rounded-2xl space-y-1 shadow-sm">
+                  <div className="flex items-center justify-between text-ey-muted">
+                    <span>External Projects Spend</span>
+                    <Briefcase className="w-4 h-4 text-blue-400" />
+                  </div>
+                  <p className="text-2xl font-extrabold text-blue-400">${(summaryData?.externalProjectSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-blue-300">{summaryData?.externalProjectPercent}% external client work</p>
+                </div>
+              </div>
+
+              {/* Regional Spend Grid -> Level 3 Trigger */}
+              <div className="bg-ey-card border border-ey-border rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-ey-border pb-3">
+                  <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
+                    <Globe2 className="w-4 h-4 text-ey-yellow" />
+                    <span>Regional Spend Breakdown</span>
+                  </h3>
+                  <span className="text-[10px] font-mono text-ey-yellow">Click region for log records 🔍</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
+                  {byRegion.map((r: any) => (
+                    <div
+                      key={r.region}
+                      onClick={() =>
+                        setSubDrilldown({
+                          type: 'region',
+                          id: r.region,
+                          name: r.region,
+                          subtitle: `Raw usage records for ${r.region} region`,
+                        })
+                      }
+                      className="bg-ey-black/60 border border-ey-border hover:border-ey-yellow/60 p-4 rounded-xl space-y-1 cursor-pointer transition group"
+                    >
+                      <span className="text-ey-muted text-[10px] uppercase font-bold group-hover:text-ey-yellow flex items-center justify-between">
+                        <span>{r.region} Region</span>
+                        <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow" />
+                      </span>
+                      <p className="text-xl font-bold text-ey-yellow">${r.cost.toFixed(2)}</p>
+                      <p className="text-ey-muted text-[11px]">{r.tokens.toLocaleString()} tokens</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {id === 'cost_per_user' && (
+            <div className="bg-ey-card border border-ey-border rounded-2xl p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-ey-border pb-3">
+                <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
+                  <Users className="w-4 h-4 text-ey-yellow" />
+                  <span>Developer Seat &amp; Active User Spend Rankings</span>
+                </h3>
+                <span className="text-[10px] font-mono text-ey-yellow">Click user row for log records 🔍</span>
+              </div>
+              <div className="overflow-x-auto border border-ey-border rounded-xl">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="bg-ey-black/60 text-ey-muted border-b border-ey-border">
+                    <tr>
+                      <th className="px-4 py-3">Rank</th>
+                      <th className="px-4 py-3">Developer Name</th>
+                      <th className="px-4 py-3">Email Address</th>
+                      <th className="px-4 py-3 text-right">Token Consumption</th>
+                      <th className="px-4 py-3 text-right">Total AI Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-ey-border">
+                    {topUsers.slice(0, 10).map((u: any, idx: number) => (
+                      <tr
+                        key={u.userMail}
+                        onClick={() =>
+                          setSubDrilldown({
+                            type: 'user',
+                            id: u.userMail,
+                            name: u.userMail,
+                            subtitle: `Raw usage records for ${u.displayName}`,
+                          })
+                        }
+                        className="hover:bg-ey-card-hover/80 transition cursor-pointer group"
+                      >
+                        <td className="px-4 py-3 text-ey-muted font-bold">#{idx + 1}</td>
+                        <td className="px-4 py-3 font-bold text-ey-light group-hover:text-ey-yellow flex items-center gap-1.5">
+                          <span>{u.displayName}</span>
+                          <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow" />
+                        </td>
+                        <td className="px-4 py-3 text-ey-muted">{u.userMail}</td>
+                        <td className="px-4 py-3 text-right text-ey-light">{u.tokens.toLocaleString()} tokens</td>
+                        <td className="px-4 py-3 text-right font-bold text-ey-yellow">${u.cost.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Top Project Codes Telemetry Grid -> Level 3 Trigger */}
+          {byProjectCode.length > 0 && (
+            <div className="bg-ey-card border border-ey-border rounded-2xl p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-ey-border pb-3">
+                <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
+                  <FolderKanban className="w-4 h-4 text-blue-400" />
+                  <span>Top Associated Project Codes</span>
+                </h3>
+                <span className="text-[10px] font-mono text-blue-400">Click project code for log records 🔍</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+                {byProjectCode.slice(0, 8).map((p: any) => (
+                  <div
+                    key={p.projectCode}
+                    onClick={() =>
+                      setSubDrilldown({
+                        type: 'project_code',
+                        id: p.projectCode,
+                        name: p.projectCode,
+                        subtitle: `Raw usage records for project code ${p.projectCode}`,
+                      })
+                    }
+                    className="p-3 bg-ey-black/60 border border-ey-border hover:border-blue-400/60 rounded-xl flex items-center justify-between cursor-pointer transition group"
+                  >
+                    <div>
+                      <p className="font-bold text-ey-light group-hover:text-blue-300 flex items-center gap-1">
+                        <span>{p.projectCode}</span>
+                        <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-blue-300" />
+                      </p>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                        p.projectType === 'External' ? 'bg-blue-500/15 text-blue-300' : 'bg-purple-500/15 text-purple-300'
+                      }`}>
+                        {p.projectType}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-ey-yellow">${p.cost.toFixed(2)}</p>
+                      <p className="text-[10px] text-ey-muted">{p.tokens.toLocaleString()} tok</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* FLOATING QUICK-RETURN BUTTON (PERSISTENT ON SCREEN)                       */}
+      {/* ========================================================================= */}
+      <div className="fixed bottom-6 right-6 z-40 flex items-center space-x-2 animate-fade-in shadow-2xl">
+        <button
+          onClick={() => {
+            if (subDrilldown) {
+              setSubDrilldown(null);
+              setSearchTerm('');
+              setCurrentPage(1);
+            } else {
+              onBack();
+            }
+          }}
+          className="flex items-center space-x-2 px-4 py-2.5 bg-ey-yellow hover:bg-yellow-400 text-ey-black font-extrabold text-xs rounded-full shadow-2xl border-2 border-ey-black transition-all transform hover:scale-105 cursor-pointer"
+          title="Return to previous screen (Esc)"
+        >
+          <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
+          <span>{subDrilldown ? `Back to ${title}` : 'Back to Overview'}</span>
+          <kbd className="text-[10px] bg-black/20 text-ey-black px-1.5 py-0.5 rounded font-mono font-bold">Esc</kbd>
+        </button>
+
+        {subDrilldown && (
+          <button
+            onClick={onBack}
+            className="p-2.5 bg-ey-black hover:bg-ey-card text-ey-light hover:text-ey-yellow border border-ey-border hover:border-ey-yellow rounded-full shadow-2xl transition cursor-pointer"
+            title="Exit Drilldown to Overview"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+

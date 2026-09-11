@@ -58,7 +58,7 @@ export function Sidebar({
           setIsCustom(!!data.isCustom);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [pathname]);
 
   return (
@@ -133,11 +133,11 @@ export function Sidebar({
 
         {/* Navigation Links */}
         <nav className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
-          {(!isDesktopCollapsed || isMobileOpen) && (
+          {/* {(!isDesktopCollapsed || isMobileOpen) && (
             <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-ey-muted">
               CSV Analytics Pages ({NAV_ITEMS.length})
             </div>
-          )}
+          )} */}
 
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
@@ -202,11 +202,10 @@ export function Sidebar({
           {(!isDesktopCollapsed || isMobileOpen) && (
             <div className="text-[10px] text-ey-muted flex items-center justify-between px-1">
               <span>CSV Engine</span>
-              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium border truncate max-w-[120px] ${
-                isCustom
+              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium border truncate max-w-[120px] ${isCustom
                   ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                   : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-              }`}>
+                }`}>
                 {datasetName}
               </span>
             </div>

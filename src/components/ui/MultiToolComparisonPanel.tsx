@@ -14,10 +14,13 @@ import {
   ChevronDown,
   ChevronUp,
   Cpu,
+  ArrowUpRight,
+  ChevronRight,
 } from 'lucide-react';
 
 interface MultiToolComparisonPanelProps {
   summary: TokenCostSummary | null;
+  onDrilldown?: (tool?: string, userMail?: string) => void;
 }
 
 const TOOL_CONFIG: Record<
@@ -47,7 +50,7 @@ const TOOL_CONFIG: Record<
   },
 };
 
-export function MultiToolComparisonPanel({ summary }: MultiToolComparisonPanelProps) {
+export function MultiToolComparisonPanel({ summary, onDrilldown }: MultiToolComparisonPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showOverlapUsers, setShowOverlapUsers] = useState(false);
 
@@ -81,8 +84,19 @@ export function MultiToolComparisonPanel({ summary }: MultiToolComparisonPanelPr
           </div>
         </div>
 
-        {/* Quick summary tag & Collapse Toggle */}
-        <div className="flex items-center space-x-3 shrink-0 self-start sm:self-center">
+        {/* Quick summary tag, Drilldown CTA & Collapse Toggle */}
+        <div className="flex items-center space-x-2 sm:space-x-3 shrink-0 self-start sm:self-center">
+          {onDrilldown && (
+            <button
+              onClick={() => onDrilldown()}
+              className="flex items-center space-x-1.5 text-xs font-semibold text-ey-black bg-ey-yellow hover:bg-yellow-400 px-3 py-1.5 rounded-lg transition shadow shrink-0 cursor-pointer"
+              title="Drill down to Level 2 Decomposition and Level 4 Raw Telemetry Logs"
+            >
+              <span>Drill Down</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           <div className="hidden sm:flex items-center space-x-1.5 bg-ey-black/60 border border-ey-border px-2.5 py-1.5 rounded-lg text-xs font-mono">
             <Cpu className="w-3.5 h-3.5 text-ey-yellow" />
             <span className="text-ey-muted">Platforms:</span>
@@ -91,7 +105,7 @@ export function MultiToolComparisonPanel({ summary }: MultiToolComparisonPanelPr
 
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center space-x-1.5 text-xs font-semibold text-ey-yellow hover:text-ey-light bg-ey-black/60 border border-ey-border px-3 py-1.5 rounded-lg transition shrink-0"
+            className="flex items-center space-x-1.5 text-xs font-semibold text-ey-yellow hover:text-ey-light bg-ey-black/60 border border-ey-border px-3 py-1.5 rounded-lg transition shrink-0 cursor-pointer"
             title={isExpanded ? "Collapse insights" : "Expand insights"}
           >
             <span>{isExpanded ? 'Collapse Insights' : 'Expand Insights'}</span>
@@ -120,7 +134,9 @@ export function MultiToolComparisonPanel({ summary }: MultiToolComparisonPanelPr
           return (
             <div
               key={toolData.tool}
-              className={`bg-ey-black border ${config.border} rounded-xl p-5 space-y-4 relative overflow-hidden flex flex-col justify-between`}
+              onClick={() => onDrilldown?.(toolData.tool)}
+              className={`bg-ey-black border ${config.border} hover:border-ey-yellow/80 hover:shadow-lg rounded-xl p-5 space-y-4 relative overflow-hidden flex flex-col justify-between cursor-pointer transition-all duration-200 group`}
+              title={`Click to drill down into ${config.label} metrics and root-cause telemetry`}
             >
               {/* Tool Header */}
               <div>
@@ -205,6 +221,12 @@ export function MultiToolComparisonPanel({ summary }: MultiToolComparisonPanelPr
                     style={{ width: `${Math.min(100, Math.max(2, toolData.spendSharePercent))}%` }}
                   />
                 </div>
+              </div>
+
+              {/* Card Drilldown Indicator Footer */}
+              <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-mono font-bold flex items-center justify-between group-hover:text-ey-light">
+                <span>Inspect {config.label}</span>
+                <ChevronRight className="w-3.5 h-3.5 text-ey-yellow group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
           );
@@ -325,19 +347,25 @@ export function MultiToolComparisonPanel({ summary }: MultiToolComparisonPanelPr
                           <th className="px-4 py-2.5">AI Platforms Used</th>
                           <th className="px-4 py-2.5 text-right">Total Tokens</th>
                           <th className="px-4 py-2.5 text-right">Total Spend ($)</th>
+                          <th className="px-4 py-2.5 text-center">Telemetry</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-ey-border/40">
                         {multiToolOverlap.multiToolUserList.map((user) => (
-                          <tr key={user.userMail} className="hover:bg-ey-card/40 transition-colors">
+                          <tr
+                            key={user.userMail}
+                            onClick={() => onDrilldown?.(undefined, user.userMail)}
+                            className="hover:bg-ey-card transition-colors cursor-pointer group"
+                            title={`Click to inspect dual-platform telemetry logs for ${user.displayName || user.userMail}`}
+                          >
                             <td className="px-4 py-2 font-medium text-ey-light">
                               {user.displayName ? (
                                 <div>
-                                  <span className="font-bold">{user.displayName}</span>
+                                  <span className="font-bold group-hover:text-ey-yellow transition-colors">{user.displayName}</span>
                                   <span className="block text-[10px] text-ey-muted">{user.userMail}</span>
                                 </div>
                               ) : (
-                                <span>{user.userMail}</span>
+                                <span className="group-hover:text-ey-yellow transition-colors">{user.userMail}</span>
                               )}
                             </td>
                             <td className="px-4 py-2">
@@ -365,6 +393,9 @@ export function MultiToolComparisonPanel({ summary }: MultiToolComparisonPanelPr
                             </td>
                             <td className="px-4 py-2 text-right text-emerald-400 font-bold">
                               ${user.totalCost.toFixed(2)}
+                            </td>
+                            <td className="px-4 py-2 text-center text-ey-yellow group-hover:translate-x-0.5 transition-transform">
+                              <ChevronRight className="w-4 h-4 inline" />
                             </td>
                           </tr>
                         ))}

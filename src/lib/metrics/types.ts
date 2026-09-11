@@ -92,6 +92,21 @@ export interface TokenCostSummary {
   licenseEfficiencyRate: number;
   ceilingRiskCount: number;
   userCapacityBreakdown: UserCapacityRow[];
+  // Project & Billability Telemetry Insights
+  billableSpend: number;
+  nonBillableSpend: number;
+  billableSpendPercent: number;
+  externalProjectSpend: number;
+  internalProjectSpend: number;
+  externalProjectPercent: number;
+  byProjectCode?: {
+    projectCode: string;
+    projectType: string;
+    tokens: number;
+    cost: number;
+    userCount: number;
+    billablePercent: number;
+  }[];
 }
 
 export interface UserCapacityRow {

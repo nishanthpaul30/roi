@@ -39,14 +39,19 @@ const CSV_SCHEMA = [
   { column: 'Token Consumption', fieldName: 'tokenConsumption', description: 'Total raw tokens generated and processed (Prompt + Completion)', dataType: 'Numeric' },
   { column: 'Daily Billable Tokens', fieldName: 'dailyBillableTokens', description: 'Tokens charged toward billable quota', dataType: 'Numeric' },
   { column: 'Cost in USD', fieldName: 'cost', description: 'Direct monetary expenditure incurred in USD ($)', dataType: 'Numeric ($)' },
-  { column: 'Org Service Line', fieldName: 'orgServiceLine', description: 'Organizational unit / Service line (e.g. Power, Financial Services)', dataType: 'String' },
+  { column: 'Org Service Line', fieldName: 'orgServiceLine', description: 'Organizational Service Line (e.g. Tax, Assurance, S&T, CBS, Consulting)', dataType: 'String' },
   { column: 'Management Region', fieldName: 'managementRegion', description: 'Regional management division (e.g. EMEA, APAC, Americas)', dataType: 'String' },
   { column: 'Country', fieldName: 'country', description: 'Country location of user', dataType: 'String' },
+  { column: 'License Cost in USD', fieldName: 'licenseCost', description: 'Fixed seat license cost assigned per user seat', dataType: 'Numeric ($)' },
+  { column: 'Usage Free Token Limit', fieldName: 'usageFreeTokenLimit', description: 'Baseline free token/spending ceiling threshold', dataType: 'Numeric' },
+  { column: 'Billable/Non-Billable', fieldName: 'billableFlag', description: 'Client billability flag (True for billable, False for internal)', dataType: 'Boolean' },
+  { column: 'ProjectType', fieldName: 'projectType', description: 'Project classification (External for client, Internal for R&D)', dataType: 'String' },
+  { column: 'ProjectCode', fieldName: 'projectCode', description: 'Project code (E-XXXXXX for external, I-XXXXXX for internal)', dataType: 'String' },
 ];
 
 const FORMULA_CATEGORIES = [
   {
-    title: 'Core Copilot Token Formulas',
+    title: 'Core AI Token & Utilization Formulas',
     icon: Zap,
     color: 'text-ey-yellow',
     formulas: [
@@ -56,23 +61,24 @@ const FORMULA_CATEGORIES = [
     ],
   },
   {
-    title: 'Financial & Spend Efficiency Formulas',
+    title: 'Financial & Capacity Waste Formulas',
     icon: DollarSign,
     color: 'text-emerald-400',
     formulas: [
       { name: 'Total AI Investment ($)', formula: 'Total Spend = ∑ (cost)', example: '$0.4627 + $0.5055 + $0.6155 = $1.5837' },
-      { name: 'Cost per 1K Tokens ($ / 1k)', formula: 'Cost per 1k = (Total Spend / (Total Billable Tokens / 1000))', example: '($1.5837 / (102,889 / 1000)) = $0.015392 / 1k' },
-      { name: 'Average Daily Cost ($ / day)', formula: 'Avg Daily Spend = Total Spend / Unique Activity Days', example: '$1.5837 / 3 days = $0.5279 / day' },
+      { name: 'Cost per Active User ($ / user)', formula: 'Cost per User = Total Spend / Unique Active Users', example: '$1,750.00 / 70 Users = $25.00 / user' },
+      { name: 'Capacity Waste ($)', formula: 'Waste = ∑ max(0, usageFreeTokenLimit - actualCost)', example: '$80.00 limit - $13.44 cost = $66.56 wasted capacity' },
+      { name: 'Overage Cost ($)', formula: 'Overage = ∑ max(0, actualCost - usageFreeTokenLimit)', example: '$95.20 cost - $80.00 limit = $15.20 overage' },
     ],
   },
   {
-    title: 'Organizational & User Breakdown Formulas',
+    title: 'Project Telemetry & Billability Formulas',
     icon: Building2,
     color: 'text-cyan-400',
     formulas: [
-      { name: 'Tool Spend Share (%)', formula: 'Tool Spend % = (Tool Cost / Total Spend) × 100', example: '($1,240.50 / $2,500.00) × 100 = 49.62%' },
-      { name: 'Service Line Token Share (%)', formula: 'Service Line Share % = (Service Line Tokens / Total Tokens) × 100', example: '(450,000 / 1,500,000) × 100 = 30.0%' },
-      { name: 'User Token Contribution', formula: 'User Token Share % = (User Tokens / Total Tokens) × 100', example: '(257,880 / 7,761,876) × 100 = 3.32%' },
+      { name: 'Billable AI Spend Share (%)', formula: 'Billable Spend % = (Billable Spend / Total Spend) × 100', example: '($1,372.40 / $1,750.00) × 100 = 78.4%' },
+      { name: 'External Project Share (%)', formula: 'External Share % = (External Spend / Total Spend) × 100', example: '($1,246.00 / $1,750.00) × 100 = 71.2%' },
+      { name: 'Project Code Token Ranking', formula: 'Project Cost = ∑ (cost) grouped by ProjectCode (E-XXXXXX / I-XXXXXX)', example: 'E-301461: 325,000 tokens | $48.20' },
     ],
   },
 ];
@@ -152,18 +158,48 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     name: 'Service Line Token Distribution',
     csvField: 'group_by(orgServiceLine) -> sum(token_consumption)',
     formula: 'Sum of token_consumption grouped by Org Service Line',
-    sampleInput: 'Power = 102,889, Financial Services = 186,020',
-    workedCalculation: 'Power: 102,889 | Financial Services: 186,020',
+    sampleInput: 'Tax = 102,889, Assurance = 186,020, CBS = 145,000',
+    workedCalculation: 'Tax: 102,889 | Assurance: 186,020 | CBS: 145,000',
     derivedOutput: 'Service line totals',
-    notes: 'Organizational usage distribution by service line',
+    notes: 'Organizational usage distribution across Service Lines (Tax, Assurance, S&T, CBS, Consulting)',
     category: 'Breakdowns',
+  },
+  {
+    name: 'Billable AI Spend Share (%)',
+    csvField: 'group_by(billableFlag) -> sum(cost)',
+    formula: '(Sum of cost where billableFlag == True / Total Cost) × 100',
+    sampleInput: 'Billable Spend = $1,372.40, Total Cost = $1,750.00',
+    workedCalculation: '($1,372.40 ÷ $1,750.00) × 100',
+    derivedOutput: '78.4% Billable',
+    notes: 'Measures proportion of AI investment tied directly to billable client work',
+    category: 'Projects',
+  },
+  {
+    name: 'Project Type Distribution (External vs Internal)',
+    csvField: 'group_by(projectType) -> sum(cost), sum(token_consumption)',
+    formula: 'Sum of cost and tokens grouped by ProjectType',
+    sampleInput: 'External Spend = $1,246.00, Internal Spend = $504.00',
+    workedCalculation: 'External: 71.2% ($1,246.00) | Internal: 28.8% ($504.00)',
+    derivedOutput: '71.2% External / 28.8% Internal',
+    notes: 'Separates client project investment from internal R&D / operational overhead',
+    category: 'Projects',
+  },
+  {
+    name: 'Project Code Spend & Token Rankings',
+    csvField: 'group_by(projectCode) -> sum(token_consumption), sum(cost)',
+    formula: 'Aggregate token consumption and cost per unique projectCode',
+    sampleInput: 'projectCode: E-301461, projectType: External',
+    workedCalculation: 'Tokens: 325,000 | Cost: $48.20 | Users: 4',
+    derivedOutput: 'Ranked project code list',
+    notes: 'Ranks all client (E-XXXXXX) and internal (I-XXXXXX) project codes by AI consumption',
+    category: 'Projects',
   },
   {
     name: 'User Spend & Token Ranking',
     csvField: 'group_by(userMail) -> sum(token_consumption), sum(cost)',
     formula: 'Sum of tokens and cost per userMail',
-    sampleInput: 'userMail: steven.krishnan@enterprise-corp.com',
-    workedCalculation: 'Tokens: 7,761,876 | Cost: $119.0022',
+    sampleInput: 'userMail: aditya.malik@enterprise-corp.com',
+    workedCalculation: 'Tokens: 257,880 | Cost: $3.9620',
     derivedOutput: 'Ranked user list',
     notes: 'Ranks all 70 enterprise users by total token consumption and spend',
     category: 'Breakdowns',
@@ -175,7 +211,7 @@ export default function MetricsDerivationPage() {
   const [copiedFormula, setCopiedFormula] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
-  const categories = ['All', 'Tokens', 'Cost', 'Breakdowns'];
+  const categories = ['All', 'Tokens', 'Cost', 'Projects', 'Breakdowns'];
 
   const filteredMetrics = METRICS_DERIVATION_LIST.filter((item) => {
     const matchesSearch =

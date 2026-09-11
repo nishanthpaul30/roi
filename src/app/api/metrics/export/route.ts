@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       rows = rows.filter((r) => r.aiTool.toLowerCase() === aiTool.toLowerCase());
     }
 
-    const csvHeader = 'Activity Date,AI Tool,User Mail,Display Name,Service Line,Management Region,Country,Token Consumption,Daily Billable Tokens,Cost ($),License Cost ($),Usage Free Token Limit';
+    const csvHeader = 'Activity Date,AI Tool,User Mail,Display Name,Service Line,Management Region,Country,Token Consumption,Daily Billable Tokens,Cost ($),License Cost ($),Usage Free Token Limit,Billable/Non-Billable,ProjectType,ProjectCode';
     const csvRows = rows.map((r) =>
       [
         r.activityDate,
@@ -37,6 +37,9 @@ export async function GET(request: Request) {
         r.cost.toFixed(4),
         (r.licenseCost || 100.0).toFixed(2),
         (r.usageFreeTokenLimit || r.usageLimit || 80.0).toFixed(2),
+        r.billableFlag || 'True',
+        r.projectType || 'External',
+        r.projectCode || 'E-100000',
       ].join(',')
     );
 

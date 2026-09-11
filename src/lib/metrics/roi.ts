@@ -232,6 +232,39 @@ export async function calculateTokenCostSummary(
     ? Number(((totalCost / totalUsageLimitsSum) * 100).toFixed(1))
     : 0;
 
+  // Billable vs Non-Billable Insights
+  const billableRows = currentRows.filter(r => r.billableFlag === 'True' || r.billableFlag === 'true' || r.billableFlag === '1');
+  const nonBillableRows = currentRows.filter(r => r.billableFlag === 'False' || r.billableFlag === 'false' || r.billableFlag === '0');
+  const billableSpend = Number(billableRows.reduce((s, r) => s + r.cost, 0).toFixed(2));
+  const nonBillableSpend = Number(nonBillableRows.reduce((s, r) => s + r.cost, 0).toFixed(2));
+  const billableSpendPercent = totalCost > 0 ? Number(((billableSpend / totalCost) * 100).toFixed(1)) : 0;
+
+  // External vs Internal Project Insights
+  const externalRows = currentRows.filter(r => r.projectType === 'External');
+  const internalRows = currentRows.filter(r => r.projectType === 'Internal');
+  const externalProjectSpend = Number(externalRows.reduce((s, r) => s + r.cost, 0).toFixed(2));
+  const internalProjectSpend = Number(internalRows.reduce((s, r) => s + r.cost, 0).toFixed(2));
+  const externalProjectPercent = totalCost > 0 ? Number(((externalProjectSpend / totalCost) * 100).toFixed(1)) : 0;
+
+  // By ProjectCode breakdown
+  const byProjectCodeMap = groupBy(currentRows, r => r.projectCode || 'Unassigned');
+  const byProjectCode = Array.from(byProjectCodeMap.entries()).map(([pCode, rows]) => {
+    const tokens = Math.round(rows.reduce((s, r) => s + r.tokenConsumption, 0));
+    const cost = Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(2));
+    const userCount = new Set(rows.map(r => r.userMail)).size;
+    const pType = rows[0]?.projectType || (pCode.startsWith('E-') ? 'External' : 'Internal');
+    const bRows = rows.filter(r => r.billableFlag === 'True' || r.billableFlag === 'true');
+    const billablePercent = rows.length > 0 ? Number(((bRows.length / rows.length) * 100).toFixed(1)) : 0;
+    return {
+      projectCode: pCode,
+      projectType: pType,
+      tokens,
+      cost,
+      userCount,
+      billablePercent,
+    };
+  }).sort((a, b) => b.cost - a.cost);
+
   return {
     totalTokenConsumption: Math.round(totalTokenConsumption),
     totalBillableTokens: Math.round(totalBillableTokens),
@@ -253,5 +286,12 @@ export async function calculateTokenCostSummary(
     licenseEfficiencyRate,
     ceilingRiskCount,
     userCapacityBreakdown,
+    billableSpend,
+    nonBillableSpend,
+    billableSpendPercent,
+    externalProjectSpend,
+    internalProjectSpend,
+    externalProjectPercent,
+    byProjectCode,
   };
 }

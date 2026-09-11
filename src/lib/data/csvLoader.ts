@@ -1,6 +1,21 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import { RAW_CSV_DATA } from './rawCsvData';
+
+// Lazy load Node.js fs and path modules on server side to prevent browser bundling errors
+const getFs = () => {
+  try {
+    return typeof window === 'undefined' ? require('fs') : null;
+  } catch (_e) {
+    return null;
+  }
+};
+
+const getPath = () => {
+  try {
+    return typeof window === 'undefined' ? require('path') : null;
+  } catch (_e) {
+    return null;
+  }
+};
 
 export interface CsvUsageRow {
   aiTool: string;               // AI Tool Flag: chatgpt | copilot | claude
@@ -15,7 +30,7 @@ export interface CsvUsageRow {
   dailyBillableTokens: number;  // Daily Billable Tokens
   cost: number;                 // Cost in USD
   orgServiceLine: string;       // Org Service Line: Consulting, Power, Financial Services, Technology
-  orgSubServiceLine: string;    // Org Sub Service Line: Banking, Strategy, etc.
+  orgSubServiceLine: string;    // Org Sub Service Line: Reporting, Strategy, etc.
   country: string;              // Country
   region: string;               // Region: Middle East, ANZ, Europe, etc.
   managementRegion: string;     // Management Region: EMEA | APAC | Americas
@@ -23,6 +38,8 @@ export interface CsvUsageRow {
   licenseCost: number;          // License Cost in USD
   usageFreeTokenLimit: number;  // Usage Free Token Limit
   usageLimit?: number;          // Backward-compatible alias
+  billableFlag: string;         // Billable/Non-Billable: 'True' | 'False'
+  projectType: string;          // ProjectType: 'External' | 'Internal'
 }
 
 let _cache: CsvUsageRow[] | null = null;
@@ -31,6 +48,11 @@ let _isCustomActive: boolean = false;
 let _customFileName: string = 'ai_usage_data.csv';
 
 function getCsvFilePath(): string {
+  if (typeof window !== 'undefined') return '';
+  const fs = getFs();
+  const path = getPath();
+  if (!fs || !path) return '';
+
   const possiblePaths = [
     path.join(process.cwd(), 'public', 'ai_usage_data.csv'),
     path.join(process.cwd(), 'ai_usage_data.csv'),
@@ -42,7 +64,7 @@ function getCsvFilePath(): string {
 
   for (const p of possiblePaths) {
     try {
-      if (fs.existsSync && fs.existsSync(/*turbopackIgnore: true*/ p)) {
+      if (fs.existsSync && fs.existsSync(p)) {
         return p;
       }
     } catch (_err) {
@@ -62,6 +84,10 @@ export function parseRawCsvText(raw: string): CsvUsageRow[] {
     const cols = lines[i].split(',');
     if (cols.length < 17) continue;
 
+    const billableFlag = cols.length >= 20 ? cols[19].trim() : 'True';
+    const projectType = cols.length >= 21 ? cols[20].trim() : 'External';
+    const pCode = cols.length >= 22 ? cols[21].trim() : cols[16].trim();
+
     rows.push({
       aiTool: cols[0].trim().toLowerCase(),
       userMail: cols[1].trim(),
@@ -79,10 +105,12 @@ export function parseRawCsvText(raw: string): CsvUsageRow[] {
       country: cols[13].trim(),
       region: cols[14].trim(),
       managementRegion: cols[15].trim(),
-      projectCode: cols[16].trim(),
+      projectCode: pCode,
       licenseCost: cols.length >= 18 ? (parseFloat(cols[17].trim()) || 100.0) : 100.0,
       usageFreeTokenLimit: cols.length >= 19 ? (parseFloat(cols[18].trim()) || 80.0) : 80.0,
       usageLimit: cols.length >= 19 ? (parseFloat(cols[18].trim()) || 80.0) : 80.0,
+      billableFlag,
+      projectType,
     });
   }
 
@@ -103,9 +131,10 @@ export function loadCsvData(): CsvUsageRow[] {
 
   let raw = '';
   try {
+    const fsModule = getFs();
     const csvPath = getCsvFilePath();
-    if (fs.readFileSync) {
-      raw = fs.readFileSync(/*turbopackIgnore: true*/ csvPath, 'utf-8');
+    if (fsModule && fsModule.readFileSync) {
+      raw = fsModule.readFileSync(/*turbopackIgnore: true*/ csvPath, 'utf-8');
     }
   } catch (_err) {
     // Cloudflare Pages / Workers Edge runtime fallback
