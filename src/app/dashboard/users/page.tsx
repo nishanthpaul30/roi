@@ -15,6 +15,7 @@ export default function UsersPage() {
     rank: idx + 1,
     displayName: u.displayName || u.userMail,
     userMail: u.userMail,
+    aiTools: u.aiTools || [],
     tokens: u.tokens.toLocaleString(),
     cost: `$${u.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`,
   }));
@@ -56,6 +57,33 @@ export default function UsersPage() {
                 { header: '#', accessorKey: 'rank' },
                 { header: 'Display Name', accessorKey: 'displayName' },
                 { header: 'User Email', accessorKey: 'userMail' },
+                {
+                  header: 'AI Tool(s) Used',
+                  accessorKey: 'aiTools',
+                  cell: (row: any) => (
+                    <div className="flex flex-wrap gap-1">
+                      {row.aiTools && row.aiTools.length > 0 ? (
+                        row.aiTools.map((tool: string) => {
+                          const tLower = tool.toLowerCase();
+                          let badgeStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+                          if (tLower.includes('chatgpt')) badgeStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+                          if (tLower.includes('copilot')) badgeStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/30';
+                          if (tLower.includes('claude')) badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+                          return (
+                            <span
+                              key={tool}
+                              className={`px-2 py-0.5 text-[10px] font-mono border rounded-md capitalize font-semibold ${badgeStyle}`}
+                            >
+                              {tool}
+                            </span>
+                          );
+                        })
+                      ) : (
+                        <span className="text-ey-muted text-xs">-</span>
+                      )}
+                    </div>
+                  ),
+                },
                 { header: 'Token Consumption', accessorKey: 'tokens' },
                 { header: 'Total Cost ($)', accessorKey: 'cost' },
               ]}

@@ -84,5 +84,5 @@ export interface TokenCostSummary {
   byManagementRegion: { region: string; tokens: number; cost: number }[];
   byCountry: { country: string; tokens: number; cost: number }[];
   byServiceLine: { serviceLine: string; tokens: number; cost: number }[];
-  topUsers: { displayName: string; userMail: string; tokens: number; cost: number }[];
+  topUsers: { displayName: string; userMail: string; tokens: number; cost: number; aiTools?: string[] }[];
 }

@@ -161,12 +161,16 @@ export async function calculateTokenCostSummary(
   // Users breakdown by token consumption
   const byUserMap = groupBy(currentRows, r => r.userMail);
   const topUsers = Array.from(byUserMap.entries())
-    .map(([userMail, rows]) => ({
-      userMail,
-      displayName: rows[0].displayName,
-      tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
-      cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
-    }))
+    .map(([userMail, rows]) => {
+      const toolsSet = new Set(rows.map(r => r.aiTool).filter(Boolean));
+      return {
+        userMail,
+        displayName: rows[0].displayName,
+        tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
+        cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
+        aiTools: Array.from(toolsSet),
+      };
+    })
     .sort((a, b) => b.tokens - a.tokens);
 
   return {
