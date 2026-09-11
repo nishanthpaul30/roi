@@ -122,9 +122,6 @@ export default function RoiPage() {
               />
             </div>
 
-            {/* Multi-Tool Spend & Efficiency Comparison (ChatGPT vs Copilot vs Claude) */}
-            <MultiToolComparisonPanel summary={summary} />
-
             {/* Top Users Table */}
             {summary.topUsers?.length > 0 && (
               <DataTable
