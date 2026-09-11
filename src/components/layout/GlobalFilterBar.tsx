@@ -241,7 +241,7 @@ export function GlobalFilterBar({
               className="w-full bg-ey-black border border-ey-border text-ey-light rounded px-2 py-1.5 focus:outline-none focus:border-ey-yellow"
             >
               <option value="all">All Service Lines</option>
-              {(filterOptions?.serviceLines || ['Consulting', 'Power', 'Financial Services', 'Technology']).map(s => (
+              {(filterOptions?.serviceLines || ['Consulting', 'Tax', 'Assurance', 'S&T', 'CBS']).map(s => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
