@@ -54,6 +54,7 @@ export interface TokenCostSummary {
   // Derived insights
   avgDailyCost: number;
   costPer1kTokens: number;
+  costPerActiveUser?: number;
   billableUtilizationRate: number;
   // Previous period (for delta comparisons)
   prevTotalCost: number;

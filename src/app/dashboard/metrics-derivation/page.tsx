@@ -60,7 +60,7 @@ const FORMULA_CATEGORIES = [
     icon: DollarSign,
     color: 'text-emerald-400',
     formulas: [
-      { name: 'Total API Spend ($)', formula: 'Total Spend = ∑ (cost)', example: '$0.4627 + $0.5055 + $0.6155 = $1.5837' },
+      { name: 'Total AI Investment ($)', formula: 'Total Spend = ∑ (cost)', example: '$0.4627 + $0.5055 + $0.6155 = $1.5837' },
       { name: 'Cost per 1K Tokens ($ / 1k)', formula: 'Cost per 1k = (Total Spend / (Total Billable Tokens / 1000))', example: '($1.5837 / (102,889 / 1000)) = $0.015392 / 1k' },
       { name: 'Average Daily Cost ($ / day)', formula: 'Avg Daily Spend = Total Spend / Unique Activity Days', example: '$1.5837 / 3 days = $0.5279 / day' },
     ],
@@ -99,7 +99,7 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     category: 'Tokens',
   },
   {
-    name: 'Total API Spend ($)',
+    name: 'Total AI Investment ($)',
     csvField: 'cost',
     formula: 'Sum of all cost rows matching filters',
     sampleInput: 'cost array: [$0.4627, $0.5055, $0.6155]',

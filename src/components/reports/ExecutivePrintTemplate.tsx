@@ -22,7 +22,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
   const totalCost = metrics?.cost?.summary?.current ?? 0;
   const totalTokens = metrics?.tokenConsumption?.summary?.current ?? 0;
   const avgDailyCost = metrics?.avgDailyCost?.summary?.current ?? 0;
-  const costPer1k = metrics?.costPer1kTokens?.summary?.current ?? 0;
+  const costPerActiveUser = metrics?.costPerActiveUser?.summary?.current ?? 0;
 
   const toolBreakdown = summary?.byAiTool ?? [];
   const regionalBreakdown = summary?.byManagementRegion ?? [];
@@ -58,7 +58,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-4 gap-4">
         <div className="border border-slate-300 rounded-xl p-4 bg-slate-50/80 shadow-xs">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total API Spend</span>
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total AI Investment</span>
           <div className="text-2xl font-black text-slate-900 font-mono mt-1">
             ${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
@@ -221,7 +221,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
           <span>4. Strategic Observations &amp; Executive Cost Guidance</span>
         </h3>
         <ul className="list-disc pl-4 text-slate-700 space-y-1 text-xs font-medium">
-          <li>Billing efficiency rate is maintained at <strong>${costPer1k.toFixed(4)}</strong> per 1,000 billable tokens.</li>
+          <li>Average spend per active user stands at <strong>${costPerActiveUser.toFixed(2)}</strong> across the filtered period.</li>
           <li>Dominant portfolio tool is <strong>{dominantTool}</strong> driving high enterprise adoption and token consumption.</li>
           <li>Telemetry data verified directly from source usage log entries (<span className="font-mono">ai_usage_data.csv</span>).</li>
         </ul>

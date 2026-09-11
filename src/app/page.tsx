@@ -69,9 +69,9 @@ export default function ExecutiveOverviewPage() {
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <KpiCard title="Total Token Consumption" delta={data.metrics.tokenConsumption.summary} unit="tokens" description="Total tokens consumed (Token Consumption column)" comparisonLabel="vs prev period" />
-              <KpiCard title="Total API Spend" delta={data.metrics.cost.summary} formatType="currency" description="Actual billed cost (Cost in USD column)" comparisonLabel="vs prev period" />
-              <KpiCard title="Avg Daily API Cost" delta={data.metrics.avgDailyCost.summary} formatType="currency" description="Average cost per active day (Cost ÷ active days)" comparisonLabel="vs prev period" />
-              <KpiCard title="Cost per 1K Tokens" delta={data.metrics.costPer1kTokens.summary} formatType="currency" description="Billing efficiency rate per 1k tokens" comparisonLabel="vs prev period" />
+              <KpiCard title="Total AI Investment" delta={data.metrics.cost.summary} formatType="currency" description="Actual billed cost (Cost in USD column)" comparisonLabel="vs prev period" />
+              <KpiCard title="Avg Daily AI Cost" delta={data.metrics.avgDailyCost.summary} formatType="currency" description="Average cost per active day (Cost ÷ active days)" comparisonLabel="vs prev period" />
+              <KpiCard title="Cost per Active User" delta={data.metrics.costPerActiveUser?.summary} formatType="currency" description="Average spend per active user (Cost ÷ active users)" comparisonLabel="vs prev period" />
             </div>
 
             {/* Executive Strategic Leadership Inferences Panel */}
