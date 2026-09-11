@@ -36,6 +36,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = (username: string, password: string): boolean => {
     if (username.trim().toLowerCase() === 'admin' && password === 'admin123') {
       localStorage.setItem('git_kpi_user', 'admin');
+      sessionStorage.setItem('just_logged_in', 'true');
+      sessionStorage.removeItem('onboarding_seen');
       setUser('admin');
       router.push('/');
       return true;
@@ -45,6 +47,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = () => {
     localStorage.removeItem('git_kpi_user');
+    sessionStorage.removeItem('just_logged_in');
+    sessionStorage.removeItem('onboarding_seen');
     setUser(null);
     router.push('/login');
   };

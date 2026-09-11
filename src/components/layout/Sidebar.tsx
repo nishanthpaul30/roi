@@ -16,8 +16,11 @@ import {
   PanelLeftOpen,
   BookOpen,
   Database,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 
 const NAV_ITEMS = [
   { name: 'Executive Overview', href: '/', icon: LayoutDashboard },
@@ -43,6 +46,7 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const { logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [datasetName, setDatasetName] = useState<string>('ai_usage_data.csv');
   const [isCustom, setIsCustom] = useState<boolean>(false);
 
@@ -178,13 +182,22 @@ export function Sidebar({
                 </div>
               )}
             </div>
-            <button
-              onClick={logout}
-              title="Log Out"
-              className="p-1.5 hover:bg-red-500/20 text-ey-muted hover:text-red-400 rounded-md transition-colors shrink-0"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center space-x-1 shrink-0">
+              <button
+                onClick={toggleTheme}
+                title={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+                className="p-1.5 hover:bg-ey-card-hover text-ey-yellow rounded-md transition-colors"
+              >
+                {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+              </button>
+              <button
+                onClick={logout}
+                title="Log Out"
+                className="p-1.5 hover:bg-red-500/20 text-ey-muted hover:text-red-400 rounded-md transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
           {(!isDesktopCollapsed || isMobileOpen) && (

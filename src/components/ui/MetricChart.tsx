@@ -70,11 +70,11 @@ export function MetricChart({
                   </linearGradient>
                 ))}
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2E2E3A" vertical={false} />
-              <XAxis dataKey={dataKeyX} stroke="#A0A0B0" fontSize={11} tickLine={false} />
-              <YAxis stroke="#A0A0B0" fontSize={11} tickLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--ey-border)" vertical={false} />
+              <XAxis dataKey={dataKeyX} stroke="var(--ey-muted)" fontSize={11} tickLine={false} />
+              <YAxis stroke="var(--ey-muted)" fontSize={11} tickLine={false} />
               <Tooltip
-                contentStyle={{ backgroundColor: '#121217', borderColor: '#2E2E3A', borderRadius: '0.5rem', color: '#F4F4F6' }}
+                contentStyle={{ backgroundColor: 'var(--ey-card)', borderColor: 'var(--ey-border)', borderRadius: '0.5rem', color: 'var(--ey-light)' }}
                 itemStyle={{ fontSize: '12px' }}
               />
               <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
@@ -94,11 +94,11 @@ export function MetricChart({
             </AreaChart>
           ) : chartType === 'bar' ? (
             <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2E2E3A" vertical={false} />
-              <XAxis dataKey={dataKeyX} stroke="#A0A0B0" fontSize={11} tickLine={false} />
-              <YAxis stroke="#A0A0B0" fontSize={11} tickLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--ey-border)" vertical={false} />
+              <XAxis dataKey={dataKeyX} stroke="var(--ey-muted)" fontSize={11} tickLine={false} />
+              <YAxis stroke="var(--ey-muted)" fontSize={11} tickLine={false} />
               <Tooltip
-                contentStyle={{ backgroundColor: '#121217', borderColor: '#2E2E3A', borderRadius: '0.5rem', color: '#F4F4F6' }}
+                contentStyle={{ backgroundColor: 'var(--ey-card)', borderColor: 'var(--ey-border)', borderRadius: '0.5rem', color: 'var(--ey-light)' }}
                 itemStyle={{ fontSize: '12px' }}
               />
               <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
@@ -115,11 +115,11 @@ export function MetricChart({
             </BarChart>
           ) : (
             <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2E2E3A" vertical={false} />
-              <XAxis dataKey={dataKeyX} stroke="#A0A0B0" fontSize={11} tickLine={false} />
-              <YAxis stroke="#A0A0B0" fontSize={11} tickLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--ey-border)" vertical={false} />
+              <XAxis dataKey={dataKeyX} stroke="var(--ey-muted)" fontSize={11} tickLine={false} />
+              <YAxis stroke="var(--ey-muted)" fontSize={11} tickLine={false} />
               <Tooltip
-                contentStyle={{ backgroundColor: '#121217', borderColor: '#2E2E3A', borderRadius: '0.5rem', color: '#F4F4F6' }}
+                contentStyle={{ backgroundColor: 'var(--ey-card)', borderColor: 'var(--ey-border)', borderRadius: '0.5rem', color: 'var(--ey-light)' }}
                 itemStyle={{ fontSize: '12px' }}
               />
               <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />

@@ -21,7 +21,7 @@ export function RoiCapacityPanel({
   ceilingRiskCount,
   pageSize = 10,
 }: RoiCapacityPanelProps) {
-  const [activeTab, setActiveTab] = useState<'zone1' | 'zone2' | 'all'>('zone1');
+  const [activeTab, setActiveTab] = useState<'zone1' | 'zone2' | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -67,6 +67,17 @@ export function RoiCapacityPanel({
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => handleTabChange('all')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition ${
+                activeTab === 'all'
+                  ? 'bg-ey-yellow/20 text-ey-yellow border-ey-yellow/40 shadow-sm'
+                  : 'bg-ey-black text-ey-muted border-ey-border hover:text-ey-light'
+              }`}
+            >
+              All Seats — Mixed Data ({userCapacityBreakdown.length})
+            </button>
+
+            <button
               onClick={() => handleTabChange('zone1')}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition ${
                 activeTab === 'zone1'
@@ -86,17 +97,6 @@ export function RoiCapacityPanel({
               }`}
             >
               Zone 2: Over-Utilized ({zone2List.length})
-            </button>
-
-            <button
-              onClick={() => handleTabChange('all')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition ${
-                activeTab === 'all'
-                  ? 'bg-ey-yellow/20 text-ey-yellow border-ey-yellow/40 shadow-sm'
-                  : 'bg-ey-black text-ey-muted border-ey-border hover:text-ey-light'
-              }`}
-            >
-              All Seats ({userCapacityBreakdown.length})
             </button>
           </div>
         </div>
@@ -144,7 +144,7 @@ export function RoiCapacityPanel({
             ) : activeTab === 'zone2' ? (
               <span className="text-purple-400 font-semibold">Zone 2: Budget Breach &amp; Overage Charges (Actual Cost - Limit)</span>
             ) : (
-              <span>All User License &amp; Capacity Statuses</span>
+              <span className="text-ey-yellow font-semibold">All User Seats — Mixed Capacity &amp; Zone Statuses</span>
             )}
           </h3>
 

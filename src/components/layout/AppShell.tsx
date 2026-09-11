@@ -4,21 +4,30 @@ import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { useAuth } from '@/context/AuthContext';
-import { Zap, Menu } from 'lucide-react';
+import { useTheme } from '@/context/ThemeContext';
+import { Zap, Menu, Sun, Moon } from 'lucide-react';
 import { OnboardingModal } from '@/components/ui/OnboardingModal';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isAuthenticated, loading } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const isLoginPage = pathname === '/login';
 
-  // Show modal on every fresh login (state resets on re-mount / logout)
+  // Show modal ONLY on fresh login via login screen (not on page refresh)
   useEffect(() => {
     if (isAuthenticated && !loading) {
-      setShowOnboarding(true);
+      const justLoggedIn = sessionStorage.getItem('just_logged_in') === 'true';
+      const onboardingSeen = sessionStorage.getItem('onboarding_seen') === 'true';
+
+      if (justLoggedIn && !onboardingSeen) {
+        setShowOnboarding(true);
+        sessionStorage.setItem('onboarding_seen', 'true');
+        sessionStorage.removeItem('just_logged_in');
+      }
     }
   }, [isAuthenticated, loading]);
 
@@ -72,9 +81,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="font-bold text-xs tracking-wide text-ey-light">AI Analytics</span>
             </div>
           </div>
-          <span className="text-[10px] text-ey-yellow font-semibold px-2 py-0.5 rounded bg-ey-yellow/10 border border-ey-yellow/20">
-            Mobile
-          </span>
+
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+              className="p-1.5 rounded-lg text-ey-yellow hover:bg-ey-card-hover transition-colors"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            <span className="text-[10px] text-ey-yellow font-semibold px-2 py-0.5 rounded bg-ey-yellow/10 border border-ey-yellow/20">
+              Mobile
+            </span>
+          </div>
         </header>
 
         <main className="flex-1 min-w-0">

@@ -96,6 +96,39 @@ claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/0
     document.body.removeChild(link);
   };
 
+  const handleDownloadActiveDataset = async () => {
+    try {
+      const customText = localStorage.getItem('custom_csv_data');
+      let csvContent = customText;
+      let name = meta?.fileName || 'ai_usage_data.csv';
+
+      if (!csvContent) {
+        const publicRes = await fetch('/ai_usage_data.csv');
+        if (publicRes.ok) {
+          csvContent = await publicRes.text();
+        } else {
+          const exportRes = await fetch('/api/metrics/export');
+          csvContent = await exportRes.text();
+        }
+      }
+
+      if (!csvContent || !csvContent.trim()) {
+        throw new Error('Active CSV data source could not be retrieved.');
+      }
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', name.endsWith('.csv') ? name : `${name}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      setStatusMessage({ type: 'error', text: err.message || 'Failed to download active dataset' });
+    }
+  };
+
   const validateAndPreviewCsv = (text: string, name = 'custom_data.csv') => {
     setValidationError(null);
     setParsedRows([]);
@@ -239,11 +272,20 @@ claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/0
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleDownloadActiveDataset}
+            className="flex items-center space-x-1.5 text-xs font-semibold px-3 py-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-lg hover:bg-emerald-500/25 transition-colors shadow-sm"
+            title="Download Active Source CSV File"
+          >
+            <Download className="w-4 h-4" />
+            <span>Download Active Data Source CSV</span>
+          </button>
+
           <button
             onClick={handleDownloadTemplate}
             className="flex items-center space-x-1.5 text-xs font-semibold px-3 py-2 bg-ey-yellow/15 border border-ey-yellow/30 text-ey-yellow rounded-lg hover:bg-ey-yellow/25 transition-colors"
-            title="Download CSV Schema Template"
+            title="Download Blank CSV Schema Template"
           >
             <Download className="w-4 h-4" />
             <span>Download CSV Template</span>
@@ -276,14 +318,14 @@ claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/0
           <div className="flex items-center justify-between border-b border-ey-border/60 pb-3">
             <div className="flex items-center space-x-2">
               <FileSpreadsheet className="w-5 h-5 text-ey-yellow" />
-              <h3 className="text-sm font-bold text-ey-light tracking-wide">Required CSV Schema Fields (17 Columns)</h3>
+              <h3 className="text-sm font-bold text-ey-light tracking-wide">Required CSV Schema Fields (20 Columns)</h3>
             </div>
             <button
               onClick={handleDownloadTemplate}
               className="text-xs font-semibold text-ey-yellow hover:underline flex items-center space-x-1"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Download `.csv` file</span>
+              <span>Download `.csv` template</span>
             </button>
           </div>
 
@@ -304,17 +346,29 @@ claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/0
 
       {/* Current Dataset Overview KPI Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2">
+        <div className="bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted">Active Data Source</span>
             <div className="p-1.5 bg-ey-yellow/10 border border-ey-yellow/30 text-ey-yellow rounded-lg">
               <FileSpreadsheet className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-xl font-bold text-ey-light truncate">
-            {meta?.isCustom ? 'Custom Uploaded' : 'Default Embedded'}
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xl font-bold text-ey-light truncate">
+                {meta?.isCustom ? 'Custom Uploaded' : 'Default Embedded'}
+              </div>
+              <p className="text-xs text-ey-yellow font-mono truncate">{meta?.fileName ?? 'ai_usage_data.csv'}</p>
+            </div>
+            <button
+              onClick={handleDownloadActiveDataset}
+              className="flex items-center space-x-1 text-xs font-semibold px-3 py-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg hover:bg-emerald-500/30 transition shrink-0"
+              title="Download full CSV file of active data source"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download CSV</span>
+            </button>
           </div>
-          <p className="text-xs text-ey-yellow font-mono truncate">{meta?.fileName ?? 'ai_usage_data.csv'}</p>
         </div>
 
         <div className="bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2">
