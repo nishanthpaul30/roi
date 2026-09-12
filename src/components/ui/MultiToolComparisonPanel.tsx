@@ -92,7 +92,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown }: MultiToolComp
               className="flex items-center space-x-1.5 text-xs font-semibold text-ey-black bg-ey-yellow hover:bg-yellow-400 px-3 py-1.5 rounded-lg transition shadow shrink-0 cursor-pointer"
               title="Drill down to Level 2 Decomposition and Level 4 Raw Telemetry Logs"
             >
-              <span>Drill Down</span>
+              <span>Deep Dive</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           )}

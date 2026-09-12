@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -14,6 +15,7 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
+import { LineChart as LineChartIcon, Table2 } from 'lucide-react';
 
 interface SeriesConfig {
   key: string;
@@ -33,6 +35,14 @@ interface MetricChartProps {
   height?: number;
 }
 
+function formatCellValue(value: any, seriesName: string): string {
+  const n = Number(value) || 0;
+  if (seriesName.includes('$')) {
+    return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  return n.toLocaleString();
+}
+
 export function MetricChart({
   title,
   subtitle,
@@ -43,6 +53,8 @@ export function MetricChart({
   stacked = false,
   height = 320,
 }: MetricChartProps) {
+  const [view, setView] = useState<'chart' | 'table'>('chart');
+
   if (!data || data.length === 0) {
     return (
       <div className="bg-ey-card border border-ey-border rounded-xl p-5 flex flex-col justify-center items-center h-64 text-ey-muted">
@@ -53,11 +65,56 @@ export function MetricChart({
 
   return (
     <div className="bg-ey-card border border-ey-border rounded-xl p-5 shadow-sm">
-      <div className="mb-4">
-        <h3 className="text-sm font-bold text-ey-light tracking-wide">{title}</h3>
-        {subtitle && <p className="text-xs text-ey-muted mt-0.5">{subtitle}</p>}
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <h3 className="text-sm font-bold text-ey-light tracking-wide">{title}</h3>
+          {subtitle && <p className="text-xs text-ey-muted mt-0.5">{subtitle}</p>}
+        </div>
+
+        <div className="flex items-center gap-1 bg-ey-black border border-ey-border rounded-lg p-1 shrink-0">
+          <button
+            onClick={() => setView('chart')}
+            title="Chart view"
+            className={`p-1.5 rounded-md transition ${view === 'chart' ? 'bg-ey-yellow text-ey-black' : 'text-ey-muted hover:text-ey-light'}`}
+          >
+            <LineChartIcon className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setView('table')}
+            title="Table view"
+            className={`p-1.5 rounded-md transition ${view === 'table' ? 'bg-ey-yellow text-ey-black' : 'text-ey-muted hover:text-ey-light'}`}
+          >
+            <Table2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
+      {view === 'table' ? (
+        <div className="overflow-auto rounded-lg border border-ey-border" style={{ maxHeight: height }}>
+          <table className="w-full text-left text-xs text-ey-light">
+            <thead className="bg-ey-black/80 text-[11px] uppercase font-semibold text-ey-muted border-b border-ey-border sticky top-0">
+              <tr>
+                <th className="px-4 py-2.5 capitalize">{dataKeyX}</th>
+                {series.map((s) => (
+                  <th key={s.key} className="px-4 py-2.5 text-right">{s.name}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-ey-border">
+              {data.map((row, idx) => (
+                <tr key={idx} className="hover:bg-ey-card-hover/60 transition">
+                  <td className="px-4 py-2.5 font-medium">{row[dataKeyX]}</td>
+                  {series.map((s) => (
+                    <td key={s.key} className="px-4 py-2.5 text-right font-mono">
+                      {formatCellValue(row[s.key], s.name)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
       <div style={{ width: '100%', height }}>
         <ResponsiveContainer width="100%" height="100%">
           {chartType === 'area' ? (
@@ -138,6 +195,7 @@ export function MetricChart({
           )}
         </ResponsiveContainer>
       </div>
+      )}
     </div>
   );
 }

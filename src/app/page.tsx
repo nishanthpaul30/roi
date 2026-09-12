@@ -202,6 +202,7 @@ export default function ExecutiveOverviewPage() {
                 {/* Executive Strategic Leadership Inferences Panel */}
                 <ExecutiveInferencesPanel
                   summary={data.tokenCostSummary}
+                  totalRosterSeats={data?.filterOptions?.users?.length}
                   onSelectInference={(infId) => {
                     setInferenceInitialEntity(null);
                     setActiveInferenceDrilldown(infId);

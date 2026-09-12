@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Search, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 
 export interface Column<T> {
@@ -15,6 +15,7 @@ interface DataTableProps<T> {
   data: T[];
   columns: Column<T>[];
   pageSize?: number;
+  onRowClick?: (row: T) => void;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -22,6 +23,7 @@ export function DataTable<T extends Record<string, any>>({
   data,
   columns,
   pageSize = 10,
+  onRowClick,
 }: DataTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -30,9 +32,13 @@ export function DataTable<T extends Record<string, any>>({
 
   // Search filter logic
   const filteredData = data.filter((row) =>
-    Object.values(row).some((val) =>
-      String(val).toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    Object.values(row).some((val) => {
+      if (val === null || val === undefined || React.isValidElement(val)) return false;
+      if (typeof val === 'string' || typeof val === 'number') {
+        return String(val).toLowerCase().includes(searchTerm.toLowerCase());
+      }
+      return false;
+    })
   );
 
   // Pagination logic
@@ -47,6 +53,17 @@ export function DataTable<T extends Record<string, any>>({
       return col.accessorKey(row);
     }
     return row[col.accessorKey];
+  };
+
+  const renderCell = (row: T, col: Column<T>) => {
+    if (col.cell) {
+      return col.cell(row);
+    }
+    const val = getValue(row, col);
+    if (React.isValidElement(val)) {
+      return val;
+    }
+    return String(val ?? '-');
   };
 
   return (
@@ -86,10 +103,16 @@ export function DataTable<T extends Record<string, any>>({
           <tbody className="divide-y divide-ey-border">
             {paginatedData.length > 0 ? (
               paginatedData.map((row, rIdx) => (
-                <tr key={rIdx} className="hover:bg-ey-card-hover/80 transition">
+                <tr
+                  key={rIdx}
+                  onClick={() => onRowClick?.(row)}
+                  className={`hover:bg-ey-card-hover/80 transition ${
+                    onRowClick ? 'cursor-pointer' : ''
+                  }`}
+                >
                   {columns.map((col, cIdx) => (
                     <td key={cIdx} className="px-4 py-3 font-medium text-ey-light">
-                      {col.cell ? col.cell(row) : String(getValue(row, col) ?? '-')}
+                      {renderCell(row, col)}
                     </td>
                   ))}
                 </tr>

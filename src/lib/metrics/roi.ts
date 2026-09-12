@@ -1,5 +1,5 @@
 import { loadCsvData, CsvUsageRow } from '../data/csvLoader';
-import { GlobalFilterState, TokenCostSummary } from './types';
+import { GlobalFilterState, TokenCostSummary, MonthlyTrendPoint } from './types';
 import { getPreviousDateRange } from './engine';
 
 function filterRows(rows: CsvUsageRow[], filters: GlobalFilterState, sDate: string, eDate: string): CsvUsageRow[] {
@@ -135,6 +135,8 @@ export async function calculateTokenCostSummary(
       region,
       tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
       cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
+      userCount: new Set(rows.map(r => r.userMail.toLowerCase())).size,
+      countries: Array.from(new Set(rows.map(r => r.country).filter(Boolean))),
     }))
     .sort((a, b) => b.tokens - a.tokens);
 
@@ -143,8 +145,11 @@ export async function calculateTokenCostSummary(
   const byCountry = Array.from(byCountryMap.entries())
     .map(([country, rows]) => ({
       country,
+      region: rows[0]?.region || 'N/A',
+      managementRegion: rows[0]?.managementRegion || 'N/A',
       tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
       cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
+      userCount: new Set(rows.map(r => r.userMail.toLowerCase())).size,
     }))
     .sort((a, b) => b.tokens - a.tokens);
 
@@ -155,7 +160,24 @@ export async function calculateTokenCostSummary(
       serviceLine,
       tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
       cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
+      userCount: new Set(rows.map(r => r.userMail.toLowerCase())).size,
+      subServiceLines: Array.from(new Set(rows.map(r => r.orgSubServiceLine).filter(Boolean))),
     }))
+    .sort((a, b) => b.tokens - a.tokens);
+
+  // By Sub-Service Line breakdown
+  const bySubSlMap = groupBy(currentRows, r => `${r.orgServiceLine}:::${r.orgSubServiceLine || 'General'}`);
+  const bySubServiceLine = Array.from(bySubSlMap.entries())
+    .map(([key, rows]) => {
+      const [serviceLine, subServiceLine] = key.split(':::');
+      return {
+        serviceLine,
+        subServiceLine,
+        tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
+        cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
+        userCount: new Set(rows.map(r => r.userMail.toLowerCase())).size,
+      };
+    })
     .sort((a, b) => b.tokens - a.tokens);
 
   // Users breakdown by token consumption
@@ -181,6 +203,9 @@ export async function calculateTokenCostSummary(
   let totalOverageCost = 0;
   let totalUsageLimitsSum = 0;
   let ceilingRiskCount = 0;
+  let totalLicenseCost = 0;
+  let licenseUnderutilizedCost = 0;
+  let licenseOverutilizedValue = 0;
 
   const userCapacityBreakdown = Array.from(byUserMap.entries()).map(([userMail, rows]) => {
     const displayName = rows[0].displayName || userMail;
@@ -213,6 +238,21 @@ export async function calculateTokenCostSummary(
       ceilingRiskCount++;
     }
 
+    // License Cost ROI: compare actual usage cost against the real per-seat
+    // License Cost in USD from the CSV (independent of the $ free-token limit above).
+    const licenseCost = rows[0]?.licenseCost || 0;
+    totalLicenseCost += licenseCost;
+    const licenseRoiPercent = licenseCost > 0 ? Number(((actualCost / licenseCost) * 100).toFixed(1)) : 0;
+
+    let licenseRoiZone: 'underutilized' | 'overutilized' | 'aligned' = 'aligned';
+    if (licenseCost > 0 && actualCost < licenseCost) {
+      licenseRoiZone = 'underutilized';
+      licenseUnderutilizedCost += Number((licenseCost - actualCost).toFixed(4));
+    } else if (licenseCost > 0 && actualCost > licenseCost) {
+      licenseRoiZone = 'overutilized';
+      licenseOverutilizedValue += Number((actualCost - licenseCost).toFixed(4));
+    }
+
     return {
       userMail,
       displayName,
@@ -225,11 +265,18 @@ export async function calculateTokenCostSummary(
       tokenConsumption,
       ceilingPercent,
       zone,
+      licenseCost,
+      licenseRoiPercent,
+      licenseRoiZone,
     };
   }).sort((a, b) => b.wasteCost - a.wasteCost || b.actualCost - a.actualCost);
 
   const licenseEfficiencyRate = totalUsageLimitsSum > 0
     ? Number(((totalCost / totalUsageLimitsSum) * 100).toFixed(1))
+    : 0;
+
+  const licenseRoiPercent = totalLicenseCost > 0
+    ? Number(((totalCost / totalLicenseCost) * 100).toFixed(1))
     : 0;
 
   // Billable vs Non-Billable Insights
@@ -265,6 +312,63 @@ export async function calculateTokenCostSummary(
     };
   }).sort((a, b) => b.cost - a.cost);
 
+  // Monthly Trend breakdown (Month_Year / Month Id columns) with per-AI-tool cost split
+  const byMonthMap = groupBy(currentRows, r => String(r.monthId));
+  const monthlyTrend = Array.from(byMonthMap.entries())
+    .map(([, rows]) => {
+      const monthId = rows[0].monthId;
+      const monthLabel = rows[0].monthYear.replace(/_/g, ' ');
+      const tokens = Math.round(rows.reduce((s, r) => s + r.tokenConsumption, 0));
+      const billableTokens = Math.round(rows.reduce((s, r) => s + r.dailyBillableTokens, 0));
+      const cost = Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4));
+      const userCount = new Set(rows.map(r => r.userMail.toLowerCase())).size;
+      const costPer1kTokens = tokens > 0 ? Number((cost / (tokens / 1000)).toFixed(6)) : 0;
+
+      const point: Record<string, number | string> = {
+        monthId,
+        monthLabel,
+        tokens,
+        cost,
+        billableTokens,
+        userCount,
+        costPer1kTokens,
+      };
+      const toolCostMap = groupBy(rows, r => r.aiTool);
+      for (const [tool, toolRows] of toolCostMap.entries()) {
+        point[tool] = Number(toolRows.reduce((s, r) => s + r.cost, 0).toFixed(4));
+      }
+      return point as unknown as MonthlyTrendPoint;
+    })
+    .sort((a, b) => a.monthId - b.monthId);
+
+  // User Engagement Cohorts: classify each active user by their average distinct
+  // active-days per active month, so retention/adoption health is measurable from
+  // the raw CSV instead of asserted.
+  const byUserDaysMap = groupBy(currentRows, r => r.userMail.toLowerCase());
+  let embeddedCount = 0, regularCount = 0, occasionalCount = 0, dropoutCount = 0;
+  for (const [, rows] of byUserDaysMap.entries()) {
+    const activeDays = new Set(rows.map(r => r.activityDate)).size;
+    const activeMonths = new Set(rows.map(r => r.monthId)).size || 1;
+    const avgDaysPerActiveMonth = activeDays / activeMonths;
+    if (avgDaysPerActiveMonth >= 16) embeddedCount++;
+    else if (avgDaysPerActiveMonth >= 9) regularCount++;
+    else if (avgDaysPerActiveMonth >= 4) occasionalCount++;
+    else dropoutCount++;
+  }
+  const engagementTotalUsers = byUserDaysMap.size;
+  const pct = (n: number) => (engagementTotalUsers > 0 ? Number(((n / engagementTotalUsers) * 100).toFixed(1)) : 0);
+  const userEngagementCohorts = {
+    embeddedCount,
+    regularCount,
+    occasionalCount,
+    dropoutCount,
+    totalUsers: engagementTotalUsers,
+    embeddedPercent: pct(embeddedCount),
+    regularPercent: pct(regularCount),
+    occasionalPercent: pct(occasionalCount),
+    dropoutPercent: pct(dropoutCount),
+  };
+
   return {
     totalTokenConsumption: Math.round(totalTokenConsumption),
     totalBillableTokens: Math.round(totalBillableTokens),
@@ -280,12 +384,17 @@ export async function calculateTokenCostSummary(
     byManagementRegion,
     byCountry,
     byServiceLine,
+    bySubServiceLine,
     topUsers,
     totalWasteCost: Number(totalWasteCost.toFixed(2)),
     totalOverageCost: Number(totalOverageCost.toFixed(2)),
     licenseEfficiencyRate,
     ceilingRiskCount,
     userCapacityBreakdown,
+    totalLicenseCost: Number(totalLicenseCost.toFixed(2)),
+    licenseRoiPercent,
+    licenseUnderutilizedCost: Number(licenseUnderutilizedCost.toFixed(2)),
+    licenseOverutilizedValue: Number(licenseOverutilizedValue.toFixed(2)),
     billableSpend,
     nonBillableSpend,
     billableSpendPercent,
@@ -293,5 +402,7 @@ export async function calculateTokenCostSummary(
     internalProjectSpend,
     externalProjectPercent,
     byProjectCode,
+    monthlyTrend,
+    userEngagementCohorts,
   };
 }

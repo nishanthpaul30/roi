@@ -34,7 +34,8 @@ export interface CsvUsageRow {
   country: string;              // Country
   region: string;               // Region: Middle East, ANZ, Europe, etc.
   managementRegion: string;     // Management Region: EMEA | APAC | Americas
-  projectCode: string;          // Project Investment Code: PRJ-XXX-XXXX
+  projectCode: string;          // ProjectCode: billing code, E-XXXXXX (External) | I-XXXXXX (Internal)
+  projectInvestmentCode: string; // Project Investment Code: PRJ-<ServiceLine>-XXXX (distinct from ProjectCode)
   licenseCost: number;          // License Cost in USD
   usageFreeTokenLimit: number;  // Usage Free Token Limit
   usageLimit?: number;          // Backward-compatible alias
@@ -106,6 +107,7 @@ export function parseRawCsvText(raw: string): CsvUsageRow[] {
       region: cols[14].trim(),
       managementRegion: cols[15].trim(),
       projectCode: pCode,
+      projectInvestmentCode: cols[16].trim(),
       licenseCost: cols.length >= 18 ? (parseFloat(cols[17].trim()) || 100.0) : 100.0,
       usageFreeTokenLimit: cols.length >= 19 ? (parseFloat(cols[18].trim()) || 80.0) : 80.0,
       usageLimit: cols.length >= 19 ? (parseFloat(cols[18].trim()) || 80.0) : 80.0,

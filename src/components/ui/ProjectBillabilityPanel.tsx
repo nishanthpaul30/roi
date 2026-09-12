@@ -2,13 +2,19 @@
 
 import { useState } from 'react';
 import { TokenCostSummary } from '@/lib/metrics/types';
-import { FolderKanban, CheckCircle2, AlertCircle, Building, Briefcase, Search, ArrowUpDown } from 'lucide-react';
+import { FolderKanban, CheckCircle2, AlertCircle, Building, Briefcase, Search, ArrowUpDown, ArrowUpRight } from 'lucide-react';
 
 interface ProjectBillabilityPanelProps {
   summary: TokenCostSummary;
+  onSelectProject?: (projectCode: string, projectType: string) => void;
+  onSelectBillability?: (type: 'billable' | 'non_billable' | 'external' | 'internal') => void;
 }
 
-export function ProjectBillabilityPanel({ summary }: ProjectBillabilityPanelProps) {
+export function ProjectBillabilityPanel({
+  summary,
+  onSelectProject,
+  onSelectBillability,
+}: ProjectBillabilityPanelProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'External' | 'Internal'>('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -36,15 +42,23 @@ export function ProjectBillabilityPanel({ summary }: ProjectBillabilityPanelProp
       {/* 4 Summary KPI Cards for Billability & Project Types */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Billable Spend */}
-        <div className="bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2">
+        <div
+          onClick={() => onSelectBillability?.('billable')}
+          className={`bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2 transition ${
+            onSelectBillability ? 'cursor-pointer hover:border-emerald-500/60 hover:shadow-md group' : ''
+          }`}
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted">Billable AI Spend</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted group-hover:text-emerald-300 transition-colors flex items-center gap-1">
+              <span>Billable AI Spend</span>
+              {onSelectBillability && <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-400" />}
+            </span>
             <div className="p-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <div className="text-xl font-bold text-ey-light font-mono">
+            <div className="text-xl font-bold text-ey-light font-mono group-hover:text-emerald-300 transition-colors">
               ${(summary.billableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="text-xs font-semibold font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
@@ -55,15 +69,23 @@ export function ProjectBillabilityPanel({ summary }: ProjectBillabilityPanelProp
         </div>
 
         {/* Non-Billable Overhead */}
-        <div className="bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2">
+        <div
+          onClick={() => onSelectBillability?.('non_billable')}
+          className={`bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2 transition ${
+            onSelectBillability ? 'cursor-pointer hover:border-amber-500/60 hover:shadow-md group' : ''
+          }`}
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted">Non-Billable Overhead</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted group-hover:text-amber-300 transition-colors flex items-center gap-1">
+              <span>Non-Billable Overhead</span>
+              {onSelectBillability && <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-amber-400" />}
+            </span>
             <div className="p-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg">
               <AlertCircle className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <div className="text-xl font-bold text-ey-light font-mono">
+            <div className="text-xl font-bold text-ey-light font-mono group-hover:text-amber-300 transition-colors">
               ${(summary.nonBillableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="text-xs font-semibold font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
@@ -74,15 +96,23 @@ export function ProjectBillabilityPanel({ summary }: ProjectBillabilityPanelProp
         </div>
 
         {/* External Client Projects */}
-        <div className="bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2">
+        <div
+          onClick={() => onSelectBillability?.('external')}
+          className={`bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2 transition ${
+            onSelectBillability ? 'cursor-pointer hover:border-blue-500/60 hover:shadow-md group' : ''
+          }`}
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted">External Client Projects</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted group-hover:text-blue-300 transition-colors flex items-center gap-1">
+              <span>External Client Projects</span>
+              {onSelectBillability && <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-blue-400" />}
+            </span>
             <div className="p-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 rounded-lg">
               <Briefcase className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <div className="text-xl font-bold text-ey-light font-mono">
+            <div className="text-xl font-bold text-ey-light font-mono group-hover:text-blue-300 transition-colors">
               ${(summary.externalProjectSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="text-xs font-semibold font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
@@ -93,15 +123,23 @@ export function ProjectBillabilityPanel({ summary }: ProjectBillabilityPanelProp
         </div>
 
         {/* Internal R&D Projects */}
-        <div className="bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2">
+        <div
+          onClick={() => onSelectBillability?.('internal')}
+          className={`bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2 transition ${
+            onSelectBillability ? 'cursor-pointer hover:border-purple-500/60 hover:shadow-md group' : ''
+          }`}
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted">Internal R&amp;D Projects</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted group-hover:text-purple-300 transition-colors flex items-center gap-1">
+              <span>Internal R&amp;D Projects</span>
+              {onSelectBillability && <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-purple-400" />}
+            </span>
             <div className="p-1.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 rounded-lg">
               <Building className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <div className="text-xl font-bold text-ey-light font-mono">
+            <div className="text-xl font-bold text-ey-light font-mono group-hover:text-purple-300 transition-colors">
               ${(summary.internalProjectSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="text-xs font-semibold font-mono text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
@@ -173,14 +211,23 @@ export function ProjectBillabilityPanel({ summary }: ProjectBillabilityPanelProp
             <tbody className="divide-y divide-ey-border">
               {paginatedList.length > 0 ? (
                 paginatedList.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-ey-card-hover/80 transition">
+                  <tr
+                    key={idx}
+                    onClick={() => onSelectProject?.(row.projectCode, row.projectType)}
+                    className={`hover:bg-ey-card-hover/80 transition ${
+                      onSelectProject ? 'cursor-pointer group' : ''
+                    }`}
+                  >
                     <td className="px-4 py-3 font-mono font-bold text-ey-light flex items-center space-x-2">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono border flex items-center gap-1 group-hover:border-ey-yellow/60 ${
                         row.projectCode.startsWith('E-')
                           ? 'bg-blue-500/10 text-blue-300 border-blue-500/30'
                           : 'bg-purple-500/10 text-purple-300 border-purple-500/30'
                       }`}>
-                        {row.projectCode}
+                        <span>{row.projectCode}</span>
+                        {onSelectProject && (
+                          <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow" />
+                        )}
                       </span>
                     </td>
 

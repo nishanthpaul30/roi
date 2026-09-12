@@ -18,6 +18,7 @@ import {
   Database,
   Sun,
   Moon,
+  LayoutGrid,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { name: 'Executive Overview', href: '/', icon: LayoutDashboard },
   { name: 'Token & Spend ROI', href: '/dashboard/roi', icon: DollarSign },
   { name: 'Org & Regional Analytics', href: '/dashboard/teams', icon: Building2 },
+  { name: 'Data Explorer', href: '/dashboard/explore', icon: LayoutGrid },
   { name: 'Metrics Derivation Guide', href: '/dashboard/metrics-derivation', icon: BookOpen },
   { name: 'Admin & Data Upload', href: '/dashboard/admin', icon: Database },
 ];

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { UserCapacityRow } from '@/lib/metrics/types';
-import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert, Search, ChevronLeft, ChevronRight, ArrowUpRight } from 'lucide-react';
 
 interface RoiCapacityPanelProps {
   userCapacityBreakdown: UserCapacityRow[];
@@ -10,7 +10,13 @@ interface RoiCapacityPanelProps {
   totalOverageCost: number;
   licenseEfficiencyRate: number;
   ceilingRiskCount: number;
+  totalLicenseCost: number;
+  licenseRoiPercent: number;
+  licenseUnderutilizedCost: number;
+  licenseOverutilizedValue: number;
   pageSize?: number;
+  onSelectUser?: (user: UserCapacityRow) => void;
+  onSelectZone?: (zone: 'zone1_under' | 'zone2_over' | 'ceiling_risk') => void;
 }
 
 export function RoiCapacityPanel({
@@ -19,7 +25,13 @@ export function RoiCapacityPanel({
   totalOverageCost,
   licenseEfficiencyRate,
   ceilingRiskCount,
+  totalLicenseCost,
+  licenseRoiPercent,
+  licenseUnderutilizedCost,
+  licenseOverutilizedValue,
   pageSize = 10,
+  onSelectUser,
+  onSelectZone,
 }: RoiCapacityPanelProps) {
   const [activeTab, setActiveTab] = useState<'zone1' | 'zone2' | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -133,6 +145,39 @@ export function RoiCapacityPanel({
             </div>
           </div>
         </div>
+
+        {/* License Cost ROI Insight */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div className="bg-sky-500/10 border border-sky-500/20 rounded-xl p-3.5 flex items-start space-x-3">
+            <TrendingUp className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sky-300 font-bold">License Investment ROI</p>
+              <p className="text-[11px] text-ey-muted mt-0.5">
+                <strong className="text-sky-200">{licenseRoiPercent}%</strong> of total per-seat License Cost in USD (${totalLicenseCost.toLocaleString()}) was actually consumed as usage.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 flex items-start space-x-3">
+            <TrendingDown className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-amber-300 font-bold">Underutilized License Spend</p>
+              <p className="text-[11px] text-ey-muted mt-0.5">
+                <strong className="text-amber-200">${licenseUnderutilizedCost.toLocaleString()}</strong> of purchased license cost went unconsumed by usage.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3.5 flex items-start space-x-3">
+            <TrendingUp className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-purple-300 font-bold">Usage Beyond License Cost</p>
+              <p className="text-[11px] text-ey-muted mt-0.5">
+                <strong className="text-purple-200">${licenseOverutilizedValue.toLocaleString()}</strong> of usage cost exceeded what was paid in License Cost in USD.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* User Capacity Breakdown Table */}
@@ -178,6 +223,8 @@ export function RoiCapacityPanel({
                 <th className="px-4 py-3 text-right">Free Limit ($)</th>
                 <th className="px-4 py-3 text-right">Wasted Capacity</th>
                 <th className="px-4 py-3 text-right">Overage Fee</th>
+                <th className="px-4 py-3 text-right">License Cost ($)</th>
+                <th className="px-4 py-3 text-right">License ROI</th>
                 <th className="px-4 py-3 text-center">100K Cap Proximity</th>
                 <th className="px-4 py-3 text-center">Status Zone</th>
               </tr>
@@ -185,9 +232,20 @@ export function RoiCapacityPanel({
             <tbody className="divide-y divide-ey-border">
               {paginatedList.length > 0 ? (
                 paginatedList.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-ey-card-hover/80 transition">
+                  <tr
+                    key={idx}
+                    onClick={() => onSelectUser?.(row)}
+                    className={`hover:bg-ey-card-hover/80 transition ${
+                      onSelectUser ? 'cursor-pointer group' : ''
+                    }`}
+                  >
                     <td className="px-4 py-3 font-medium">
-                      <div>{row.displayName}</div>
+                      <div className="font-bold text-ey-light group-hover:text-ey-yellow flex items-center gap-1.5">
+                        <span>{row.displayName}</span>
+                        {onSelectUser && (
+                          <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow" />
+                        )}
+                      </div>
                       <div className="text-[10px] text-ey-muted font-mono">{row.userMail}</div>
                     </td>
 
@@ -226,6 +284,24 @@ export function RoiCapacityPanel({
                       ) : (
                         <span className="text-ey-muted">$0.00</span>
                       )}
+                    </td>
+
+                    <td className="px-4 py-3 text-right font-mono text-ey-muted">
+                      ${row.licenseCost.toFixed(2)}
+                    </td>
+
+                    <td className="px-4 py-3 text-right font-mono font-bold">
+                      <span
+                        className={
+                          row.licenseRoiZone === 'underutilized'
+                            ? 'text-amber-400'
+                            : row.licenseRoiZone === 'overutilized'
+                            ? 'text-purple-400'
+                            : 'text-emerald-400'
+                        }
+                      >
+                        {row.licenseRoiPercent}%
+                      </span>
                     </td>
 
                     <td className="px-4 py-3 text-center">
@@ -275,7 +351,7 @@ export function RoiCapacityPanel({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-ey-muted">
+                  <td colSpan={10} className="px-4 py-8 text-center text-ey-muted">
                     No matching users found for selected zone or search term.
                   </td>
                 </tr>
