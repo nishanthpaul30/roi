@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { TokenCostSummary } from '@/lib/metrics/types';
+import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
 import { loadCsvData } from '@/lib/data/csvLoader';
+import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 import {
   Layers,
@@ -23,6 +24,7 @@ import {
 interface MultiToolComparisonPanelProps {
   summary: TokenCostSummary | null;
   onDrilldown?: (tool?: string, userMail?: string) => void;
+  filters?: GlobalFilterState;
 }
 
 const TOOL_CONFIG: Record<
@@ -52,18 +54,19 @@ const TOOL_CONFIG: Record<
   },
 };
 
-export function MultiToolComparisonPanel({ summary, onDrilldown }: MultiToolComparisonPanelProps) {
+export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: MultiToolComparisonPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showOverlapUsers, setShowOverlapUsers] = useState(false);
 
   // Raw CSV rows, needed to walk the mandated hierarchy before any overlap user is named.
   const allRows = useMemo(() => {
     try {
-      return loadCsvData();
+      const rows = loadCsvData();
+      return filters ? filterRowsByGlobalFilters(rows, filters) : rows;
     } catch (_err) {
       return [];
     }
-  }, []);
+  }, [filters]);
 
   const multiToolOverlap = summary?.multiToolOverlap;
   const overlapHierarchyRows = useMemo(() => {

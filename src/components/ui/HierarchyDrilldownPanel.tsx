@@ -110,7 +110,7 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle }:
             <span>{title || 'Hierarchy Drilldown'}</span>
           </h3>
           <p className="text-xs text-ey-muted mt-0.5">
-            {subtitle || 'CT/Non-CT → Country → Service Line → Sub-Service Line 1 → Sub-Service Line 2 → Engagement Code → Engagement Super Region → Engagement Service Line → Engagement Sub Service Line → Engagement Competency → User'}
+            {subtitle || 'Drill down step by step through the org structure — individual user identity is only revealed at the final level.'}
           </p>
         </div>
         {path.length > 0 && (

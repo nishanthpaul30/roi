@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GlobalFilterState } from '@/lib/metrics/types';
 
+// Defaults to "All Months" — the full span of the dataset (March - August 2026).
 const DEFAULT_FILTERS: GlobalFilterState = {
   startDate: '2026-03-01',
   endDate: '2026-08-31',

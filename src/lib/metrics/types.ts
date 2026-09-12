@@ -111,7 +111,6 @@ export interface TokenCostSummary {
     tokens: number;
     cost: number;
     userCount: number;
-    billablePercent: number;
   }[];
   // Monthly Trend Insights (derived from Month_Year / Month Id CSV columns)
   monthlyTrend: MonthlyTrendPoint[];

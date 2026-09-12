@@ -270,7 +270,7 @@ export function ExecutiveInferencesPanel({ summary, totalRosterSeats, onSelectIn
               Leadership Strategic Inferences &amp; Decision Intelligence
             </h2>
             <p className="text-xs text-ey-muted mt-0.5">
-              C-Suite actionable insights derived directly from <span className="font-mono text-ey-yellow font-medium">ai_usage_data.csv</span> for the current filters
+              C-Suite actionable insights for the current filters
             </p>
           </div>
         </div>

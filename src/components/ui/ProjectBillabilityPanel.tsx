@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { TokenCostSummary } from '@/lib/metrics/types';
-import { FolderKanban, CheckCircle2, AlertCircle, Building, Briefcase, Search, ArrowUpDown, ArrowUpRight } from 'lucide-react';
+import { FolderKanban, Building, Briefcase, Search, ArrowUpDown, ArrowUpRight } from 'lucide-react';
 
 interface ProjectBillabilityPanelProps {
   summary: TokenCostSummary;
   onSelectProject?: (projectCode: string, projectType: string) => void;
-  onSelectBillability?: (type: 'billable' | 'non_billable' | 'external' | 'internal') => void;
+  onSelectBillability?: (type: 'external' | 'internal') => void;
 }
 
 export function ProjectBillabilityPanel({
@@ -34,68 +34,13 @@ export function ProjectBillabilityPanel({
   const totalPages = Math.ceil(filteredList.length / itemsPerPage) || 1;
   const paginatedList = filteredList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const billablePercent = summary.billableSpendPercent || 0;
   const externalPercent = summary.externalProjectPercent || 0;
 
   return (
     <div className="space-y-6">
-      {/* 4 Summary KPI Cards for Billability & Project Types */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Billable Spend */}
-        <div
-          onClick={() => onSelectBillability?.('billable')}
-          className={`bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2 transition ${
-            onSelectBillability ? 'cursor-pointer hover:border-emerald-500/60 hover:shadow-md group' : ''
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted group-hover:text-emerald-300 transition-colors flex items-center gap-1">
-              <span>Billable AI Spend</span>
-              {onSelectBillability && <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-400" />}
-            </span>
-            <div className="p-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <div className="text-xl font-bold text-ey-light font-mono group-hover:text-emerald-300 transition-colors">
-              ${(summary.billableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className="text-xs font-semibold font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-              {billablePercent}% of Total
-            </div>
-          </div>
-          <p className="text-xs text-ey-muted">Direct revenue-generating client allocation</p>
-        </div>
-
-        {/* Non-Billable Overhead */}
-        <div
-          onClick={() => onSelectBillability?.('non_billable')}
-          className={`bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2 transition ${
-            onSelectBillability ? 'cursor-pointer hover:border-amber-500/60 hover:shadow-md group' : ''
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted group-hover:text-amber-300 transition-colors flex items-center gap-1">
-              <span>Non-Billable Overhead</span>
-              {onSelectBillability && <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-amber-400" />}
-            </span>
-            <div className="p-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg">
-              <AlertCircle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <div className="text-xl font-bold text-ey-light font-mono group-hover:text-amber-300 transition-colors">
-              ${(summary.nonBillableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className="text-xs font-semibold font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
-              {(100 - billablePercent).toFixed(1)}% of Total
-            </div>
-          </div>
-          <p className="text-xs text-ey-muted">Internal operational AI cost allocation</p>
-        </div>
-
-        {/* External Client Projects */}
+      {/* 2 Summary KPI Cards — Billable and External are the same 1:1 classification, as are Non-Billable and Internal */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Billable / External Client Projects */}
         <div
           onClick={() => onSelectBillability?.('external')}
           className={`bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2 transition ${
@@ -104,7 +49,7 @@ export function ProjectBillabilityPanel({
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted group-hover:text-blue-300 transition-colors flex items-center gap-1">
-              <span>External Client Projects</span>
+              <span>Billable Spend (External Projects)</span>
               {onSelectBillability && <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-blue-400" />}
             </span>
             <div className="p-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 rounded-lg">
@@ -116,13 +61,13 @@ export function ProjectBillabilityPanel({
               ${(summary.externalProjectSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="text-xs font-semibold font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
-              {externalPercent}% External
+              {externalPercent}% of Total
             </div>
           </div>
-          <p className="text-xs text-ey-muted">Client engagements (Code prefix: E-XXXXXX)</p>
+          <p className="text-xs text-ey-muted">Client engagements, billable to the client (Code prefix: E-XXXXXX)</p>
         </div>
 
-        {/* Internal R&D Projects */}
+        {/* Non-Billable / Internal R&D Projects */}
         <div
           onClick={() => onSelectBillability?.('internal')}
           className={`bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2 transition ${
@@ -131,7 +76,7 @@ export function ProjectBillabilityPanel({
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted group-hover:text-purple-300 transition-colors flex items-center gap-1">
-              <span>Internal R&amp;D Projects</span>
+              <span>Non-Billable Overhead (Internal Projects)</span>
               {onSelectBillability && <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-purple-400" />}
             </span>
             <div className="p-1.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 rounded-lg">
@@ -143,10 +88,10 @@ export function ProjectBillabilityPanel({
               ${(summary.internalProjectSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="text-xs font-semibold font-mono text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
-              {(100 - externalPercent).toFixed(1)}% Internal
+              {(100 - externalPercent).toFixed(1)}% of Total
             </div>
           </div>
-          <p className="text-xs text-ey-muted">Internal tools &amp; R&amp;D (Code prefix: I-XXXXXX)</p>
+          <p className="text-xs text-ey-muted">Internal tools &amp; R&amp;D, not billed to any client (Code prefix: I-XXXXXX)</p>
         </div>
       </div>
 
@@ -205,7 +150,6 @@ export function ProjectBillabilityPanel({
                 <th className="px-4 py-3 text-right">Active Users</th>
                 <th className="px-4 py-3 text-right">Token Consumption</th>
                 <th className="px-4 py-3 text-right">Total AI Investment</th>
-                <th className="px-4 py-3 text-center">Billable Ratio</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ey-border">
@@ -252,23 +196,11 @@ export function ProjectBillabilityPanel({
                     <td className="px-4 py-3 text-right font-mono font-bold text-ey-yellow">
                       ${row.cost.toFixed(2)}
                     </td>
-
-                    <td className="px-4 py-3 text-center font-mono">
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="w-16 bg-ey-black rounded-full h-1.5 overflow-hidden border border-ey-border">
-                          <div
-                            className={`h-full ${row.billablePercent >= 75 ? 'bg-emerald-400' : row.billablePercent >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
-                            style={{ width: `${row.billablePercent}%` }}
-                          />
-                        </div>
-                        <span className="text-[11px] font-semibold text-ey-light">{row.billablePercent}%</span>
-                      </div>
-                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-ey-muted">
+                  <td colSpan={5} className="px-4 py-8 text-center text-ey-muted">
                     No project codes matching your filter criteria.
                   </td>
                 </tr>

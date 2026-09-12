@@ -10,7 +10,7 @@ import { ExecutiveMetricDrilldownView } from '@/components/ui/ExecutiveMetricDri
 import { ExecutiveInferenceDrilldownView } from '@/components/ui/ExecutiveInferenceDrilldownView';
 import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
 import { ExecutivePrintTemplate } from '@/components/reports/ExecutivePrintTemplate';
-import { Sparkles, ShieldCheck, Printer, MousePointerClick } from 'lucide-react';
+import { Sparkles, Printer } from 'lucide-react';
 
 export default function ExecutiveOverviewPage() {
   const { filters, setFilters, data, loading } = useMetricsData();
@@ -69,6 +69,7 @@ export default function ExecutiveOverviewPage() {
               setActiveInferenceDrilldown(null);
               setInferenceInitialEntity(null);
             }}
+            filters={filters}
           />
         ) : activeDrilldown ? (
           /* In-Page Deep Metric Drilldown Component View */
@@ -88,13 +89,9 @@ export default function ExecutiveOverviewPage() {
                 <div>
                   <h1 className="text-xl font-bold text-ey-light tracking-tight flex items-center gap-3">
                     <span>Executive Overview</span>
-                    <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-ey-yellow/10 border border-ey-yellow/30 text-ey-yellow">
-                      <MousePointerClick className="w-3 h-3" />
-                      Click any metric for in-page drilldown
-                    </span>
                   </h1>
                   <p className="text-xs text-ey-muted mt-0.5">
-                    Token consumption, billable tokens, and API cost — click any metric card to enter deep-dive telemetry.
+                    Token consumption, billable tokens, and API cost across your organization.
                   </p>
                 </div>
               </div>
@@ -108,19 +105,12 @@ export default function ExecutiveOverviewPage() {
                   <Printer className="w-4 h-4" />
                   <span>Print / Save as PDF</span>
                 </button>
-
-                <div className="hidden md:flex items-center space-x-2 text-xs bg-ey-card border border-ey-border rounded-xl px-3 py-2 text-ey-light shrink-0">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="font-mono text-[11px] text-ey-muted">
-                    Source: <strong className="text-ey-light font-medium">ai_usage_data.csv</strong>
-                  </span>
-                </div>
               </div>
             </div>
 
             {loading || !data ? (
               <div className="h-64 flex items-center justify-center text-ey-muted text-sm animate-pulse">
-                Loading data from ai_usage_data.csv...
+                Loading data...
               </div>
             ) : (
               <>
@@ -213,6 +203,7 @@ export default function ExecutiveOverviewPage() {
                 {/* Multi-Tool Spend & Efficiency Comparison (ChatGPT vs Copilot vs Claude) */}
                 <MultiToolComparisonPanel
                   summary={data.tokenCostSummary}
+                  filters={filters}
                   onDrilldown={(tool, userMail) => {
                     if (userMail) {
                       setInferenceInitialEntity({ type: 'user', name: userMail, label: userMail });

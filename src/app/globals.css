@@ -53,6 +53,16 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/* Native date inputs otherwise render their calendar-picker icon in a fixed
+   dark color, making it invisible against the dark theme's own dark fields. */
+input[type="date"] {
+  color-scheme: dark;
+}
+
+html.light input[type="date"], body.light input[type="date"] {
+  color-scheme: light;
+}
+
 @keyframes geo-marker-ping {
   0% {
     transform: scale(0.9);

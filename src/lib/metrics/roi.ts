@@ -300,15 +300,12 @@ export async function calculateTokenCostSummary(
     const cost = Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(2));
     const userCount = new Set(rows.map(r => r.userMail)).size;
     const pType = rows[0]?.projectType || (pCode.startsWith('E-') ? 'External' : 'Internal');
-    const bRows = rows.filter(r => r.billableFlag === 'True' || r.billableFlag === 'true');
-    const billablePercent = rows.length > 0 ? Number(((bRows.length / rows.length) * 100).toFixed(1)) : 0;
     return {
       projectCode: pCode,
       projectType: pType,
       tokens,
       cost,
       userCount,
-      billablePercent,
     };
   }).sort((a, b) => b.cost - a.cost);
 

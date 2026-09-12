@@ -6,7 +6,7 @@ import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { KpiCard } from '@/components/ui/KpiCard';
 import { HierarchicalTable, HierGroup } from '@/components/ui/HierarchicalTable';
 import { RoiDrilldownView, RoiDrilldownTarget } from '@/components/ui/RoiDrilldownView';
-import { Building2, Layers, MousePointerClick } from 'lucide-react';
+import { Building2, Layers } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
 
 const SERVICE_LINE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -95,6 +95,7 @@ export default function OrgAndRegionalPage() {
             summary={summary}
             onBack={() => setActiveDrilldown(null)}
             parentTitle="Service Line Analytics"
+            filters={filters}
           />
         ) : (
           <>
@@ -107,13 +108,9 @@ export default function OrgAndRegionalPage() {
                 <div>
                   <h1 className="text-xl font-bold text-ey-light tracking-wide flex items-center gap-2.5">
                     <span>Service Line Analytics</span>
-                    <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-ey-yellow/10 border border-ey-yellow/30 text-ey-yellow">
-                      <MousePointerClick className="w-3 h-3" />
-                      Click any card or table row to drill down to core log stream
-                    </span>
                   </h1>
                   <p className="text-xs text-ey-muted mt-0.5">
-                    Unified view of token consumption and spend aggregated by Service Line and Sub-Practice from <span className="font-mono text-ey-yellow">ai_usage_data.csv</span>. For a country-level breakdown, see Geo Pulse.
+                    Unified view of token consumption and spend aggregated by Service Line and Sub-Practice. For a country-level breakdown, see Geo Pulse.
                   </p>
                 </div>
               </div>
@@ -127,7 +124,7 @@ export default function OrgAndRegionalPage() {
 
             {loading || !summary ? (
               <div className="h-64 flex items-center justify-center text-ey-muted text-sm animate-pulse font-mono">
-                Loading live organizational telemetry from ai_usage_data.csv...
+                Loading live organizational telemetry...
               </div>
             ) : (
               <>
@@ -150,7 +147,7 @@ export default function OrgAndRegionalPage() {
                         type: 'service_line',
                         id: topServiceLine.serviceLine,
                         title: `Service Line: ${topServiceLine.serviceLine}`,
-                        subtitle: `Direct row-level CSV records and workforce telemetry for ${topServiceLine.serviceLine} in ai_usage_data.csv.`,
+                        subtitle: `Direct row-level records and workforce telemetry for ${topServiceLine.serviceLine}.`,
                         badge: 'Service Line',
                         filterCriteria: { serviceLine: topServiceLine.serviceLine },
                       })
@@ -174,7 +171,7 @@ export default function OrgAndRegionalPage() {
                         type: 'region',
                         id: topRegion.region,
                         title: `Management Region: ${topRegion.region}`,
-                        subtitle: `Direct row-level CSV records and country distribution for ${topRegion.region} in ai_usage_data.csv.`,
+                        subtitle: `Direct row-level records and country distribution for ${topRegion.region}.`,
                         badge: 'Management Region',
                         filterCriteria: { region: topRegion.region },
                       })
@@ -198,7 +195,7 @@ export default function OrgAndRegionalPage() {
                         type: 'sub_service_line',
                         id: topSubPractice.subServiceLine,
                         title: `Practice: ${topSubPractice.subServiceLine}`,
-                        subtitle: `Practice-level telemetry records under ${topSubPractice.serviceLine} in ai_usage_data.csv.`,
+                        subtitle: `Practice-level telemetry records under ${topSubPractice.serviceLine}.`,
                         badge: topSubPractice.serviceLine,
                         filterCriteria: { subServiceLine: topSubPractice.subServiceLine },
                       })
@@ -221,7 +218,7 @@ export default function OrgAndRegionalPage() {
                         type: 'metric',
                         id: 'efficiency',
                         title: 'Global Org Telemetry Stream',
-                        subtitle: 'All active employee logs across all service lines and regions in ai_usage_data.csv.',
+                        subtitle: 'All active employee logs across all service lines and regions.',
                         badge: 'Global Overview',
                       })
                     }
@@ -230,7 +227,7 @@ export default function OrgAndRegionalPage() {
 
                 {/* Service Line & Sub-Service Line Practices (consolidated, expandable) */}
                 <HierarchicalTable
-                  title="Service Line & Practice Breakdown (Click a row to drill down, chevron to expand)"
+                  title="Service Line & Practice Breakdown"
                   subtitle="Every Service Line with its Sub-Service Line practices nested underneath — replaces two separate tables"
                   groups={serviceLineGroups}
                   parentColumnHeader="Service Line"
@@ -245,7 +242,7 @@ export default function OrgAndRegionalPage() {
                       type: 'service_line',
                       id,
                       title: `Service Line: ${id}`,
-                      subtitle: `Row-level CSV usage events and workforce activity for ${id} in ai_usage_data.csv.`,
+                      subtitle: `Row-level usage events and workforce activity for ${id}.`,
                       badge: 'Service Line',
                       filterCriteria: { serviceLine: id },
                     });
@@ -255,7 +252,7 @@ export default function OrgAndRegionalPage() {
                       type: 'sub_service_line',
                       id,
                       title: `Practice: ${id}`,
-                      subtitle: `Row-level CSV records for ${id} practice (${parentId}) in ai_usage_data.csv.`,
+                      subtitle: `Row-level records for ${id} practice (${parentId}).`,
                       badge: parentId,
                       filterCriteria: { subServiceLine: id },
                     })

@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { UserCapacityRow } from '@/lib/metrics/types';
+import { UserCapacityRow, GlobalFilterState } from '@/lib/metrics/types';
 import { loadCsvData } from '@/lib/data/csvLoader';
+import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert } from 'lucide-react';
 
@@ -19,6 +20,7 @@ interface RoiCapacityPanelProps {
   pageSize?: number;
   onSelectUser?: (user: UserCapacityRow) => void;
   onSelectZone?: (zone: 'zone1_under' | 'zone2_over' | 'ceiling_risk') => void;
+  filters?: GlobalFilterState;
 }
 
 export function RoiCapacityPanel({
@@ -33,6 +35,7 @@ export function RoiCapacityPanel({
   licenseOverutilizedValue,
   onSelectUser,
   onSelectZone,
+  filters,
 }: RoiCapacityPanelProps) {
   const [activeTab, setActiveTab] = useState<'zone1' | 'zone2' | 'all'>('all');
 
@@ -49,11 +52,12 @@ export function RoiCapacityPanel({
   // Raw CSV rows, needed to walk the mandated hierarchy before any user is named.
   const allRows = useMemo(() => {
     try {
-      return loadCsvData();
+      const rows = loadCsvData();
+      return filters ? filterRowsByGlobalFilters(rows, filters) : rows;
     } catch (_err) {
       return [];
     }
-  }, []);
+  }, [filters]);
 
   const capacityByEmail = useMemo(() => {
     const map = new Map<string, UserCapacityRow>();

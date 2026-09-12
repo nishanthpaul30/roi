@@ -143,7 +143,7 @@ export function GeoHierarchyMap({ groups, onSelect }: GeoHierarchyMapProps) {
             )}
           </div>
           <div className="bg-ey-card/95 backdrop-blur border border-ey-border rounded-lg px-2.5 py-1.5 text-[10px] text-ey-muted shadow-lg">
-            Bubble size &amp; label = active users &middot; click to drill down
+            Bubble size &amp; label = active users
           </div>
         </div>
       </div>

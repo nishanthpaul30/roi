@@ -10,19 +10,13 @@ import { RoiCapacityPanel } from '@/components/ui/RoiCapacityPanel';
 import { ProjectBillabilityPanel } from '@/components/ui/ProjectBillabilityPanel';
 import { RoiDrilldownView, RoiDrilldownTarget } from '@/components/ui/RoiDrilldownView';
 import { ExecutivePrintTemplate } from '@/components/reports/ExecutivePrintTemplate';
-import { Coins, ShieldCheck, Zap, MousePointerClick } from 'lucide-react';
+import { Coins, ShieldCheck, Zap } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
 
 const TOOL_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT',
   copilot: 'GitHub Copilot',
   claude: 'Claude',
-};
-
-const TOOL_COLORS: Record<string, string> = {
-  chatgpt: '#10a37f',
-  copilot: '#8957e5',
-  claude: '#d97706',
 };
 
 export default function RoiPage() {
@@ -46,6 +40,7 @@ export default function RoiPage() {
             target={activeDrilldown}
             summary={summary}
             onBack={() => setActiveDrilldown(null)}
+            filters={filters}
           />
         ) : (
           <>
@@ -58,13 +53,9 @@ export default function RoiPage() {
                 <div>
                   <h1 className="text-xl font-bold text-ey-light tracking-wide flex items-center gap-2.5">
                     <span>Financial Governance &amp; Capacity Waste ROI</span>
-                    <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-ey-yellow/10 border border-ey-yellow/30 text-ey-yellow">
-                      <MousePointerClick className="w-3 h-3" />
-                      Click any card or row to drill down
-                    </span>
                   </h1>
                   <p className="text-xs text-ey-muted mt-0.5">
-                    Bifurcated capacity waste, overage risk, and 100K token cap governance derived directly from <span className="font-mono text-ey-yellow">ai_usage_data.csv</span>.
+                    Bifurcated capacity waste, overage risk, and 100K token cap governance across your organization.
                   </p>
                 </div>
               </div>
@@ -79,7 +70,7 @@ export default function RoiPage() {
 
         {loading || !summary ? (
           <div className="h-64 flex items-center justify-center text-ey-muted text-sm animate-pulse">
-            Loading CSV data &amp; calculating ROI metrics...
+            Loading data &amp; calculating ROI metrics...
           </div>
         ) : (
           <>
@@ -102,7 +93,7 @@ export default function RoiPage() {
                     type: 'metric',
                     id: 'efficiency',
                     title: 'License Investment ROI Analysis',
-                    subtitle: 'Actual telemetry spend vs real per-seat License Cost in USD from ai_usage_data.csv.',
+                    subtitle: 'Actual telemetry spend vs real per-seat License Cost in USD.',
                     badge: 'License ROI',
                   })
                 }
@@ -209,6 +200,7 @@ export default function RoiPage() {
               licenseRoiPercent={summary.licenseRoiPercent}
               licenseUnderutilizedCost={summary.licenseUnderutilizedCost}
               licenseOverutilizedValue={summary.licenseOverutilizedValue}
+              filters={filters}
               onSelectUser={(u) =>
                 openDrilldown({
                   type: 'user',
@@ -253,14 +245,10 @@ export default function RoiPage() {
                   type: 'billability',
                   id: bType,
                   title:
-                    bType === 'billable'
-                      ? 'Billable Client AI Telemetry'
-                      : bType === 'non_billable'
-                      ? 'Non-Billable Operational AI Overhead'
-                      : bType === 'external'
-                      ? 'External Client Projects Telemetry'
-                      : 'Internal R&D Projects Telemetry',
-                  subtitle: `Row-level CSV records matching ${bType.replace('_', ' ')} criteria in ai_usage_data.csv.`,
+                    bType === 'external'
+                      ? 'Billable / External Client Projects Telemetry'
+                      : 'Non-Billable / Internal R&D Projects Telemetry',
+                  subtitle: `Row-level records matching ${bType} criteria.`,
                   badge: bType.toUpperCase(),
                 })
               }
@@ -270,49 +258,24 @@ export default function RoiPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <MetricChart
                 title="Daily API Cost Over Time"
-                subtitle="Cost in USD per day from ai_usage_data.csv"
+                subtitle="Cost in USD per day"
                 data={data.metrics.cost.series}
                 chartType="area"
                 series={[{ key: 'value', name: 'Daily Cost ($)', color: '#FFE600' }]}
               />
               <MetricChart
                 title="Daily Token Consumption"
-                subtitle="Token Consumption per day from ai_usage_data.csv"
+                subtitle="Token Consumption per day"
                 data={data.metrics.tokenConsumption.series}
                 chartType="area"
                 series={[{ key: 'value', name: 'Token Consumption', color: '#6366f1' }]}
               />
             </div>
 
-            {/* Monthly Trend Charts (Month_Year / Month Id from ai_usage_data.csv) */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <MetricChart
-                title="Monthly Cost Trend"
-                subtitle="Total cost in USD per calendar month from ai_usage_data.csv"
-                data={summary.monthlyTrend}
-                dataKeyX="monthLabel"
-                chartType="bar"
-                series={[{ key: 'cost', name: 'Monthly Cost ($)', color: '#FFE600' }]}
-              />
-              <MetricChart
-                title="Monthly Spend by AI Tool"
-                subtitle="Month-over-month adoption/spend split across ChatGPT, Copilot &amp; Claude"
-                data={summary.monthlyTrend}
-                dataKeyX="monthLabel"
-                chartType="bar"
-                stacked
-                series={summary.byAiTool.map((t) => ({
-                  key: t.tool,
-                  name: TOOL_LABELS[t.tool] || t.tool,
-                  color: TOOL_COLORS[t.tool] || '#94a3b8',
-                }))}
-              />
-            </div>
-
             {/* AI Tool Breakdown */}
             {summary.byAiTool?.length > 0 && (
               <DataTable
-                title="Cost &amp; Token Efficiency by AI Tool (Click tool to drill down)"
+                title="Cost &amp; Token Efficiency by AI Tool"
                 data={summary.byAiTool.map((t) => ({
                   rawTool: t.tool,
                   tool: TOOL_LABELS[t.tool] || t.tool,

@@ -59,7 +59,7 @@ const CSV_SCHEMA = [
   { column: 'Management Region', fieldName: 'managementRegion', description: 'Regional management division (e.g. EMEA, APAC, Americas)', dataType: 'String' },
   { column: 'License Cost in USD', fieldName: 'licenseCost', description: 'Real per-seat license cost billed for that user — the basis for License Investment ROI', dataType: 'Numeric ($)' },
   { column: 'Usage Free Token Limit', fieldName: 'usageFreeTokenLimit', description: 'Baseline free token/spending ceiling threshold used for Zone 1/2 Capacity Waste & Overage (distinct from License Cost)', dataType: 'Numeric' },
-  { column: 'Billable/Non-Billable', fieldName: 'billableFlag', description: 'Client billability flag (True for billable, False for internal)', dataType: 'Boolean' },
+  { column: 'Billable/Non-Billable', fieldName: 'billableFlag', description: 'Client billability flag, derived from Project Type: True for External (E-XXXXXX) engagements, False for Internal (I-XXXXXX) projects', dataType: 'Boolean' },
   { column: 'ProjectType', fieldName: 'projectType', description: 'Project classification (External for client, Internal for R&D)', dataType: 'String' },
   { column: 'GDS Location', fieldName: 'gdsLocation', description: 'Global Delivery Services location fulfilling the work, or "Onshore" if not GDS-delivered — independent of the hierarchy chain', dataType: 'String' },
   { column: 'Cost Center', fieldName: 'costCenter', description: 'Internal accounting cost center code (e.g. CC-TAX-647) — independent of the hierarchy chain', dataType: 'String' },

@@ -118,7 +118,7 @@ export default function DataExplorerPage() {
                 </span>
               </h1>
               <p className="text-xs text-ey-muted mt-0.5">
-                Cross-tabulate every field in <span className="font-mono text-ey-yellow">ai_usage_data.csv</span> on demand &mdash; including the CT/Non-CT &rarr; Country &rarr; Service Line &rarr; Engagement hierarchy, GDS Location, and Cost Center, which have no dedicated panel elsewhere.
+                Cross-tabulate every field on demand &mdash; including the CT/Non-CT &rarr; Country &rarr; Service Line &rarr; Engagement hierarchy, GDS Location, and Cost Center, which have no dedicated panel elsewhere.
               </p>
             </div>
           </div>
@@ -171,13 +171,13 @@ export default function DataExplorerPage() {
 
         {loading || !result ? (
           <div className="h-64 flex items-center justify-center text-ey-muted text-sm animate-pulse">
-            Computing cross-tabulation from ai_usage_data.csv...
+            Computing cross-tabulation...
           </div>
         ) : (
           <>
             <ExplorerChart
               title={`${result.metricLabel} by ${result.rowDimLabel}${result.colDim !== 'none' ? ` × ${result.colDimLabel}` : ''}`}
-              subtitle={`Top ${chartData.length} of ${result.rows.length} ${result.rowDimLabel.toLowerCase()} values, from ai_usage_data.csv`}
+              subtitle={`Top ${chartData.length} of ${result.rows.length} ${result.rowDimLabel.toLowerCase()} values`}
               rows={chartData}
               colDim={result.colDim}
               columns={result.columns}

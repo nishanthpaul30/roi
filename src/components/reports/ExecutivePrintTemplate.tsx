@@ -51,7 +51,6 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
         <div className="text-right text-xs text-slate-700 font-mono space-y-1 bg-slate-50 border border-slate-200 p-3 rounded-lg">
           <p>Report Date: <strong className="text-slate-900 font-bold">{new Date().toLocaleDateString()}</strong></p>
           <p>Filter Period: <strong className="text-slate-900">{filters.startDate} → {filters.endDate}</strong></p>
-          <p>Source Data: <strong className="text-slate-900">ai_usage_data.csv</strong></p>
         </div>
       </div>
 
@@ -223,7 +222,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
         <ul className="list-disc pl-4 text-slate-700 space-y-1 text-xs font-medium">
           <li>Average spend per active user stands at <strong>${costPerActiveUser.toFixed(2)}</strong> across the filtered period.</li>
           <li>Dominant portfolio tool is <strong>{dominantTool}</strong> driving high enterprise adoption and token consumption.</li>
-          <li>Telemetry data verified directly from source usage log entries (<span className="font-mono">ai_usage_data.csv</span>).</li>
+          <li>Telemetry data verified directly from source usage log entries.</li>
         </ul>
       </div>
 

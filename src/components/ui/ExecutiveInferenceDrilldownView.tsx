@@ -24,7 +24,6 @@ import {
   Calendar,
   ExternalLink,
   RefreshCw,
-  Sliders,
   DollarSign,
   PieChart as PieChartIcon,
   BarChart3,
@@ -35,8 +34,9 @@ import {
   FolderKanban,
   Briefcase,
 } from 'lucide-react';
-import { TokenCostSummary } from '@/lib/metrics/types';
+import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
 import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
+import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 
 export interface InferenceDefinition {
@@ -60,6 +60,7 @@ interface ExecutiveInferenceDrilldownViewProps {
     label?: string;
   } | null;
   onBack: () => void;
+  filters?: GlobalFilterState;
 }
 
 export function ExecutiveInferenceDrilldownView({
@@ -67,6 +68,7 @@ export function ExecutiveInferenceDrilldownView({
   summary,
   initialEntity,
   onBack,
+  filters,
 }: ExecutiveInferenceDrilldownViewProps) {
   // Level 3 Entity / Sub-dimension filter state
   const [selectedEntity, setSelectedEntity] = useState<{
@@ -116,11 +118,12 @@ export function ExecutiveInferenceDrilldownView({
   // Load raw CSV data synchronously
   const allRows = useMemo(() => {
     try {
-      return loadCsvData();
+      const rows = loadCsvData();
+      return filters ? filterRowsByGlobalFilters(rows, filters) : rows;
     } catch (_err) {
       return [];
     }
-  }, []);
+  }, [filters]);
 
   // Compute Active vs Inactive Telemetry Roster — real roster (all distinct users ever
   // seen in the CSV) vs real period-active seats (matching summary.userCapacityBreakdown,
@@ -982,15 +985,6 @@ export function ExecutiveInferenceDrilldownView({
       {/* ========================================================================= */}
       {!selectedEntity ? (
         <div className="space-y-6">
-          {/* Sub-Header Notice */}
-          <div className="flex items-center justify-between text-xs text-ey-muted font-mono bg-ey-card/50 px-4 py-2 rounded-xl border border-ey-border/60">
-            <span className="flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-ey-yellow" />
-              <span>Click any segment, tier, or user row below to drill down to its <strong>Level 4 Core Usage Log Records</strong></span>
-            </span>
-            <span className="hidden sm:inline text-ey-yellow font-semibold">Multi-Level Deep Dive Ready</span>
-          </div>
-
           {/* 1. SEAT UTILIZATION DECOMPOSITION */}
           {inferenceId === 'seat_utilization' && (
             <div className="space-y-6">
@@ -1121,7 +1115,7 @@ export function ExecutiveInferenceDrilldownView({
                   <div className="border-b border-ey-border/60 pb-3">
                     <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
                       <TrendingUp className="w-4 h-4 text-amber-400" />
-                      <span>Level 3: Month-by-Month Run-Rate Trajectory (Click Month to Drill Down)</span>
+                      <span>Level 3: Month-by-Month Run-Rate Trajectory</span>
                     </h3>
                     <p className="text-xs text-ey-muted mt-0.5">
                       Select any billing month to continue down the mandated hierarchy for that period's spend.
@@ -2027,7 +2021,6 @@ export function ExecutiveInferenceDrilldownView({
                 <CheckCircle2 className="w-3 h-3" />
                 <span>Level 4: Core Usage Log Telemetry (Last Level)</span>
               </span>
-              <span className="text-xs text-ey-muted font-mono">ai_usage_data.csv</span>
             </div>
             <h2 className="text-base font-bold text-ey-light mt-1 flex items-center gap-2">
               <FileSpreadsheet className="w-5 h-5 text-ey-yellow" />
@@ -2248,7 +2241,7 @@ export function ExecutiveInferenceDrilldownView({
               <div className="flex items-center space-x-2">
                 <FileSpreadsheet className="w-5 h-5 text-ey-yellow" />
                 <h3 className="text-base font-bold text-ey-light">
-                  Raw CSV Record Inspector (ai_usage_data.csv)
+                  Raw Record Inspector
                 </h3>
               </div>
               <button

@@ -30,7 +30,8 @@ import {
   Info,
 } from 'lucide-react';
 import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
-import { TokenCostSummary, UserCapacityRow } from '@/lib/metrics/types';
+import { TokenCostSummary, UserCapacityRow, GlobalFilterState } from '@/lib/metrics/types';
+import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 
 export interface RoiDrilldownTarget {
@@ -69,9 +70,10 @@ interface RoiDrilldownViewProps {
   summary?: TokenCostSummary | null;
   onBack: () => void;
   parentTitle?: string;
+  filters?: GlobalFilterState;
 }
 
-export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI Dashboard' }: RoiDrilldownViewProps) {
+export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI Dashboard', filters }: RoiDrilldownViewProps) {
   const { type, id, title, subtitle, badge, filterCriteria } = target;
 
   // Selected sub-entity within the drilldown (e.g. drilling down from "Wasted AI Capacity" or a Service Line into a specific sub-practice or employee)
@@ -114,11 +116,12 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
   // Load all raw CSV rows synchronously from memory
   const allRows = useMemo(() => {
     try {
-      return loadCsvData();
+      const rows = loadCsvData();
+      return filters ? filterRowsByGlobalFilters(rows, filters) : rows;
     } catch (_err) {
       return [];
     }
-  }, []);
+  }, [filters]);
 
   // Compute map of active user capacity breakdown (zone1 vs zone2 vs ceiling risk)
   const userCapacityMap = useMemo(() => {
@@ -496,12 +499,6 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
             </>
           )}
         </nav>
-
-        <div className="flex items-center space-x-2 text-xs font-mono">
-          <span className="px-2 py-0.5 rounded bg-ey-black text-ey-muted border border-ey-border">
-            Data Source: <strong className="text-ey-light">ai_usage_data.csv</strong>
-          </span>
-        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -525,8 +522,8 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
             </h1>
             <p className="text-xs text-ey-muted">
               {selectedSubEntity
-                ? `Inspecting all row-level activity log events for ${selectedSubEntity.name} in ai_usage_data.csv.`
-                : subtitle || 'Deep telemetry decomposition and raw log records derived from live CSV data.'}
+                ? `Inspecting all row-level activity log events for ${selectedSubEntity.name}.`
+                : subtitle || 'Deep telemetry decomposition and raw log records.'}
             </p>
           </div>
 
@@ -975,7 +972,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
               </span>
             </h2>
             <p className="text-xs text-ey-muted">
-              Row-by-row raw CSV records from <strong className="text-ey-light">ai_usage_data.csv</strong>. Click any row to inspect complete record JSON.
+              Row-by-row raw activity records. Click any row to inspect complete record JSON.
             </p>
           </div>
 
@@ -1195,7 +1192,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
               <div className="flex items-center space-x-2">
                 <FileSpreadsheet className="w-5 h-5 text-ey-yellow" />
                 <h3 className="text-base font-bold text-ey-light">
-                  Raw CSV Record Inspector (ai_usage_data.csv)
+                  Raw Record Inspector
                 </h3>
               </div>
               <button

@@ -5,7 +5,7 @@ import { useMetricsData } from '@/hooks/useMetricsData';
 import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
-import { GlobalFilterState } from '@/lib/metrics/types';
+import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
 import { GitBranch, ChevronRight, RotateCcw, ArrowUpRight, TableProperties, Globe2 } from 'lucide-react';
 import { GeoHierarchyMap } from '@/components/ui/GeoHierarchyMap';
 
@@ -44,18 +44,6 @@ interface PathEntry {
   value: string;
 }
 
-function filterByGlobalFilters(rows: CsvUsageRow[], filters: GlobalFilterState): CsvUsageRow[] {
-  return rows.filter((r) => {
-    if (r.activityDate < filters.startDate || r.activityDate > filters.endDate) return false;
-    if (filters.aiTool && filters.aiTool !== 'all' && r.aiTool !== filters.aiTool) return false;
-    if (filters.managementRegion && filters.managementRegion !== 'all' && r.managementRegion !== filters.managementRegion) return false;
-    if (filters.serviceLine && filters.serviceLine !== 'all' && r.orgServiceLine !== filters.serviceLine) return false;
-    if (filters.userMail && filters.userMail !== 'all' && r.userMail !== filters.userMail) return false;
-    if (filters.country && filters.country !== 'all' && r.country !== filters.country) return false;
-    return true;
-  });
-}
-
 function summarize(rows: CsvUsageRow[], field: keyof CsvUsageRow) {
   const map = new Map<string, CsvUsageRow[]>();
   for (const r of rows) {
@@ -90,7 +78,7 @@ export default function HierarchyDrilldownPage() {
     }
   }, []);
 
-  const baseRows = useMemo(() => filterByGlobalFilters(allRows, filters), [allRows, filters]);
+  const baseRows = useMemo(() => filterRowsByGlobalFilters(allRows, filters), [allRows, filters]);
 
   const pathRows = useMemo(
     () => baseRows.filter((r) => path.every((p) => String(r[p.field] || '').trim() === p.value)),
@@ -153,7 +141,7 @@ export default function HierarchyDrilldownPage() {
             <div>
               <h1 className="text-xl font-bold text-ey-light tracking-wide">Geo Pulse</h1>
               <p className="text-xs text-ey-muted mt-0.5">
-                Click through the mandated hierarchy — CT/Non-CT &rarr; Country &rarr; Service Line &rarr; Sub-Service Line 1 &rarr; Sub-Service Line 2 &rarr; Engagement Code &rarr; Engagement Super Region &rarr; Engagement Service Line &rarr; Engagement Sub Service Line &rarr; Engagement Competency.
+                Explore spend by geography and organization, one level at a time — individual names only appear once you reach the final step.
               </p>
             </div>
           </div>

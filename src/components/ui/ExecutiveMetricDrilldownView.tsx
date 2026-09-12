@@ -199,8 +199,8 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
             </h1>
             <p className="text-xs text-ey-muted mt-0.5">
               {subDrilldown
-                ? `Inspecting ${granularRows.length} raw usage log entries in ai_usage_data.csv for ${subDrilldown.name}`
-                : `${subtitle} — Click any card or row below for end-level record telemetry.`}
+                ? `Inspecting ${granularRows.length} raw usage log entries for ${subDrilldown.name}`
+                : subtitle}
             </p>
           </div>
 
@@ -371,7 +371,6 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                 <Zap className="w-5 h-5 text-ey-yellow" />
                 <span>Daily Telemetry Movement &amp; Run-Rate</span>
               </h3>
-              <span className="text-xs font-mono text-ey-muted">Source: ai_usage_data.csv</span>
             </div>
 
             <MetricChart
