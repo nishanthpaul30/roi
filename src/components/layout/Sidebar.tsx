@@ -23,10 +23,13 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 
-const NAV_ITEMS = [
+const INSIGHTS_NAV_ITEMS = [
   { name: 'Executive Overview', href: '/', icon: LayoutDashboard },
   { name: 'Token & Spend ROI', href: '/dashboard/roi', icon: DollarSign },
   { name: 'Org & Regional Analytics', href: '/dashboard/teams', icon: Building2 },
+];
+
+const TOOLS_NAV_ITEMS = [
   { name: 'Data Explorer', href: '/dashboard/explore', icon: LayoutGrid },
   { name: 'Metrics Derivation Guide', href: '/dashboard/metrics-derivation', icon: BookOpen },
   { name: 'Admin & Data Upload', href: '/dashboard/admin', icon: Database },
@@ -135,13 +138,48 @@ export function Sidebar({
 
         {/* Navigation Links */}
         <nav className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
-          {/* {(!isDesktopCollapsed || isMobileOpen) && (
-            <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-ey-muted">
-              CSV Analytics Pages ({NAV_ITEMS.length})
+          {(!isDesktopCollapsed || isMobileOpen) && (
+            <div className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-wider text-ey-muted">
+              Insights &amp; Analytics
             </div>
-          )} */}
+          )}
 
-          {NAV_ITEMS.map((item) => {
+          {INSIGHTS_NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            const isCollapsed = isDesktopCollapsed && !isMobileOpen;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setIsMobileOpen(false)}
+                title={isCollapsed ? item.name : undefined}
+                className={`flex items-center ${isCollapsed ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2'
+                  } rounded-md text-xs font-medium transition-all duration-150 ${isActive
+                    ? 'bg-ey-yellow/15 text-ey-yellow border border-ey-yellow/30 font-semibold'
+                    : 'hover:bg-ey-card-hover hover:text-ey-light text-ey-muted'
+                  }`}
+              >
+                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-2.5 min-w-0'}`}>
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-ey-yellow' : 'text-ey-muted'}`} />
+                  {!isCollapsed && <span className="truncate">{item.name}</span>}
+                </div>
+                {!isCollapsed && isActive && <ChevronRight className="w-3.5 h-3.5 text-ey-yellow shrink-0 ml-1" />}
+              </Link>
+            );
+          })}
+
+          {/* Divider between data-insight pages and tooling/admin pages */}
+          <div className={`border-t border-ey-border my-2 ${isDesktopCollapsed && !isMobileOpen ? 'mx-1' : ''}`} />
+
+          {(!isDesktopCollapsed || isMobileOpen) && (
+            <div className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-wider text-ey-muted">
+              Tools &amp; Administration
+            </div>
+          )}
+
+          {TOOLS_NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
             const isCollapsed = isDesktopCollapsed && !isMobileOpen;
