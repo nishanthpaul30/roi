@@ -194,12 +194,12 @@ export function MetricDrilldownModal({ isOpen, onClose, data }: MetricDrilldownM
             </div>
           )}
 
-          {/* Project Code Snippets preview if available */}
+          {/* Engagement Code Snippets preview if available */}
           {byProjectCode.length > 0 && (
             <div className="bg-ey-black/40 border border-ey-border rounded-xl p-4 space-y-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4" />
-                <span>Top Associated Project Codes</span>
+                <span>Top Associated Engagement Codes</span>
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs font-mono">
                 {byProjectCode.slice(0, 6).map((p: any) => (

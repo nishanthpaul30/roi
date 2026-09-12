@@ -150,13 +150,13 @@ export function ProjectBillabilityPanel({
         </div>
       </div>
 
-      {/* Project Codes Telemetry Table */}
+      {/* Engagement Codes Telemetry Table */}
       <div className="bg-ey-card border border-ey-border rounded-xl p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h3 className="text-base font-bold text-ey-light flex items-center space-x-2">
               <FolderKanban className="w-5 h-5 text-ey-yellow" />
-              <span>Project Code Telemetry &amp; Spend Rankings</span>
+              <span>Engagement Code Telemetry &amp; Spend Rankings</span>
             </h3>
             <p className="text-xs text-ey-muted mt-0.5">
               Rankings of project codes (<span className="font-mono text-blue-400">E-XXXXXX</span> vs <span className="font-mono text-purple-400">I-XXXXXX</span>) by total AI token spend.
@@ -200,7 +200,7 @@ export function ProjectBillabilityPanel({
           <table className="w-full text-left text-xs">
             <thead className="bg-ey-black/60 text-ey-muted font-semibold uppercase tracking-wider border-b border-ey-border">
               <tr>
-                <th className="px-4 py-3">Project Code</th>
+                <th className="px-4 py-3">Engagement Code</th>
                 <th className="px-4 py-3">Project Type</th>
                 <th className="px-4 py-3 text-right">Active Users</th>
                 <th className="px-4 py-3 text-right">Token Consumption</th>

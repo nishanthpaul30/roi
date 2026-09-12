@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Filter, Calendar, LogOut, Bot, Globe2, BarChart3, User, RotateCcw, FileText } from 'lucide-react';
+import { Filter, Calendar, LogOut, Bot, Globe2, BarChart3, RotateCcw, FileText } from 'lucide-react';
 import { GlobalFilterState, ComparisonPeriod } from '@/lib/metrics/types';
 import { subDays, format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
@@ -11,7 +11,6 @@ interface FilterOptions {
   managementRegions?: string[];
   serviceLines?: string[];
   countries?: string[];
-  users?: string[];
 }
 
 interface GlobalFilterBarProps {
@@ -72,7 +71,6 @@ export function GlobalFilterBar({
     filters.aiTool !== 'all',
     filters.managementRegion !== 'all',
     filters.serviceLine !== 'all',
-    filters.userMail !== 'all',
     filters.country !== 'all',
   ].filter(Boolean).length;
 
@@ -279,24 +277,6 @@ export function GlobalFilterBar({
               <option value="all">All Tools</option>
               {(filterOptions?.aiTools || ['chatgpt', 'copilot', 'claude']).map(t => (
                 <option key={t} value={t}>{TOOL_LABELS[t] || t}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* User */}
-          <div>
-            <label className="flex items-center gap-1 text-[10px] text-ey-muted font-semibold uppercase mb-1.5">
-              <User className="w-3 h-3" />
-              User
-            </label>
-            <select
-              value={filters.userMail}
-              onChange={(e) => handleChange('userMail', e.target.value)}
-              className="w-full bg-ey-black border border-ey-border text-ey-light rounded px-2 py-1.5 focus:outline-none focus:border-ey-yellow"
-            >
-              <option value="all">All Users</option>
-              {(filterOptions?.users || []).map(u => (
-                <option key={u} value={u}>{u}</option>
               ))}
             </select>
           </div>

@@ -32,6 +32,10 @@ interface MetricDerivationItem {
   category: string;
 }
 
+// Ordered per the required application-wide hierarchy:
+// CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1 -> Sub-Service Line 2 ->
+// Engagement Code -> Engagement Super Region -> Engagement Service Line ->
+// Engagement Sub Service Line -> Engagement Competency. Remaining columns follow.
 const CSV_SCHEMA = [
   { column: 'AI Tool Flag', fieldName: 'aiTool', description: 'AI Tool classification flag (e.g. copilot, chatgpt, claude)', dataType: 'String' },
   { column: 'User Mail', fieldName: 'userMail', description: 'Developer email identifier (e.g. aditya.malik@enterprise-corp.com)', dataType: 'String' },
@@ -40,16 +44,25 @@ const CSV_SCHEMA = [
   { column: 'Token Consumption', fieldName: 'tokenConsumption', description: 'Total raw tokens generated and processed (Prompt + Completion)', dataType: 'Numeric' },
   { column: 'Daily Billable Tokens', fieldName: 'dailyBillableTokens', description: 'Tokens charged toward billable quota', dataType: 'Numeric' },
   { column: 'Cost in USD', fieldName: 'cost', description: 'Direct monetary expenditure incurred in USD ($)', dataType: 'Numeric ($)' },
-  { column: 'Org Service Line', fieldName: 'orgServiceLine', description: 'Organizational Service Line (e.g. Tax, Assurance, S&T, CBS, Consulting)', dataType: 'String' },
+  { column: 'CT/Non-CT', fieldName: 'ctNonCt', description: 'Chargeable Time flag distinguishing CT (client-chargeable) from Non-CT work — hierarchy level 1', dataType: 'String' },
+  { column: 'Country', fieldName: 'country', description: 'Country location of user — hierarchy level 2', dataType: 'String' },
+  { column: 'Service Line', fieldName: 'orgServiceLine', description: 'Internal delivery Service Line (e.g. Tax, Assurance, S&T, CBS, Consulting) — hierarchy level 3', dataType: 'String' },
+  { column: 'Org Sub Service Line', fieldName: 'orgSubServiceLine', description: 'Internal delivery sub-practice under Service Line (e.g. Reporting, Strategy)', dataType: 'String' },
+  { column: 'Sub-Service Line 1', fieldName: 'subServiceLine1', description: 'First-level delivery sub-practice classification, derived from Service Line — hierarchy level 4', dataType: 'String' },
+  { column: 'Sub-Service Line 2', fieldName: 'subServiceLine2', description: 'Second-level delivery sub-practice classification, derived from Sub-Service Line 1 — hierarchy level 5', dataType: 'String' },
+  { column: 'Engagement Code', fieldName: 'projectCode', description: 'Billing engagement code (E-XXXXXX for external, I-XXXXXX for internal) — formerly labeled ProjectCode; hierarchy level 6', dataType: 'String' },
+  { column: 'Engagement Super Region', fieldName: 'engagementSuperRegion', description: 'Client engagement-side region grouping (e.g. EMEIA, Asia-Pacific, Americas) — hierarchy level 7', dataType: 'String' },
+  { column: 'Engagement Service Line', fieldName: 'engagementServiceLine', description: 'Client engagement-side Global Service Line, derived from Engagement Super Region — hierarchy level 8', dataType: 'String' },
+  { column: 'Engagement Sub Service Line', fieldName: 'engagementSubServiceLine', description: 'Client engagement-side sub-practice, derived from Engagement Service Line — hierarchy level 9', dataType: 'String' },
+  { column: 'Engagement Competency', fieldName: 'engagementCompetency', description: 'Skill/competency classification, derived from Engagement Sub Service Line — hierarchy level 10 (leaf)', dataType: 'String' },
+  { column: 'Region', fieldName: 'region', description: 'Finer-grained region than Management Region (e.g. ANZ, Middle East, North America)', dataType: 'String' },
   { column: 'Management Region', fieldName: 'managementRegion', description: 'Regional management division (e.g. EMEA, APAC, Americas)', dataType: 'String' },
-  { column: 'Country', fieldName: 'country', description: 'Country location of user', dataType: 'String' },
   { column: 'License Cost in USD', fieldName: 'licenseCost', description: 'Real per-seat license cost billed for that user — the basis for License Investment ROI', dataType: 'Numeric ($)' },
   { column: 'Usage Free Token Limit', fieldName: 'usageFreeTokenLimit', description: 'Baseline free token/spending ceiling threshold used for Zone 1/2 Capacity Waste & Overage (distinct from License Cost)', dataType: 'Numeric' },
   { column: 'Billable/Non-Billable', fieldName: 'billableFlag', description: 'Client billability flag (True for billable, False for internal)', dataType: 'Boolean' },
   { column: 'ProjectType', fieldName: 'projectType', description: 'Project classification (External for client, Internal for R&D)', dataType: 'String' },
-  { column: 'ProjectCode', fieldName: 'projectCode', description: 'Billing project code (E-XXXXXX for external, I-XXXXXX for internal)', dataType: 'String' },
-  { column: 'Project Investment Code', fieldName: 'projectInvestmentCode', description: 'Separate investment-tracking code, e.g. PRJ-CNS-2127 (encodes service line) — distinct from ProjectCode, previously discarded by the CSV loader', dataType: 'String' },
-  { column: 'Region', fieldName: 'region', description: 'Finer-grained region than Management Region (e.g. ANZ, Middle East, North America)', dataType: 'String' },
+  { column: 'GDS Location', fieldName: 'gdsLocation', description: 'Global Delivery Services location fulfilling the work, or "Onshore" if not GDS-delivered — independent of the hierarchy chain', dataType: 'String' },
+  { column: 'Cost Center', fieldName: 'costCenter', description: 'Internal accounting cost center code (e.g. CC-TAX-647) — independent of the hierarchy chain', dataType: 'String' },
   { column: 'Month_Year', fieldName: 'monthYear', description: 'Human-readable calendar month label (e.g. March_2026) — basis for Monthly Trend charts', dataType: 'String' },
   { column: 'Month Id', fieldName: 'monthId', description: 'Sortable numeric month key (e.g. 202603) used to order Monthly Trend series', dataType: 'Numeric' },
 ];
@@ -83,7 +96,7 @@ const FORMULA_CATEGORIES = [
     formulas: [
       { name: 'Billable AI Spend Share (%)', formula: 'Billable Spend % = (Billable Spend / Total Spend) × 100', example: '($1,372.40 / $1,750.00) × 100 = 78.4%' },
       { name: 'External Project Share (%)', formula: 'External Share % = (External Spend / Total Spend) × 100', example: '($1,246.00 / $1,750.00) × 100 = 71.2%' },
-      { name: 'Project Code Token Ranking', formula: 'Project Cost = ∑ (cost) grouped by ProjectCode (E-XXXXXX / I-XXXXXX)', example: 'E-301461: 325,000 tokens | $48.20' },
+      { name: 'Engagement Code Token Ranking', formula: 'Engagement Cost = ∑ (cost) grouped by Engagement Code (E-XXXXXX / I-XXXXXX)', example: 'E-301461: 325,000 tokens | $48.20' },
     ],
   },
   {
@@ -173,7 +186,7 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
   {
     name: 'Service Line Token Distribution',
     csvField: 'group_by(orgServiceLine) -> sum(token_consumption)',
-    formula: 'Sum of token_consumption grouped by Org Service Line',
+    formula: 'Sum of token_consumption grouped by Service Line',
     sampleInput: 'Tax = 102,889, Assurance = 186,020, CBS = 145,000',
     workedCalculation: 'Tax: 102,889 | Assurance: 186,020 | CBS: 145,000',
     derivedOutput: 'Service line totals',
@@ -201,13 +214,13 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     category: 'Projects',
   },
   {
-    name: 'Project Code Spend & Token Rankings',
+    name: 'Engagement Code Spend & Token Rankings',
     csvField: 'group_by(projectCode) -> sum(token_consumption), sum(cost)',
-    formula: 'Aggregate token consumption and cost per unique projectCode',
-    sampleInput: 'projectCode: E-301461, projectType: External',
+    formula: 'Aggregate token consumption and cost per unique Engagement Code',
+    sampleInput: 'Engagement Code: E-301461, projectType: External',
     workedCalculation: 'Tokens: 325,000 | Cost: $48.20 | Users: 4',
-    derivedOutput: 'Ranked project code list',
-    notes: 'Ranks all client (E-XXXXXX) and internal (I-XXXXXX) project codes by AI consumption',
+    derivedOutput: 'Ranked engagement code list',
+    notes: 'Ranks all client (E-XXXXXX) and internal (I-XXXXXX) engagement codes by AI consumption',
     category: 'Projects',
   },
   {

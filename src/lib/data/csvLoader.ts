@@ -29,18 +29,26 @@ export interface CsvUsageRow {
   tokenConsumption: number;     // Token Consumption
   dailyBillableTokens: number;  // Daily Billable Tokens
   cost: number;                 // Cost in USD
-  orgServiceLine: string;       // Org Service Line: Consulting, Power, Financial Services, Technology
+  orgServiceLine: string;       // Service Line: Consulting, Tax, Assurance, CBS, S&T
   orgSubServiceLine: string;    // Org Sub Service Line: Reporting, Strategy, etc.
   country: string;              // Country
   region: string;               // Region: Middle East, ANZ, Europe, etc.
   managementRegion: string;     // Management Region: EMEA | APAC | Americas
-  projectCode: string;          // ProjectCode: billing code, E-XXXXXX (External) | I-XXXXXX (Internal)
-  projectInvestmentCode: string; // Project Investment Code: PRJ-<ServiceLine>-XXXX (distinct from ProjectCode)
+  projectCode: string;          // Engagement Code: billing code, E-XXXXXX (External) | I-XXXXXX (Internal)
   licenseCost: number;          // License Cost in USD
   usageFreeTokenLimit: number;  // Usage Free Token Limit
   usageLimit?: number;          // Backward-compatible alias
   billableFlag: string;         // Billable/Non-Billable: 'True' | 'False'
   projectType: string;          // ProjectType: 'External' | 'Internal'
+  ctNonCt: string;              // CT/Non-CT
+  subServiceLine1: string;      // Sub-Service Line 1
+  subServiceLine2: string;      // Sub-Service Line 2
+  engagementSuperRegion: string; // Engagement Super Region
+  engagementServiceLine: string; // Engagement Service Line
+  engagementSubServiceLine: string; // Engagement Sub Service Line
+  engagementCompetency: string; // Engagement Competency
+  gdsLocation: string;          // GDS Location
+  costCenter: string;           // Cost Center
 }
 
 let _cache: CsvUsageRow[] | null = null;
@@ -76,6 +84,20 @@ function getCsvFilePath(): string {
   return path.join(process.cwd(), 'public', 'ai_usage_data.csv');
 }
 
+// Column order matches the current ai_usage_data.csv header exactly, which follows
+// the required hierarchy: CT/Non-CT -> Country -> Service Line -> (Sub-Service Line 1,
+// Sub-Service Line 2, Engagement Code) -> Engagement Super Region -> (Engagement Service
+// Line, Engagement Sub Service Line) -> Engagement Competency.
+const COL = {
+  aiTool: 0, userMail: 1, displayName: 2, activityDate: 3, monthYear: 4, monthId: 5,
+  periodStartDate: 6, periodEndDate: 7, tokenConsumption: 8, dailyBillableTokens: 9, cost: 10,
+  ctNonCt: 11, country: 12, orgServiceLine: 13, orgSubServiceLine: 14,
+  subServiceLine1: 15, subServiceLine2: 16, projectCode: 17,
+  engagementSuperRegion: 18, engagementServiceLine: 19, engagementSubServiceLine: 20, engagementCompetency: 21,
+  region: 22, managementRegion: 23, licenseCost: 24, usageFreeTokenLimit: 25,
+  billableFlag: 26, projectType: 27, gdsLocation: 28, costCenter: 29,
+};
+
 export function parseRawCsvText(raw: string): CsvUsageRow[] {
   const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   const rows: CsvUsageRow[] = [];
@@ -83,36 +105,43 @@ export function parseRawCsvText(raw: string): CsvUsageRow[] {
   // Skip header line (0)
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(',');
-    if (cols.length < 17) continue;
+    if (cols.length < 21) continue;
 
-    const billableFlag = cols.length >= 20 ? cols[19].trim() : 'True';
-    const projectType = cols.length >= 21 ? cols[20].trim() : 'External';
-    const pCode = cols.length >= 22 ? cols[21].trim() : cols[16].trim();
+    const get = (idx: number, fallback = '') => (cols[idx] !== undefined ? cols[idx].trim() : fallback);
+    const usageFreeTokenLimit = parseFloat(get(COL.usageFreeTokenLimit)) || 80.0;
 
     rows.push({
-      aiTool: cols[0].trim().toLowerCase(),
-      userMail: cols[1].trim(),
-      displayName: cols[2].trim(),
-      activityDate: cols[3].trim(),  // YYYY-MM-DD
-      monthYear: cols[4].trim(),
-      monthId: parseInt(cols[5].trim(), 10) || 0,
-      periodStartDate: cols[6].trim(),
-      periodEndDate: cols[7].trim(),
-      tokenConsumption: parseFloat(cols[8].trim()) || 0,
-      dailyBillableTokens: parseFloat(cols[9].trim()) || 0,
-      cost: parseFloat(cols[10].trim()) || 0,
-      orgServiceLine: cols[11].trim(),
-      orgSubServiceLine: cols[12].trim(),
-      country: cols[13].trim(),
-      region: cols[14].trim(),
-      managementRegion: cols[15].trim(),
-      projectCode: pCode,
-      projectInvestmentCode: cols[16].trim(),
-      licenseCost: cols.length >= 18 ? (parseFloat(cols[17].trim()) || 100.0) : 100.0,
-      usageFreeTokenLimit: cols.length >= 19 ? (parseFloat(cols[18].trim()) || 80.0) : 80.0,
-      usageLimit: cols.length >= 19 ? (parseFloat(cols[18].trim()) || 80.0) : 80.0,
-      billableFlag,
-      projectType,
+      aiTool: get(COL.aiTool).toLowerCase(),
+      userMail: get(COL.userMail),
+      displayName: get(COL.displayName),
+      activityDate: get(COL.activityDate),  // YYYY-MM-DD
+      monthYear: get(COL.monthYear),
+      monthId: parseInt(get(COL.monthId), 10) || 0,
+      periodStartDate: get(COL.periodStartDate),
+      periodEndDate: get(COL.periodEndDate),
+      tokenConsumption: parseFloat(get(COL.tokenConsumption)) || 0,
+      dailyBillableTokens: parseFloat(get(COL.dailyBillableTokens)) || 0,
+      cost: parseFloat(get(COL.cost)) || 0,
+      orgServiceLine: get(COL.orgServiceLine),
+      orgSubServiceLine: get(COL.orgSubServiceLine),
+      country: get(COL.country),
+      region: get(COL.region),
+      managementRegion: get(COL.managementRegion),
+      projectCode: get(COL.projectCode),
+      licenseCost: parseFloat(get(COL.licenseCost)) || 100.0,
+      usageFreeTokenLimit,
+      usageLimit: usageFreeTokenLimit,
+      billableFlag: get(COL.billableFlag, 'True'),
+      projectType: get(COL.projectType, 'External'),
+      ctNonCt: get(COL.ctNonCt),
+      subServiceLine1: get(COL.subServiceLine1),
+      subServiceLine2: get(COL.subServiceLine2),
+      engagementSuperRegion: get(COL.engagementSuperRegion),
+      engagementServiceLine: get(COL.engagementServiceLine),
+      engagementSubServiceLine: get(COL.engagementSubServiceLine),
+      engagementCompetency: get(COL.engagementCompetency),
+      gdsLocation: get(COL.gdsLocation),
+      costCenter: get(COL.costCenter),
     });
   }
 

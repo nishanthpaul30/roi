@@ -28,17 +28,25 @@ const REQUIRED_HEADERS = [
   'Token Consumption',
   'Daily Billable Tokens',
   'Cost in USD',
-  'Org Service Line',
-  'Org Sub Service Line',
+  'CT/Non-CT',
   'Country',
+  'Service Line',
+  'Org Sub Service Line',
+  'Sub-Service Line 1',
+  'Sub-Service Line 2',
+  'Engagement Code',
+  'Engagement Super Region',
+  'Engagement Service Line',
+  'Engagement Sub Service Line',
+  'Engagement Competency',
   'Region',
   'Management Region',
-  'Project Investment Code',
   'License Cost in USD',
   'Usage Free Token Limit',
   'Billable/Non-Billable',
   'ProjectType',
-  'ProjectCode',
+  'GDS Location',
+  'Cost Center',
 ];
 
 interface DatasetMeta {
@@ -83,10 +91,10 @@ export default function AdminPage() {
   }, []);
 
   const handleDownloadTemplate = () => {
-    const templateCsv = `AI Tool Flag,User Mail,Display Name,Activity Date,Month_Year,Month Id,Period Start Date,Period End Date,Token Consumption,Daily Billable Tokens,Cost in USD,Org Service Line,Org Sub Service Line,Country,Region,Management Region,Project Investment Code,License Cost in USD,Usage Free Token Limit,Billable/Non-Billable,ProjectType,ProjectCode
-copilot,john.doe@enterprise-corp.com,John Doe,2026-03-01,March_2026,202603,01/03/2026,31/03/2026,25000,25000,0.35,Consulting,Strategy,United States,North America,Americas,PRJ-CNS-1234,100.00,80.00,True,External,E-481920
-chatgpt,jane.smith@enterprise-corp.com,Jane Smith,2026-03-02,March_2026,202603,01/03/2026,31/03/2026,42000,42000,0.65,CBS,Data & AI,United Kingdom,Europe,EMEA,PRJ-TCH-5678,100.00,80.00,True,External,E-719302
-claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/03/2026,31/03/2026,18000,18000,0.28,Assurance,Reporting,Singapore,Southeast Asia,APAC,PRJ-FIN-9012,100.00,80.00,False,Internal,I-304918`;
+    const templateCsv = `AI Tool Flag,User Mail,Display Name,Activity Date,Month_Year,Month Id,Period Start Date,Period End Date,Token Consumption,Daily Billable Tokens,Cost in USD,CT/Non-CT,Country,Service Line,Org Sub Service Line,Sub-Service Line 1,Sub-Service Line 2,Engagement Code,Engagement Super Region,Engagement Service Line,Engagement Sub Service Line,Engagement Competency,Region,Management Region,License Cost in USD,Usage Free Token Limit,Billable/Non-Billable,ProjectType,GDS Location,Cost Center
+copilot,john.doe@enterprise-corp.com,John Doe,2026-03-01,March_2026,202603,01/03/2026,31/03/2026,25000,25000,0.35,CT,United States,Consulting,Strategy,Delivery,Hybrid Delivery,E-481920,Americas,Tax,Client Advisory,People Advisory,North America,Americas,100.00,80.00,True,External,Onshore,CC-CNS-101
+chatgpt,jane.smith@enterprise-corp.com,Jane Smith,2026-03-02,March_2026,202603,01/03/2026,31/03/2026,42000,42000,0.65,CT,United Kingdom,CBS,Data & AI,Innovation,Offshore Delivery,E-719302,EMEIA,Assurance,Risk & Compliance,Risk Management,Europe,EMEA,100.00,80.00,True,External,Wroclaw,CC-CBS-205
+claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/03/2026,31/03/2026,18000,18000,0.28,Non-CT,Singapore,Assurance,Reporting,Delivery,Onshore Delivery,I-304918,Asia-Pacific,Consulting,Digital Enablement,Technology,Southeast Asia,APAC,100.00,80.00,False,Internal,Bangalore,CC-ASU-318`;
 
     const blob = new Blob([templateCsv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -168,9 +176,9 @@ claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/0
           activityDate: cols[3] || '',
           tokenConsumption: cols[8] || '0',
           cost: cols[10] || '0',
-          serviceLine: cols[11] || '',
-          country: cols[13] || '',
-          region: cols[15] || '',
+          serviceLine: cols[13] || '',
+          country: cols[12] || '',
+          region: cols[22] || '',
         });
       }
     }
@@ -454,7 +462,7 @@ claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/0
               value={rawText}
               onChange={(e) => validateAndPreviewCsv(e.target.value, 'pasted_data.csv')}
               rows={8}
-              placeholder="AI Tool Flag,User Mail,Display Name,Activity Date,Month_Year,Month Id,Period Start Date,Period End Date,Token Consumption,Daily Billable Tokens,Cost in USD,Org Service Line,Org Sub Service Line,Country,Region,Management Region,Project Investment Code&#10;chatgpt,user@corp.com,User Name,2026-03-01,March_2026,202603,01/03/2026,31/03/2026,25000,25000,0.35,Consulting,Strategy,USA,North America,Americas,PRJ-1234"
+              placeholder="AI Tool Flag,User Mail,Display Name,Activity Date,Month_Year,Month Id,Period Start Date,Period End Date,Token Consumption,Daily Billable Tokens,Cost in USD,CT/Non-CT,Country,Service Line,Org Sub Service Line,Sub-Service Line 1,Sub-Service Line 2,Engagement Code,Engagement Super Region,Engagement Service Line,Engagement Sub Service Line,Engagement Competency,Region,Management Region,License Cost in USD,Usage Free Token Limit,Billable/Non-Billable,ProjectType,GDS Location,Cost Center&#10;chatgpt,user@corp.com,User Name,2026-03-01,March_2026,202603,01/03/2026,31/03/2026,25000,25000,0.35,CT,USA,Consulting,Strategy,Delivery,Hybrid Delivery,E-1234,Americas,Tax,Client Advisory,People Advisory,North America,Americas,100.00,80.00,True,External,Onshore,CC-CNS-101"
               className="w-full bg-ey-black/60 border border-ey-border rounded-xl p-3 text-xs text-ey-light font-mono focus:outline-none focus:border-ey-yellow"
             />
           </div>

@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
 import { TokenCostSummary, UserCapacityRow } from '@/lib/metrics/types';
+import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 
 export interface RoiDrilldownTarget {
   type:
@@ -306,30 +307,6 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
     [targetRows]
   );
 
-  // Associated users breakdown for Level 2 selector
-  const associatedUsers = useMemo(() => {
-    const map = new Map<string, { email: string; name: string; cost: number; tokens: number; count: number; tools: Set<string> }>();
-    for (const r of targetRows) {
-      const email = (r.userMail || '').toLowerCase().trim();
-      if (!email) continue;
-      if (!map.has(email)) {
-        map.set(email, {
-          email,
-          name: r.displayName || email.split('@')[0],
-          cost: 0,
-          tokens: 0,
-          count: 0,
-          tools: new Set<string>(),
-        });
-      }
-      const item = map.get(email)!;
-      item.cost += r.cost;
-      item.tokens += r.tokenConsumption;
-      item.count += 1;
-      if (r.aiTool) item.tools.add(r.aiTool.toLowerCase());
-    }
-    return Array.from(map.values()).sort((a, b) => b.cost - a.cost);
-  }, [targetRows]);
 
   // Associated project codes breakdown
   const associatedProjects = useMemo(() => {
@@ -431,8 +408,8 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
       'Display Name',
       'User Email',
       'AI Tool Flag',
-      'Project Investment Code',
-      'Org Service Line',
+      'Engagement Code',
+      'Service Line',
       'Org Sub Service Line',
       'Country',
       'Region',
@@ -471,6 +448,11 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
     document.body.removeChild(link);
     triggerToast('Filtered CSV audit trail exported successfully!');
   };
+
+  // A specific user has been reached, either as the original drilldown target or via
+  // the mandated hierarchy navigator below -- only now is it valid to show named,
+  // row-level identity in the raw telemetry log table.
+  const isUserScoped = type === 'user' || selectedSubEntity?.type === 'user';
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -599,12 +581,14 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
       </div>
 
       {/* ========================================================================= */}
-      {/* LEVEL 2 DECOMPOSITION: Quick Selectors (Users / Projects / Tools)           */}
+      {/* LEVEL 2 DECOMPOSITION: Quick Selectors (Categorical Facets Only)           */}
       {/* ========================================================================= */}
+      {!isUserScoped && (
+        <>
       {!selectedSubEntity && (
         <>
           {type === 'service_line' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* 1. Sub-Service Line Practices */}
               <div className="bg-ey-card border border-ey-border rounded-2xl p-4 shadow-sm space-y-3">
                 <div className="flex items-center justify-between border-b border-ey-border pb-2.5">
@@ -643,50 +627,12 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                 </div>
               </div>
 
-              {/* 2. Top Contributing Employees */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-4 shadow-sm space-y-3">
-                <div className="flex items-center justify-between border-b border-ey-border pb-2.5">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-ey-light flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-emerald-400" />
-                    <span>Contributing Users</span>
-                  </h3>
-                  <span className="text-[10px] text-ey-muted font-mono">{associatedUsers.length} users</span>
-                </div>
-                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40">
-                  {associatedUsers.slice(0, 15).map((u) => (
-                    <div
-                      key={u.email}
-                      onClick={() =>
-                        setSelectedSubEntity({
-                          type: 'user',
-                          id: u.email,
-                          name: u.name,
-                        })
-                      }
-                      className="pt-2 first:pt-0 pb-1.5 flex items-center justify-between hover:bg-ey-black/40 px-2 rounded-lg cursor-pointer transition group"
-                    >
-                      <div className="truncate pr-2">
-                        <p className="font-bold text-ey-light group-hover:text-emerald-300 flex items-center gap-1 truncate">
-                          <span>{u.name}</span>
-                          <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-300 shrink-0" />
-                        </p>
-                        <p className="text-[10px] text-ey-muted truncate">{u.email}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-bold text-emerald-400">${u.cost.toFixed(2)}</p>
-                        <p className="text-[10px] text-ey-muted">{u.count} logs</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 3. Top Project Codes */}
+              {/* 2. Top Engagement Codes */}
               <div className="bg-ey-card border border-ey-border rounded-2xl p-4 shadow-sm space-y-3">
                 <div className="flex items-center justify-between border-b border-ey-border pb-2.5">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-ey-light flex items-center gap-1.5">
                     <Briefcase className="w-4 h-4 text-blue-400" />
-                    <span>Project Codes</span>
+                    <span>Engagement Codes</span>
                   </h3>
                   <span className="text-[10px] text-ey-muted font-mono">{associatedProjects.length} projects</span>
                 </div>
@@ -725,7 +671,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                 </div>
               </div>
 
-              {/* 4. Country Footprint */}
+              {/* 3. Country Footprint */}
               <div className="bg-ey-card border border-ey-border rounded-2xl p-4 shadow-sm space-y-3">
                 <div className="flex items-center justify-between border-b border-ey-border pb-2.5">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-ey-light flex items-center gap-1.5">
@@ -764,7 +710,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
               </div>
             </div>
           ) : type === 'region' || type === 'country' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* 1. Service Lines Active */}
               <div className="bg-ey-card border border-ey-border rounded-2xl p-4 shadow-sm space-y-3">
                 <div className="flex items-center justify-between border-b border-ey-border pb-2.5">
@@ -880,45 +826,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                 </div>
               )}
 
-              {/* 3. Top Contributing Employees */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-4 shadow-sm space-y-3">
-                <div className="flex items-center justify-between border-b border-ey-border pb-2.5">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-ey-light flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-emerald-400" />
-                    <span>Contributing Users</span>
-                  </h3>
-                  <span className="text-[10px] text-ey-muted font-mono">{associatedUsers.length} users</span>
-                </div>
-                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40">
-                  {associatedUsers.slice(0, 15).map((u) => (
-                    <div
-                      key={u.email}
-                      onClick={() =>
-                        setSelectedSubEntity({
-                          type: 'user',
-                          id: u.email,
-                          name: u.name,
-                        })
-                      }
-                      className="pt-2 first:pt-0 pb-1.5 flex items-center justify-between hover:bg-ey-black/40 px-2 rounded-lg cursor-pointer transition group"
-                    >
-                      <div className="truncate pr-2">
-                        <p className="font-bold text-ey-light group-hover:text-emerald-300 flex items-center gap-1 truncate">
-                          <span>{u.name}</span>
-                          <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-300 shrink-0" />
-                        </p>
-                        <p className="text-[10px] text-ey-muted truncate">{u.email}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-bold text-emerald-400">${u.cost.toFixed(2)}</p>
-                        <p className="text-[10px] text-ey-muted">{u.count} logs</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 4. AI Platforms */}
+              {/* 3. AI Platforms */}
               <div className="bg-ey-card border border-ey-border rounded-2xl p-4 shadow-sm space-y-3">
                 <div className="flex items-center justify-between border-b border-ey-border pb-2.5">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-ey-light flex items-center gap-1.5">
@@ -956,51 +864,13 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Top Contributing Users Selector */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-3">
-                <div className="flex items-center justify-between border-b border-ey-border pb-2.5">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-ey-light flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-ey-yellow" />
-                    <span>Filter by Contributing User</span>
-                  </h3>
-                  <span className="text-[10px] text-ey-muted font-mono">{associatedUsers.length} total</span>
-                </div>
-                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40">
-                  {associatedUsers.slice(0, 15).map((u) => (
-                    <div
-                      key={u.email}
-                      onClick={() =>
-                        setSelectedSubEntity({
-                          type: 'user',
-                          id: u.email,
-                          name: u.name,
-                        })
-                      }
-                      className="pt-2 first:pt-0 pb-1.5 flex items-center justify-between hover:bg-ey-black/40 px-2 rounded-lg cursor-pointer transition group"
-                    >
-                      <div className="truncate pr-2">
-                        <p className="font-bold text-ey-light group-hover:text-ey-yellow flex items-center gap-1 truncate">
-                          <span>{u.name}</span>
-                          <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow shrink-0" />
-                        </p>
-                        <p className="text-[10px] text-ey-muted truncate">{u.email}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-bold text-ey-yellow">${u.cost.toFixed(2)}</p>
-                        <p className="text-[10px] text-ey-muted">{u.count} records</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Top Project Codes Selector */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Top Engagement Codes Selector */}
               <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-3">
                 <div className="flex items-center justify-between border-b border-ey-border pb-2.5">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-ey-light flex items-center gap-1.5">
                     <Briefcase className="w-4 h-4 text-blue-400" />
-                    <span>Filter by Project Code</span>
+                    <span>Filter by Engagement Code</span>
                   </h3>
                   <span className="text-[10px] text-ey-muted font-mono">{associatedProjects.length} total</span>
                 </div>
@@ -1080,9 +950,19 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
         </>
       )}
 
+          <HierarchyDrilldownPanel
+            rows={targetRows}
+            title="Hierarchy Drilldown"
+            subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
+            onSelectUser={(email, name) => setSelectedSubEntity({ type: 'user', id: email, name })}
+          />
+        </>
+      )}
+
       {/* ========================================================================= */}
-      {/* LEVEL 3: CORE RAW LOG TELEMETRY TABLE (ai_usage_data.csv)                 */}
+      {/* LEVEL 3: CORE RAW LOG TELEMETRY TABLE (ai_usage_data.csv) - user-scoped only */}
       {/* ========================================================================= */}
+      {isUserScoped && (
       <div className="bg-ey-card border border-ey-border rounded-2xl p-6 shadow-sm space-y-4">
         {/* Table Controls & Filter Toolbar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-ey-border pb-4">
@@ -1164,7 +1044,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Employee</th>
                 <th className="px-4 py-3">AI Tool</th>
-                <th className="px-4 py-3">Project Code</th>
+                <th className="px-4 py-3">Engagement Code</th>
                 <th className="px-4 py-3">Service Line</th>
                 <th className="px-4 py-3">Sub Service Line</th>
                 <th className="px-4 py-3 text-center">Billable</th>
@@ -1270,6 +1150,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
           </div>
         )}
       </div>
+      )}
 
       {/* ========================================================================= */}
       {/* FLOATING QUICK-RETURN BUTTON (EXCLUSIVE PERSISTENT ON-SCREEN CONTROL)     */}

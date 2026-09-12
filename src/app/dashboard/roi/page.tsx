@@ -235,7 +235,7 @@ export default function RoiPage() {
               }
             />
 
-            {/* Project Code Telemetry & Billability Panel */}
+            {/* Engagement Code Telemetry & Billability Panel */}
             <ProjectBillabilityPanel
               summary={summary}
               onSelectProject={(projectCode, projectType) =>

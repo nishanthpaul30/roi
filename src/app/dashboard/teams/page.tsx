@@ -4,10 +4,9 @@ import { useState } from 'react';
 import { useMetricsData } from '@/hooks/useMetricsData';
 import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { KpiCard } from '@/components/ui/KpiCard';
-import { ExplorerChart } from '@/components/ui/ExplorerChart';
 import { HierarchicalTable, HierGroup } from '@/components/ui/HierarchicalTable';
 import { RoiDrilldownView, RoiDrilldownTarget } from '@/components/ui/RoiDrilldownView';
-import { Building2, Globe2, Layers, MousePointerClick, ShieldCheck, Users } from 'lucide-react';
+import { Building2, Layers, MousePointerClick } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
 
 const SERVICE_LINE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -18,12 +17,6 @@ const SERVICE_LINE_COLORS: Record<string, { bg: string; text: string; border: st
   'S&T': { bg: 'bg-cyan-500/15', text: 'text-cyan-300', border: 'border-cyan-500/30' },
 };
 
-const REGION_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  EMEA: { bg: 'bg-amber-500/15', text: 'text-amber-300', border: 'border-amber-500/30' },
-  APAC: { bg: 'bg-blue-500/15', text: 'text-blue-300', border: 'border-blue-500/30' },
-  Americas: { bg: 'bg-emerald-500/15', text: 'text-emerald-300', border: 'border-emerald-500/30' },
-};
-
 export default function OrgAndRegionalPage() {
   const { filters, setFilters, data, loading } = useMetricsData();
   const [activeDrilldown, setActiveDrilldown] = useState<RoiDrilldownTarget | null>(null);
@@ -32,7 +25,6 @@ export default function OrgAndRegionalPage() {
   const serviceLines = summary?.byServiceLine || [];
   const subServiceLines = summary?.bySubServiceLine || [];
   const regions = summary?.byManagementRegion || [];
-  const countries = summary?.byCountry || [];
 
   const openDrilldown = (target: RoiDrilldownTarget) => {
     setActiveDrilldown(target);
@@ -42,15 +34,6 @@ export default function OrgAndRegionalPage() {
   const topServiceLine = serviceLines[0];
   const topRegion = regions[0];
   const topSubPractice = subServiceLines[0];
-
-  // Chart data
-  const serviceLineChartData = [...serviceLines]
-    .sort((a: any, b: any) => b.cost - a.cost)
-    .map((sl: any) => ({ label: sl.serviceLine, value: Number(sl.cost.toFixed(2)) }));
-
-  const regionChartData = [...regions]
-    .sort((a: any, b: any) => b.cost - a.cost)
-    .map((r: any) => ({ label: r.region, value: Number(r.cost.toFixed(2)) }));
 
   // Hierarchical breakdowns: Service Line -> its Sub-Service Line practices,
   // and Management Region -> its Countries, folded into one expandable table each
@@ -90,40 +73,7 @@ export default function OrgAndRegionalPage() {
       };
     });
 
-  const regionGroups: HierGroup[] = [...regions]
-    .sort((a: any, b: any) => b.tokens - a.tokens)
-    .map((r: any) => {
-      const regStyle = REGION_COLORS[r.region] || {
-        bg: 'bg-ey-yellow/10',
-        text: 'text-ey-yellow',
-        border: 'border-ey-yellow/30',
-      };
-      const children = countries
-        .filter((c: any) => c.managementRegion === r.region)
-        .sort((a: any, b: any) => b.tokens - a.tokens)
-        .map((c: any) => ({
-          id: c.country,
-          plainLabel: c.country,
-          users: `${c.userCount || '-'} active`,
-          tokens: c.tokens.toLocaleString(),
-          cost: fmtCost(c.cost),
-          share: fmtShare(c.tokens),
-        }));
-      return {
-        parent: {
-          id: r.region,
-          badge: { label: r.region, bg: regStyle.bg, textColor: regStyle.text, border: regStyle.border },
-          meta: r.countries?.join(', ') || 'Global',
-          users: `${r.userCount || '-'} active`,
-          tokens: r.tokens.toLocaleString(),
-          cost: fmtCost(r.cost),
-          share: fmtShare(r.tokens),
-        },
-        children,
-      };
-    });
-
-  // Stacked-chart equivalents of the two hierarchical tables above: parent as the bar,
+  // Stacked-chart equivalent of the hierarchical table above: parent as the bar,
   // its children as stacked segments, so the toggle can show composition without a separate section.
   const serviceLineChartRows = serviceLines.map((sl: any) => {
     const row: Record<string, any> = { label: sl.serviceLine, total: Number(sl.cost.toFixed(2)) };
@@ -133,15 +83,6 @@ export default function OrgAndRegionalPage() {
     return row;
   });
   const serviceLineChartColumns = subServiceLines.map((ssl: any) => ssl.subServiceLine);
-
-  const regionChartRows = regions.map((r: any) => {
-    const row: Record<string, any> = { label: r.region, total: Number(r.cost.toFixed(2)) };
-    countries
-      .filter((c: any) => c.managementRegion === r.region)
-      .forEach((c: any) => { row[c.country] = Number(c.cost.toFixed(2)); });
-    return row;
-  });
-  const regionChartColumns = countries.map((c: any) => c.country);
 
   return (
     <div className="flex-1 flex flex-col">
@@ -153,7 +94,7 @@ export default function OrgAndRegionalPage() {
             target={activeDrilldown}
             summary={summary}
             onBack={() => setActiveDrilldown(null)}
-            parentTitle="Org & Regional Analytics"
+            parentTitle="Service Line Analytics"
           />
         ) : (
           <>
@@ -165,21 +106,21 @@ export default function OrgAndRegionalPage() {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-ey-light tracking-wide flex items-center gap-2.5">
-                    <span>Organizational &amp; Regional Analytics</span>
+                    <span>Service Line Analytics</span>
                     <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-ey-yellow/10 border border-ey-yellow/30 text-ey-yellow">
                       <MousePointerClick className="w-3 h-3" />
                       Click any card or table row to drill down to core log stream
                     </span>
                   </h1>
                   <p className="text-xs text-ey-muted mt-0.5">
-                    Unified view of token consumption and spend aggregated by Service Line, Sub-Practice, Region, and Country from <span className="font-mono text-ey-yellow">ai_usage_data.csv</span>.
+                    Unified view of token consumption and spend aggregated by Service Line and Sub-Practice from <span className="font-mono text-ey-yellow">ai_usage_data.csv</span>. For a country-level breakdown, see Geo Pulse.
                   </p>
                 </div>
               </div>
               <div className="flex items-center space-x-2 text-xs bg-ey-black/60 border border-ey-border rounded-lg px-3 py-2 text-ey-light shrink-0 self-start sm:self-center">
                 <Layers className="w-4 h-4 text-ey-yellow shrink-0" />
                 <span className="font-mono text-[11px] text-ey-muted">
-                  Dimensions: <strong>5 Service Lines</strong> · <strong>14 Practices</strong> · <strong>8 Countries</strong>
+                  Dimensions: <strong>5 Service Lines</strong> · <strong>14 Practices</strong>
                 </span>
               </div>
             </div>
@@ -190,7 +131,7 @@ export default function OrgAndRegionalPage() {
               </div>
             ) : (
               <>
-                {/* Org & Regional Analytics KPI Cards with Direct Drilldown */}
+                {/* Service Line Analytics KPI Cards with Direct Drilldown */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <KpiCard
                     title={topServiceLine ? `Top Spend: ${topServiceLine.serviceLine}` : 'Leading Service Line'}
@@ -287,35 +228,10 @@ export default function OrgAndRegionalPage() {
                   />
                 </div>
 
-                {/* Distribution Charts */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <ExplorerChart
-                    title="Expenditure by Organizational Service Line"
-                    subtitle="Total billed USD across Consulting, Tax, Assurance, CBS, and S&T"
-                    rows={serviceLineChartData}
-                    colDim="none"
-                    columns={[]}
-                    metric="cost"
-                    metricLabel="Total Cost ($)"
-                    rowDimLabel="Service Line"
-                  />
-
-                  <ExplorerChart
-                    title="Expenditure by Management Region"
-                    subtitle="Regional spend breakdown across EMEA, APAC, and Americas"
-                    rows={regionChartData}
-                    colDim="none"
-                    columns={[]}
-                    metric="cost"
-                    metricLabel="Regional Cost ($)"
-                    rowDimLabel="Region"
-                  />
-                </div>
-
                 {/* Service Line & Sub-Service Line Practices (consolidated, expandable) */}
                 <HierarchicalTable
                   title="Service Line & Practice Breakdown (Click a row to drill down, chevron to expand)"
-                  subtitle="Every Org Service Line with its Sub-Service Line practices nested underneath — replaces two separate tables"
+                  subtitle="Every Service Line with its Sub-Service Line practices nested underneath — replaces two separate tables"
                   groups={serviceLineGroups}
                   parentColumnHeader="Service Line"
                   childColumnHeader="Practice"
@@ -342,40 +258,6 @@ export default function OrgAndRegionalPage() {
                       subtitle: `Row-level CSV records for ${id} practice (${parentId}) in ai_usage_data.csv.`,
                       badge: parentId,
                       filterCriteria: { subServiceLine: id },
-                    })
-                  }
-                />
-
-                {/* Management Region & Country breakdowns (consolidated, expandable) */}
-                <HierarchicalTable
-                  title="Management Region & Country Breakdown (Click a row to drill down, chevron to expand)"
-                  subtitle="Every Management Region with its Countries nested underneath — replaces two separate tables"
-                  groups={regionGroups}
-                  parentColumnHeader="Management Region"
-                  childColumnHeader="Country"
-                  metaColumnHeader="Countries"
-                  chartRows={regionChartRows}
-                  chartColumns={regionChartColumns}
-                  chartMetric="cost"
-                  chartMetricLabel="Total Cost ($)"
-                  onParentClick={(id) =>
-                    openDrilldown({
-                      type: 'region',
-                      id,
-                      title: `Management Region: ${id}`,
-                      subtitle: `Row-level CSV records for ${id} management region in ai_usage_data.csv.`,
-                      badge: 'Management Region',
-                      filterCriteria: { region: id },
-                    })
-                  }
-                  onChildClick={(_parentId, id) =>
-                    openDrilldown({
-                      type: 'country',
-                      id,
-                      title: `Country Telemetry: ${id}`,
-                      subtitle: `Row-level CSV usage records for ${id} in ai_usage_data.csv.`,
-                      badge: 'Country',
-                      filterCriteria: { country: id },
                     })
                   }
                 />

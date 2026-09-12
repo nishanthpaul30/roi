@@ -62,7 +62,6 @@ export async function GET(request: Request) {
       managementRegions: getDistinctValues('managementRegion'),
       serviceLines: getDistinctValues('orgServiceLine'),
       countries: getDistinctValues('country'),
-      users: getDistinctValues('userMail'),
     };
 
     return NextResponse.json({

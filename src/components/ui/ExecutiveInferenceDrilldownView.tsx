@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
 import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
+import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 
 export interface InferenceDefinition {
   id: string;
@@ -80,6 +81,12 @@ export function ExecutiveInferenceDrilldownView({
     }
   }, [initialEntity]);
 
+  // Pre-hierarchy facet selections: financial_volatility picks a month, habitual_retention
+  // picks a cohort, before handing off to the mandated hierarchy navigator.
+  const [selectedMonthFacet, setSelectedMonthFacet] = useState<string | null>(null);
+  const [selectedCohortFacet, setSelectedCohortFacet] = useState<'embedded' | 'regular' | 'occasional' | null>(null);
+  const [selectedServiceLineFacet, setSelectedServiceLineFacet] = useState<string | null>(null);
+
   // Level 4 Search, Pagination & Modal Record Inspector State
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -115,8 +122,17 @@ export function ExecutiveInferenceDrilldownView({
     }
   }, []);
 
-  // Compute Active vs Inactive Telemetry Roster
-  const totalRosterSeats = 70;
+  // Compute Active vs Inactive Telemetry Roster — real roster (all distinct users ever
+  // seen in the CSV) vs real period-active seats (matching summary.userCapacityBreakdown,
+  // the same source the Seat Utilization card on Executive Overview uses).
+  const totalRosterSeats = useMemo(
+    () => new Set(allRows.map((r) => (r.userMail || '').toLowerCase().trim()).filter(Boolean)).size || 70,
+    [allRows]
+  );
+  const periodActiveEmails = useMemo(
+    () => new Set((summary?.userCapacityBreakdown || []).map((u) => u.userMail.toLowerCase().trim())),
+    [summary]
+  );
   const activeUserMap = useMemo(() => {
     const map = new Map<string, {
       displayName: string;
@@ -133,6 +149,8 @@ export function ExecutiveInferenceDrilldownView({
     for (const r of allRows) {
       const email = (r.userMail || '').toLowerCase().trim();
       if (!email) continue;
+      // Exclude seats with no activity in the current filtered period (real dormant seats).
+      if (periodActiveEmails.size > 0 && !periodActiveEmails.has(email)) continue;
       if (!map.has(email)) {
         map.set(email, {
           displayName: r.displayName || email.split('@')[0],
@@ -154,26 +172,39 @@ export function ExecutiveInferenceDrilldownView({
       u.billableTokens += r.dailyBillableTokens || 0;
     }
     return map;
-  }, [allRows]);
+  }, [allRows, periodActiveEmails]);
 
   const activeUserList = useMemo(() => Array.from(activeUserMap.values()), [activeUserMap]);
   const activeUserCount = activeUserList.length || 64;
+  const activePeriodRows = useMemo(
+    () => allRows.filter((r) => periodActiveEmails.size === 0 || periodActiveEmails.has((r.userMail || '').toLowerCase().trim())),
+    [allRows, periodActiveEmails]
+  );
   const inactiveUserCount = Math.max(0, totalRosterSeats - activeUserCount);
-  const activeSeatPercent = ((activeUserCount / totalRosterSeats) * 100).toFixed(1);
-  const inactiveLeakageCost = inactiveUserCount * 100;
+  const activeSeatPercent = totalRosterSeats > 0 ? ((activeUserCount / totalRosterSeats) * 100).toFixed(1) : '0.0';
+  const avgLicenseCostPerSeat = summary && activeUserCount > 0 ? summary.totalLicenseCost / activeUserCount : 100;
+  const inactiveLeakageCost = Math.round(inactiveUserCount * avgLicenseCostPerSeat);
 
-  // Synthesize dormant inactive users roster
+  // Real dormant seats: roster users with zero activity in the current filtered period,
+  // identified by cross-referencing their own (out-of-period) rows for identity/license data.
   const dormantUsers = useMemo(() => {
-    const syntheticDormant = [
-      { email: 'sarah.connor@ey.com', name: 'Sarah Connor', serviceLine: 'Consulting', region: 'Americas', daysInactive: 42 },
-      { email: 'alex.ross@ey.com', name: 'Alex Ross', serviceLine: 'Technology', region: 'EMEA', daysInactive: 38 },
-      { email: 'elena.rostova@ey.com', name: 'Elena Rostova', serviceLine: 'Assurance', region: 'EMEA', daysInactive: 65 },
-      { email: 'david.kim@ey.com', name: 'David Kim', serviceLine: 'Tax', region: 'APAC', daysInactive: 31 },
-      { email: 'priya.nair@ey.com', name: 'Priya Nair', serviceLine: 'Consulting', region: 'APAC', daysInactive: 45 },
-      { email: 'marcus.vance@ey.com', name: 'Marcus Vance', serviceLine: 'Strategy', region: 'Americas', daysInactive: 52 },
-    ];
-    return syntheticDormant.slice(0, inactiveUserCount > 0 ? inactiveUserCount : 6);
-  }, [inactiveUserCount]);
+    const seen = new Set<string>();
+    const result: { email: string; name: string; serviceLine: string; region: string; lastActivityDate: string; licenseCost: number }[] = [];
+    for (const r of allRows) {
+      const email = (r.userMail || '').toLowerCase().trim();
+      if (!email || periodActiveEmails.has(email) || seen.has(email)) continue;
+      seen.add(email);
+      result.push({
+        email,
+        name: r.displayName || email.split('@')[0],
+        serviceLine: r.orgServiceLine || 'General',
+        region: r.managementRegion || 'Unknown',
+        lastActivityDate: r.activityDate,
+        licenseCost: r.licenseCost || avgLicenseCostPerSeat,
+      });
+    }
+    return result.sort((a, b) => (a.lastActivityDate < b.lastActivityDate ? 1 : -1));
+  }, [allRows, periodActiveEmails, avgLicenseCostPerSeat]);
 
   // Compute Power Users (Pareto Analysis: Top 20%)
   const sortedUsersBySpend = useMemo(() => {
@@ -225,7 +256,7 @@ export function ExecutiveInferenceDrilldownView({
     return { embedded, regular, occasional };
   }, [activeUserList]);
 
-  // Project Code Breakdown
+  // Engagement Code Breakdown
   const projectCodeBreakdown = useMemo(() => {
     const map = new Map<string, {
       code: string;
@@ -546,6 +577,13 @@ export function ExecutiveInferenceDrilldownView({
     };
   }, [allRows, totalOrgSpend]);
 
+  // Raw rows for the dual-platform overlap cohort, scoped for the mandated hierarchy panel below.
+  const dualToolHierarchyRows = useMemo(() => {
+    if (multiToolData.dualToolUsers.length === 0) return [];
+    const allowedEmails = new Set(multiToolData.dualToolUsers.map((u) => u.email.toLowerCase()));
+    return allRows.filter((r) => allowedEmails.has((r.userMail || '').toLowerCase()));
+  }, [allRows, multiToolData]);
+
   // Map of Inference Metadata
   const inferencesMeta: Record<string, InferenceDefinition> = {
     seat_utilization: {
@@ -642,19 +680,25 @@ export function ExecutiveInferenceDrilldownView({
       actionableInsight:
         'Audit top 5 internal project codes (I-XXXXXX) to ensure non-billable AI investment yields reusable intellectual property or client delivery templates.',
     },
-    habitual_retention: {
-      id: 'habitual_retention',
-      title: 'Habitual User Retention & Health',
-      tag: 'Adoption Health',
-      tagColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      icon: Users,
-      stat: '100% Habitual Retention',
-      statSub: `${((userCohorts.embedded.length / (activeUserCount || 1)) * 100).toFixed(0)}% Embedded, ${((userCohorts.regular.length / (activeUserCount || 1)) * 100).toFixed(0)}% Regular, 0% Dropouts`,
-      finding:
-        'All active users show habitual retention: 36% Embedded (16+ days/mo), 57% Regular (9-15 days/mo), and 7% Occasional (4-8 days/mo). Zero users fell into a one-off trial-only bucket.',
-      actionableInsight:
-        'AI tools have transitioned from pilot curiosity to daily core workflow. Focus shift from basic onboarding to advanced competency training.',
-    },
+    habitual_retention: (() => {
+      const embeddedPct = (userCohorts.embedded.length / (activeUserCount || 1)) * 100;
+      const regularPct = (userCohorts.regular.length / (activeUserCount || 1)) * 100;
+      const occasionalPct = (userCohorts.occasional.length / (activeUserCount || 1)) * 100;
+      return {
+        id: 'habitual_retention',
+        title: 'Habitual User Retention & Health',
+        tag: 'Adoption Health',
+        tagColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+        icon: Users,
+        stat: `${(embeddedPct + regularPct).toFixed(0)}% Regular-or-Better Usage`,
+        statSub: `${embeddedPct.toFixed(0)}% Embedded, ${regularPct.toFixed(0)}% Regular, ${occasionalPct.toFixed(0)}% Occasional (of ${activeUserCount} active users)`,
+        finding: `Across ${activeUserCount} active users this period: ${userCohorts.embedded.length} (${embeddedPct.toFixed(0)}%) are Embedded (16+ active days), ${userCohorts.regular.length} (${regularPct.toFixed(0)}%) are Regular (9-15 active days), and ${userCohorts.occasional.length} (${occasionalPct.toFixed(0)}%) are Occasional (under 9 active days). This is total active-day count over the whole period, not average days per active month — see the Habitual Retention card on Executive Overview for the per-month cohort breakdown, which also accounts for the ${inactiveUserCount} completely dormant seats.`,
+        actionableInsight:
+          occasionalPct > 20
+            ? 'Investigate the Occasional cohort for onboarding friction or workflow gaps before expanding license seats further.'
+            : 'AI tools show healthy habitual usage among active seats. Focus shift from basic onboarding to advanced competency training.',
+      };
+    })(),
     external_vs_internal: {
       id: 'external_vs_internal',
       title: 'External Projects vs. Internal Projects',
@@ -688,31 +732,10 @@ export function ExecutiveInferenceDrilldownView({
 
   // Level 4 Granular Rows Filtered to the Selected Entity / Dimension
   const granularRows = useMemo(() => {
+    // No entity/facet selected yet — the mandated hierarchy has not been walked, so
+    // no row-level (and therefore no user-level) data may be shown.
     if (!selectedEntity) {
-      // Default to relevant subset based on inference type if no specific entity picked
-      if (inferenceId === 'seat_utilization') {
-        return allRows;
-      }
-      if (inferenceId === 'vendor_spread' || inferenceId === 'multi_tool_comparison') {
-        return allRows;
-      }
-      if (inferenceId === 'geo_asymmetry') {
-        return allRows;
-      }
-      if (inferenceId === 'project_billability') {
-        return allRows;
-      }
-      if (inferenceId === 'external_vs_internal') {
-        return allRows;
-      }
-      if (inferenceId === 'service_line_comparison') {
-        return allRows;
-      }
-      if (inferenceId === 'pareto_risk') {
-        const topEmails = new Set(top20Users.map((u) => u.email));
-        return allRows.filter((r) => topEmails.has((r.userMail || '').toLowerCase()));
-      }
-      return allRows;
+      return [];
     }
 
     const { type, name } = selectedEntity;
@@ -760,7 +783,7 @@ export function ExecutiveInferenceDrilldownView({
       }
       return true;
     });
-  }, [allRows, selectedEntity, inferenceId, top20Users, activeUserMap]);
+  }, [allRows, selectedEntity, activeUserMap]);
 
   // Search filter on granular rows
   const filteredGranularRows = useMemo(() => {
@@ -815,7 +838,7 @@ export function ExecutiveInferenceDrilldownView({
       'Display Name',
       'User Email',
       'AI Tool',
-      'Project Code',
+      'Engagement Code',
       'Service Line',
       'Country',
       'Region',
@@ -976,7 +999,7 @@ export function ExecutiveInferenceDrilldownView({
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Total Provisioned Seats</span>
                   <p className="text-2xl font-bold text-ey-light">{totalRosterSeats} Seats</p>
-                  <p className="text-[10px] text-ey-muted">$100/seat/mo Enterprise Tier</p>
+                  <p className="text-[10px] text-ey-muted">Real per-seat License Cost in USD</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Active Engaged Users</span>
@@ -986,7 +1009,7 @@ export function ExecutiveInferenceDrilldownView({
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Dormant Unutilized Seats</span>
                   <p className="text-2xl font-bold text-rose-400">{inactiveUserCount} Seats</p>
-                  <p className="text-[10px] text-rose-300/80">0 Prompts in Last 30 Days</p>
+                  <p className="text-[10px] text-rose-300/80">0 Tokens in Selected Period</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Annualized Seat Leakage</span>
@@ -1004,11 +1027,11 @@ export function ExecutiveInferenceDrilldownView({
                       <span>Level 3: Dormant Seats Action Ledger (1-Click Reclamation)</span>
                     </h3>
                     <p className="text-xs text-ey-muted mt-0.5">
-                      Identified dormant provisioned seats incurring $100/mo license fees without prompt telemetry.
+                      Identified dormant provisioned seats incurring real per-seat license fees without prompt telemetry in the selected period.
                     </p>
                   </div>
                   <button
-                    onClick={() => handleTriggerAction('Automated 30-Day Reclamation Workflow dispatched to 6 dormant accounts.')}
+                    onClick={() => handleTriggerAction(`Automated 30-Day Reclamation Workflow dispatched to ${dormantUsers.length} dormant account${dormantUsers.length === 1 ? '' : 's'}.`)}
                     className="px-3 py-1.5 bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 self-start sm:self-center"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
@@ -1039,10 +1062,10 @@ export function ExecutiveInferenceDrilldownView({
                           <td className="px-4 py-3 text-ey-muted">{u.region}</td>
                           <td className="px-4 py-3 text-center">
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
-                              {u.daysInactive} Days Zero Usage
+                              No Activity in Period (Last: {u.lastActivityDate})
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right font-bold text-rose-400">$100.00 / mo</td>
+                          <td className="px-4 py-3 text-right font-bold text-rose-400">${u.licenseCost.toFixed(2)} / mo</td>
                           <td className="px-4 py-3 text-center">
                             <button
                               onClick={() => handleTriggerAction(`License for ${u.name} reclaimed and returned to pool.`)}
@@ -1058,63 +1081,12 @@ export function ExecutiveInferenceDrilldownView({
                 </div>
               </div>
 
-              {/* Active Users Table -> Level 4 Core Drilldown Trigger */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ey-border/60 pb-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                      <UserCheck className="w-4 h-4 text-emerald-400" />
-                      <span>Level 3: Active Engaged Seats Roster ({activeUserList.length} Users)</span>
-                    </h3>
-                    <p className="text-xs text-ey-muted mt-0.5">
-                      Click any active user to drill down to their <strong>Level 4 Row-Level Raw CSV Usage Records</strong>.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto border border-ey-border rounded-xl">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-                      <tr>
-                        <th className="px-4 py-3">Active Employee</th>
-                        <th className="px-4 py-3">Service Line</th>
-                        <th className="px-4 py-3">Active Days</th>
-                        <th className="px-4 py-3 text-right">Tokens Consumed</th>
-                        <th className="px-4 py-3 text-right">Total Billed Spend</th>
-                        <th className="px-4 py-3 text-center">Telemetry Deep Dive</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-ey-border">
-                      {activeUserList.slice(0, 10).map((u, i) => (
-                        <tr
-                          key={i}
-                          onClick={() => setSelectedEntity({ type: 'user', name: u.email, label: u.displayName })}
-                          className="hover:bg-ey-yellow/5 hover:border-ey-yellow/30 cursor-pointer transition group"
-                        >
-                          <td className="px-4 py-3 font-medium text-ey-light">
-                            <div className="group-hover:text-ey-yellow transition-colors font-semibold">{u.displayName}</div>
-                            <div className="text-[10px] text-ey-muted">{u.email}</div>
-                          </td>
-                          <td className="px-4 py-3 text-ey-muted">{u.serviceLine}</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
-                              {u.activeDays.size} Days Active
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right text-ey-light">{u.totalTokens.toLocaleString()}</td>
-                          <td className="px-4 py-3 text-right font-bold text-ey-yellow">${u.totalCost.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex items-center gap-1 text-[10px] text-ey-yellow font-bold group-hover:underline">
-                              <span>Drill to Logs</span>
-                              <ChevronRight className="w-3 h-3" />
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {/* Level 3: Mandated Hierarchy Navigator — user identity only appears at the final level */}
+              <HierarchyDrilldownPanel
+                rows={activePeriodRows}
+                title={`Level 3: Active Seat Hierarchy (${activeUserList.length} Users)`}
+                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+              />
             </div>
           )}
 
@@ -1144,45 +1116,61 @@ export function ExecutiveInferenceDrilldownView({
                 </div>
               </div>
 
-              {/* Monthly Progression Cards -> Level 4 Core Drilldown Trigger */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="border-b border-ey-border/60 pb-3">
-                  <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-amber-400" />
-                    <span>Level 3: Month-by-Month Run-Rate Trajectory (Click Month to Drill Down)</span>
-                  </h3>
-                  <p className="text-xs text-ey-muted mt-0.5">
-                    Select any billing month below to inspect all row-level events that drove that period's financial movement.
-                  </p>
-                </div>
+              {selectedMonthFacet === null ? (
+                <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
+                  <div className="border-b border-ey-border/60 pb-3">
+                    <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-amber-400" />
+                      <span>Level 3: Month-by-Month Run-Rate Trajectory (Click Month to Drill Down)</span>
+                    </h3>
+                    <p className="text-xs text-ey-muted mt-0.5">
+                      Select any billing month to continue down the mandated hierarchy for that period's spend.
+                    </p>
+                  </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {monthlySpend.map((m, i) => (
-                    <div
-                      key={i}
-                      onClick={() => setSelectedEntity({ type: 'month', name: m.month })}
-                      className="bg-ey-black/70 border border-ey-border/80 hover:border-ey-yellow/80 p-4 rounded-xl cursor-pointer transition group flex flex-col justify-between space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-ey-light group-hover:text-ey-yellow transition-colors font-mono">
-                          {m.month.replace('_', ' ')}
-                        </span>
-                        <span className="text-[10px] font-mono text-ey-muted bg-ey-card px-2 py-0.5 rounded border border-ey-border">
-                          {m.rowCount} Usage Records
-                        </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {monthlySpend.map((m, i) => (
+                      <div
+                        key={i}
+                        onClick={() => setSelectedMonthFacet(m.month)}
+                        className="bg-ey-black/70 border border-ey-border/80 hover:border-ey-yellow/80 p-4 rounded-xl cursor-pointer transition group flex flex-col justify-between space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-ey-light group-hover:text-ey-yellow transition-colors font-mono">
+                            {m.month.replace('_', ' ')}
+                          </span>
+                          <span className="text-[10px] font-mono text-ey-muted bg-ey-card px-2 py-0.5 rounded border border-ey-border">
+                            {m.rowCount} Usage Records
+                          </span>
+                        </div>
+                        <div>
+                          <div className="text-xl font-bold text-ey-yellow font-mono">${m.cost.toFixed(2)}</div>
+                          <div className="text-[10px] text-ey-muted font-mono">{m.tokens.toLocaleString()} tokens</div>
+                        </div>
+                        <div className="pt-2 border-t border-ey-border/40 flex items-center justify-between text-[10px] text-ey-muted">
+                          <span>Continue to Hierarchy</span>
+                          <ChevronRight className="w-3.5 h-3.5 text-ey-yellow group-hover:translate-x-1 transition-transform" />
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-xl font-bold text-ey-yellow font-mono">${m.cost.toFixed(2)}</div>
-                        <div className="text-[10px] text-ey-muted font-mono">{m.tokens.toLocaleString()} tokens</div>
-                      </div>
-                      <div className="pt-2 border-t border-ey-border/40 flex items-center justify-between text-[10px] text-ey-muted">
-                        <span>Click for Row-Level Telemetry</span>
-                        <ChevronRight className="w-3.5 h-3.5 text-ey-yellow group-hover:translate-x-1 transition-transform" />
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setSelectedMonthFacet(null)}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-muted hover:text-ey-yellow bg-ey-black border border-ey-border px-3 py-1.5 rounded-lg transition"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    Back to Months
+                  </button>
+                  <HierarchyDrilldownPanel
+                    rows={allRows.filter((r) => r.monthYear === selectedMonthFacet)}
+                    title={`Level 3: ${selectedMonthFacet?.replace('_', ' ')} Hierarchy`}
+                    onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+                  />
+                </>
+              )}
             </div>
           )}
 
@@ -1212,61 +1200,12 @@ export function ExecutiveInferenceDrilldownView({
                 </div>
               </div>
 
-              {/* Power Users Ranking Table -> Level 4 Core Drilldown Trigger */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="border-b border-ey-border/60 pb-3">
-                  <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4 text-rose-400" />
-                    <span>Level 3: Top 20% Power Users Roster ({top20Users.length} Key Accounts)</span>
-                  </h3>
-                  <p className="text-xs text-ey-muted mt-0.5">
-                    Click any power user to drill down to their <strong>individual prompt event records and project codes</strong>.
-                  </p>
-                </div>
-
-                <div className="overflow-x-auto border border-ey-border rounded-xl">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-                      <tr>
-                        <th className="px-4 py-3">Rank</th>
-                        <th className="px-4 py-3">Power User</th>
-                        <th className="px-4 py-3">Service Line</th>
-                        <th className="px-4 py-3 text-right">Total Tokens</th>
-                        <th className="px-4 py-3 text-right">Total Cost</th>
-                        <th className="px-4 py-3 text-right">% of Org Spend</th>
-                        <th className="px-4 py-3 text-center">Core Telemetry</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-ey-border">
-                      {top20Users.map((u, i) => (
-                        <tr
-                          key={i}
-                          onClick={() => setSelectedEntity({ type: 'user', name: u.email, label: u.displayName })}
-                          className="hover:bg-ey-yellow/5 cursor-pointer transition group"
-                        >
-                          <td className="px-4 py-3 font-bold text-ey-yellow">#{i + 1}</td>
-                          <td className="px-4 py-3 font-medium text-ey-light">
-                            <div className="group-hover:text-ey-yellow transition-colors font-semibold">{u.displayName}</div>
-                            <div className="text-[10px] text-ey-muted">{u.email}</div>
-                          </td>
-                          <td className="px-4 py-3 text-ey-muted">{u.serviceLine}</td>
-                          <td className="px-4 py-3 text-right text-ey-light">{u.totalTokens.toLocaleString()}</td>
-                          <td className="px-4 py-3 text-right font-bold text-rose-400">${u.totalCost.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-right font-bold text-ey-yellow">
-                            {totalOrgSpend > 0 ? ((u.totalCost / totalOrgSpend) * 100).toFixed(1) : 0}%
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex items-center gap-1 text-[10px] text-ey-yellow font-bold group-hover:underline">
-                              <span>Drill to Logs</span>
-                              <ChevronRight className="w-3 h-3" />
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {/* Level 3: Mandated Hierarchy Navigator, scoped to the top-20% power users' rows */}
+              <HierarchyDrilldownPanel
+                rows={allRows.filter((r) => top20Users.some((u) => u.email === (r.userMail || '').toLowerCase().trim()))}
+                title={`Level 3: Top 20% Power User Hierarchy (${top20Users.length} Key Accounts)`}
+                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+              />
             </div>
           )}
 
@@ -1531,58 +1470,12 @@ export function ExecutiveInferenceDrilldownView({
                     </button>
                   </div>
 
-                  <div className="overflow-x-auto border border-ey-border rounded-xl">
-                    <table className="w-full text-left text-xs font-mono">
-                      <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-                        <tr>
-                          <th className="px-4 py-3">Employee &amp; Email</th>
-                          <th className="px-4 py-3">Service Line</th>
-                          <th className="px-4 py-3">Region</th>
-                          <th className="px-4 py-3">Active Platforms</th>
-                          <th className="px-4 py-3 text-right">Total Tokens</th>
-                          <th className="px-4 py-3 text-right">Dual Spend ($)</th>
-                          <th className="px-4 py-3 text-center">Inspect Telemetry</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-ey-border">
-                        {multiToolData.dualToolUsers.map((u) => (
-                          <tr
-                            key={u.email}
-                            onClick={() => setSelectedEntity({ type: 'user', name: u.email, label: u.displayName })}
-                            className="hover:bg-ey-card-hover transition cursor-pointer group"
-                            title={`Click to inspect ${u.displayName}'s cross-platform logs`}
-                          >
-                            <td className="px-4 py-3 font-medium text-ey-light">
-                              <div className="font-semibold group-hover:text-ey-yellow transition-colors">{u.displayName}</div>
-                              <div className="text-[10px] text-ey-muted">{u.email}</div>
-                            </td>
-                            <td className="px-4 py-3 text-ey-muted">{u.serviceLine}</td>
-                            <td className="px-4 py-3 text-ey-muted">{u.region}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex flex-wrap gap-1">
-                                {Array.from(u.tools).map((tool) => (
-                                  <span
-                                    key={tool}
-                                    className="px-2 py-0.5 rounded text-[10px] font-bold bg-ey-black border border-ey-border text-ey-light capitalize"
-                                  >
-                                    {tool}
-                                  </span>
-                                ))}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-right text-ey-light">{u.totalTokens.toLocaleString()}</td>
-                            <td className="px-4 py-3 text-right font-bold text-emerald-400">${u.totalCost.toFixed(2)}</td>
-                            <td className="px-4 py-3 text-center">
-                              <span className="inline-flex items-center gap-1 text-[10px] text-ey-yellow font-bold group-hover:underline">
-                                <span>Inspect Logs</span>
-                                <ChevronRight className="w-3 h-3" />
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <HierarchyDrilldownPanel
+                    rows={dualToolHierarchyRows}
+                    title="Level 3: Dual-Platform Seat Hierarchy"
+                    subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
+                    onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+                  />
                 </div>
               )}
 
@@ -1700,77 +1593,13 @@ export function ExecutiveInferenceDrilldownView({
           {/* 5. GEOGRAPHIC & SERVICE LINE ASYMMETRY */}
           {inferenceId === 'geo_asymmetry' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Region Breakdown -> Level 4 Core Drilldown Trigger */}
-                <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="border-b border-ey-border/60 pb-3">
-                    <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-cyan-400" />
-                      <span>Level 3: Management Region Distribution (Click to Drill)</span>
-                    </h3>
-                    <p className="text-xs text-ey-muted mt-0.5">
-                      APAC accounts for 48.3% of spend, over 3x the Americas region.
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    {regionBreakdown.map((r, i) => (
-                      <div
-                        key={i}
-                        onClick={() => setSelectedEntity({ type: 'region', name: r.region })}
-                        className="bg-ey-black/70 border border-ey-border/80 hover:border-ey-yellow/80 p-3.5 rounded-xl cursor-pointer transition group flex items-center justify-between"
-                      >
-                        <div>
-                          <div className="text-xs font-bold text-ey-light group-hover:text-ey-yellow transition-colors font-mono">
-                            {r.region}
-                          </div>
-                          <div className="text-[10px] text-ey-muted font-mono">{r.users.size} Active Users</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-bold text-ey-yellow font-mono">${r.cost.toFixed(2)}</div>
-                          <div className="text-[10px] text-cyan-400 font-mono">
-                            {totalOrgSpend > 0 ? ((r.cost / totalOrgSpend) * 100).toFixed(1) : 0}% of Total
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Country Hotspot Breakdown -> Level 4 Core Drilldown Trigger */}
-                <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="border-b border-ey-border/60 pb-3">
-                    <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-ey-yellow" />
-                      <span>Level 3: Country Hotspot Concentration</span>
-                    </h3>
-                    <p className="text-xs text-ey-muted mt-0.5">
-                      Australia alone accounts for $385.50 (28% of entire enterprise AI spend).
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    {countryBreakdown.slice(0, 5).map((c, i) => (
-                      <div
-                        key={i}
-                        onClick={() => setSelectedEntity({ type: 'country', name: c.country })}
-                        className="bg-ey-black/70 border border-ey-border/80 hover:border-ey-yellow/80 p-3.5 rounded-xl cursor-pointer transition group flex items-center justify-between"
-                      >
-                        <div>
-                          <div className="text-xs font-bold text-ey-light group-hover:text-ey-yellow transition-colors font-mono">
-                            {c.country}
-                          </div>
-                          <div className="text-[10px] text-ey-muted font-mono">{c.users.size} Active Employees</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-bold text-ey-yellow font-mono">${c.cost.toFixed(2)}</div>
-                          <div className="text-[10px] text-ey-muted font-mono">{c.tokens.toLocaleString()} tokens</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              {/* Level 3: Mandated Hierarchy Navigator (starts at Country, the hierarchy's own region-level facet) */}
+              <HierarchyDrilldownPanel
+                rows={allRows}
+                title="Level 3: Geographic & Organizational Hierarchy"
+                subtitle="APAC accounts for 48.3% of spend, over 3x Americas — drill via Country below to see exactly which teams drive it."
+                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+              />
             </div>
           )}
 
@@ -1789,7 +1618,7 @@ export function ExecutiveInferenceDrilldownView({
                   <p className="text-[10px] text-cyan-300/80">I-XXXXXX Internal IP Creation</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Total Project Codes</span>
+                  <span className="text-ey-muted text-[10px] uppercase font-bold">Total Engagement Codes</span>
                   <p className="text-2xl font-bold text-ey-light">{projectCodeBreakdown.length}</p>
                   <p className="text-[10px] text-ey-muted">Active Work Orders Tracked</p>
                 </div>
@@ -1800,129 +1629,100 @@ export function ExecutiveInferenceDrilldownView({
                 </div>
               </div>
 
-              {/* Project Portfolio Table -> Level 4 Core Drilldown Trigger */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="border-b border-ey-border/60 pb-3">
-                  <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-emerald-400" />
-                    <span>Level 3: Project Investment Code Portfolio (Click to Drill)</span>
-                  </h3>
-                  <p className="text-xs text-ey-muted mt-0.5">
-                    Click any client engagement (E-XXXX) or internal R&D code (I-XXXX) to inspect all row-level prompts charged against it.
-                  </p>
-                </div>
-
-                <div className="overflow-x-auto border border-ey-border rounded-xl">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-                      <tr>
-                        <th className="px-4 py-3">Project Code</th>
-                        <th className="px-4 py-3">Classification</th>
-                        <th className="px-4 py-3 text-center">Team Members</th>
-                        <th className="px-4 py-3 text-right">Tokens Consumed</th>
-                        <th className="px-4 py-3 text-right">Total AI Spend</th>
-                        <th className="px-4 py-3 text-center">Core Telemetry</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-ey-border">
-                      {projectCodeBreakdown.slice(0, 10).map((p, i) => (
-                        <tr
-                          key={i}
-                          onClick={() => setSelectedEntity({ type: 'project_code', name: p.code })}
-                          className="hover:bg-ey-yellow/5 cursor-pointer transition group"
-                        >
-                          <td className="px-4 py-3 font-bold text-ey-yellow">
-                            <span className={`px-2 py-0.5 rounded text-[10px] border ${
-                              p.code.startsWith('E-') ? 'bg-blue-500/10 text-blue-300 border-blue-500/30' : 'bg-purple-500/10 text-purple-300 border-purple-500/30'
-                            }`}>
-                              {p.code}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-ey-light font-medium">
-                            {p.code.startsWith('E-') ? 'External Client Engagement' : 'Internal Innovation / R&D'}
-                          </td>
-                          <td className="px-4 py-3 text-center text-ey-muted">{p.users.size} Users</td>
-                          <td className="px-4 py-3 text-right text-ey-light">{p.tokens.toLocaleString()}</td>
-                          <td className="px-4 py-3 text-right font-bold text-ey-yellow">${p.cost.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex items-center gap-1 text-[10px] text-ey-yellow font-bold group-hover:underline">
-                              <span>Drill to Logs</span>
-                              <ChevronRight className="w-3 h-3" />
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {/* Level 3: Mandated Hierarchy Navigator (Engagement Code sits inside it at level 4) */}
+              <HierarchyDrilldownPanel
+                rows={allRows}
+                title="Level 3: Billability & Engagement Hierarchy"
+                subtitle="Client Engagement Codes (E-XXXXXX) and Internal codes (I-XXXXXX) appear at the Engagement Code step below."
+                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+              />
             </div>
           )}
 
           {/* 7. HABITUAL USER RETENTION & HEALTH */}
           {inferenceId === 'habitual_retention' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-xs">
-                <div
-                  onClick={() => setSelectedEntity({ type: 'cohort', name: 'Embedded (16+ days)' })}
-                  className="bg-ey-card border border-ey-border hover:border-ey-yellow/80 p-5 rounded-xl cursor-pointer transition group space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                      Core Habitual (16+ Days)
-                    </span>
-                    <span className="text-[10px] text-ey-muted">{userCohorts.embedded.length} Users</span>
+              {selectedCohortFacet === null ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-xs">
+                  <div
+                    onClick={() => setSelectedCohortFacet('embedded')}
+                    className="bg-ey-card border border-ey-border hover:border-ey-yellow/80 p-5 rounded-xl cursor-pointer transition group space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                        Core Habitual (16+ Days)
+                      </span>
+                      <span className="text-[10px] text-ey-muted">{userCohorts.embedded.length} Users</span>
+                    </div>
+                    <p className="text-2xl font-bold text-emerald-400">
+                      {((userCohorts.embedded.length / (activeUserCount || 1)) * 100).toFixed(0)}%
+                    </p>
+                    <p className="text-xs text-ey-muted">Daily core workflow embedding</p>
+                    <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
+                      <span>Continue to Hierarchy</span>
+                      <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold text-emerald-400">
-                    {((userCohorts.embedded.length / (activeUserCount || 1)) * 100).toFixed(0)}%
-                  </p>
-                  <p className="text-xs text-ey-muted">Daily core workflow embedding</p>
-                  <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
-                    <span>Drill to Embedded User Logs</span>
-                    <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
 
-                <div
-                  onClick={() => setSelectedEntity({ type: 'cohort', name: 'Regular (9-15 days)' })}
-                  className="bg-ey-card border border-ey-border hover:border-ey-yellow/80 p-5 rounded-xl cursor-pointer transition group space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                      Regular (9-15 Days)
-                    </span>
-                    <span className="text-[10px] text-ey-muted">{userCohorts.regular.length} Users</span>
+                  <div
+                    onClick={() => setSelectedCohortFacet('regular')}
+                    className="bg-ey-card border border-ey-border hover:border-ey-yellow/80 p-5 rounded-xl cursor-pointer transition group space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+                        Regular (9-15 Days)
+                      </span>
+                      <span className="text-[10px] text-ey-muted">{userCohorts.regular.length} Users</span>
+                    </div>
+                    <p className="text-2xl font-bold text-cyan-400">
+                      {((userCohorts.regular.length / (activeUserCount || 1)) * 100).toFixed(0)}%
+                    </p>
+                    <p className="text-xs text-ey-muted">Frequent bi-weekly task assistance</p>
+                    <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
+                      <span>Continue to Hierarchy</span>
+                      <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold text-cyan-400">
-                    {((userCohorts.regular.length / (activeUserCount || 1)) * 100).toFixed(0)}%
-                  </p>
-                  <p className="text-xs text-ey-muted">Frequent bi-weekly task assistance</p>
-                  <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
-                    <span>Drill to Regular User Logs</span>
-                    <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
 
-                <div
-                  onClick={() => setSelectedEntity({ type: 'cohort', name: 'Occasional (4-8 days)' })}
-                  className="bg-ey-card border border-ey-border hover:border-ey-yellow/80 p-5 rounded-xl cursor-pointer transition group space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                      Occasional (4-8 Days)
-                    </span>
-                    <span className="text-[10px] text-ey-muted">{userCohorts.occasional.length} Users</span>
-                  </div>
-                  <p className="text-2xl font-bold text-amber-400">
-                    {((userCohorts.occasional.length / (activeUserCount || 1)) * 100).toFixed(0)}%
-                  </p>
-                  <p className="text-xs text-ey-muted">Target cohort for competency training</p>
-                  <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
-                    <span>Drill to Occasional User Logs</span>
-                    <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                  <div
+                    onClick={() => setSelectedCohortFacet('occasional')}
+                    className="bg-ey-card border border-ey-border hover:border-ey-yellow/80 p-5 rounded-xl cursor-pointer transition group space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                        Occasional (4-8 Days)
+                      </span>
+                      <span className="text-[10px] text-ey-muted">{userCohorts.occasional.length} Users</span>
+                    </div>
+                    <p className="text-2xl font-bold text-amber-400">
+                      {((userCohorts.occasional.length / (activeUserCount || 1)) * 100).toFixed(0)}%
+                    </p>
+                    <p className="text-xs text-ey-muted">Target cohort for competency training</p>
+                    <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
+                      <span>Continue to Hierarchy</span>
+                      <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setSelectedCohortFacet(null)}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-muted hover:text-ey-yellow bg-ey-black border border-ey-border px-3 py-1.5 rounded-lg transition"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    Back to Cohorts
+                  </button>
+                  <HierarchyDrilldownPanel
+                    rows={allRows.filter((r) => {
+                      const email = (r.userMail || '').toLowerCase().trim();
+                      return userCohorts[selectedCohortFacet].some((u) => u.email === email);
+                    })}
+                    title={`Level 3: ${selectedCohortFacet === 'embedded' ? 'Core Habitual' : selectedCohortFacet === 'regular' ? 'Regular' : 'Occasional'} Cohort Hierarchy`}
+                    onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+                  />
+                </>
+              )}
             </div>
           )}
 
@@ -1957,141 +1757,13 @@ export function ExecutiveInferenceDrilldownView({
                 </div>
               </div>
 
-              {/* Side-by-Side Interactive Split Cards -> Level 4 Trigger */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div
-                  onClick={() => setSelectedEntity({ type: 'project_type', name: 'External', label: 'External Client Projects (E-XXXXXX)' })}
-                  className="bg-ey-card border border-ey-border hover:border-emerald-500/80 p-5 rounded-xl cursor-pointer transition group space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                      External Engagements (E-XXXXXX)
-                    </span>
-                    <span className="text-xs font-mono text-ey-muted">{externalProjects.length} Projects</span>
-                  </div>
-                  <div>
-                    <p className="text-3xl font-black text-emerald-400 font-mono">${totalExternalCost.toFixed(2)}</p>
-                    <p className="text-xs text-ey-muted mt-1">696 total transaction events deployed on active fee-earning client delivery.</p>
-                  </div>
-                  <div className="pt-2 border-t border-ey-border/40 text-[10px] text-emerald-400 font-bold flex items-center justify-between">
-                    <span>Drill to All External Client Log Records</span>
-                    <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => setSelectedEntity({ type: 'project_type', name: 'Internal', label: 'Internal R&D Projects (I-XXXXXX)' })}
-                  className="bg-ey-card border border-ey-border hover:border-purple-500/80 p-5 rounded-xl cursor-pointer transition group space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/30">
-                      Internal R&D (I-XXXXXX)
-                    </span>
-                    <span className="text-xs font-mono text-ey-muted">{internalProjects.length} Projects</span>
-                  </div>
-                  <div>
-                    <p className="text-3xl font-black text-purple-400 font-mono">${totalInternalCost.toFixed(2)}</p>
-                    <p className="text-xs text-ey-muted mt-1">304 total transaction events absorbed by internal accelerators and R&D.</p>
-                  </div>
-                  <div className="pt-2 border-t border-ey-border/40 text-[10px] text-purple-400 font-bold flex items-center justify-between">
-                    <span>Drill to All Internal R&D Log Records</span>
-                    <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Level 3: External vs Internal Project Portfolios */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* External Projects Table */}
-                <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="border-b border-ey-border/60 pb-3">
-                    <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                      <Briefcase className="w-4 h-4 text-emerald-400" />
-                      <span>Top External Client Projects (Click Code to Drill)</span>
-                    </h3>
-                    <p className="text-xs text-ey-muted mt-0.5">Direct client delivery engagements with full fee-recovery.</p>
-                  </div>
-
-                  <div className="overflow-x-auto border border-ey-border rounded-xl">
-                    <table className="w-full text-left text-xs font-mono">
-                      <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-                        <tr>
-                          <th className="px-3 py-2.5">Project Code</th>
-                          <th className="px-3 py-2.5 text-center">Team</th>
-                          <th className="px-3 py-2.5 text-right">Spend</th>
-                          <th className="px-3 py-2.5 text-center">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-ey-border">
-                        {externalProjects.slice(0, 7).map((p, i) => (
-                          <tr
-                            key={i}
-                            onClick={() => setSelectedEntity({ type: 'project_code', name: p.code })}
-                            className="hover:bg-ey-yellow/5 cursor-pointer transition group"
-                          >
-                            <td className="px-3 py-2 font-bold text-emerald-400 group-hover:underline">
-                              {p.code}
-                            </td>
-                            <td className="px-3 py-2 text-center text-ey-muted">{p.users.size} Users</td>
-                            <td className="px-3 py-2 text-right font-bold text-ey-yellow">${p.cost.toFixed(2)}</td>
-                            <td className="px-3 py-2 text-center">
-                              <span className="inline-flex items-center gap-1 text-[10px] text-ey-yellow font-bold">
-                                <span>Drill</span>
-                                <ChevronRight className="w-3 h-3" />
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Internal Projects Table */}
-                <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="border-b border-ey-border/60 pb-3">
-                    <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                      <FolderKanban className="w-4 h-4 text-purple-400" />
-                      <span>Top Internal R&D Projects (Click Code to Drill)</span>
-                    </h3>
-                    <p className="text-xs text-ey-muted mt-0.5">Internal accelerators and reusable intellectual property creation.</p>
-                  </div>
-
-                  <div className="overflow-x-auto border border-ey-border rounded-xl">
-                    <table className="w-full text-left text-xs font-mono">
-                      <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-                        <tr>
-                          <th className="px-3 py-2.5">Project Code</th>
-                          <th className="px-3 py-2.5 text-center">Team</th>
-                          <th className="px-3 py-2.5 text-right">Spend</th>
-                          <th className="px-3 py-2.5 text-center">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-ey-border">
-                        {internalProjects.slice(0, 7).map((p, i) => (
-                          <tr
-                            key={i}
-                            onClick={() => setSelectedEntity({ type: 'project_code', name: p.code })}
-                            className="hover:bg-ey-yellow/5 cursor-pointer transition group"
-                          >
-                            <td className="px-3 py-2 font-bold text-purple-400 group-hover:underline">
-                              {p.code}
-                            </td>
-                            <td className="px-3 py-2 text-center text-ey-muted">{p.users.size} Users</td>
-                            <td className="px-3 py-2 text-right font-bold text-ey-yellow">${p.cost.toFixed(2)}</td>
-                            <td className="px-3 py-2 text-center">
-                              <span className="inline-flex items-center gap-1 text-[10px] text-ey-yellow font-bold">
-                                <span>Drill</span>
-                                <ChevronRight className="w-3 h-3" />
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
+              {/* Level 3: Mandated Hierarchy Navigator (Engagement Code, E-/I- prefixed, sits at level 4) */}
+              <HierarchyDrilldownPanel
+                rows={allRows}
+                title="Level 3: External / Internal Engagement Hierarchy"
+                subtitle={`External: $${totalExternalCost.toFixed(2)} (${externalProjects.length} codes) · Internal: $${totalInternalCost.toFixed(2)} (${internalProjects.length} codes) — drill via Engagement Code below.`}
+                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+              />
 
               {/* Action Trigger Box */}
               <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-3">
@@ -2147,109 +1819,97 @@ export function ExecutiveInferenceDrilldownView({
                 </div>
               </div>
 
-              {/* Level 3: Cross-Service Line Comparative Matrix */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="border-b border-ey-border/60 pb-3">
-                  <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4 text-ey-yellow" />
-                    <span>Cross-Service Line Usage, Spend &amp; Unit Cost Matrix (Click Row to Drill)</span>
-                  </h3>
-                  <p className="text-xs text-ey-muted mt-0.5">
-                    Comparative benchmarks showing token intensity, effective $/M unit cost, per-user economics, and client billability.
-                  </p>
-                </div>
-
-                <div className="overflow-x-auto border border-ey-border rounded-xl">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-                      <tr>
-                        <th className="px-4 py-3">Service Line</th>
-                        <th className="px-4 py-3 text-center">Active Users</th>
-                        <th className="px-4 py-3 text-right">Tokens Consumed</th>
-                        <th className="px-4 py-3 text-right">Total AI Spend</th>
-                        <th className="px-4 py-3 text-right">Effective Rate ($/M)</th>
-                        <th className="px-4 py-3 text-right">Avg Cost / User</th>
-                        <th className="px-4 py-3 text-center">Client Billable %</th>
-                        <th className="px-4 py-3">Top Sub-Practice</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-ey-border">
-                      {serviceLineComparisonData.map((s, i) => (
-                        <tr
-                          key={i}
-                          onClick={() => setSelectedEntity({ type: 'service_line', name: s.name })}
-                          className="hover:bg-ey-yellow/5 cursor-pointer transition group"
-                        >
-                          <td className="px-4 py-3 font-bold text-ey-light group-hover:text-ey-yellow transition-colors">
-                            <div className="flex items-center gap-2">
-                              <span>{s.name}</span>
-                              <ChevronRight className="w-3 h-3 text-ey-yellow opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-center text-ey-muted">{s.users.size} Users</td>
-                          <td className="px-4 py-3 text-right text-ey-light">{s.tokens.toLocaleString()}</td>
-                          <td className="px-4 py-3 text-right font-bold text-ey-yellow">
-                            ${s.cost.toFixed(2)}{' '}
-                            <span className="text-[10px] text-ey-muted font-normal">
-                              ({totalOrgSpend > 0 ? ((s.cost / totalOrgSpend) * 100).toFixed(1) : 0}%)
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right font-bold">
-                            <span className={s.unitCostPerM > 15 ? 'text-rose-400' : s.unitCostPerM < 13.5 ? 'text-emerald-400' : 'text-ey-light'}>
-                              ${s.unitCostPerM.toFixed(2)}/M
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right font-bold">
-                            <span className={s.avgCostPerUser > 25 ? 'text-rose-400' : s.avgCostPerUser < 15 ? 'text-emerald-400' : 'text-ey-light'}>
-                              ${s.avgCostPerUser.toFixed(2)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                              s.externalRatio >= 80 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
-                              s.externalRatio >= 50 ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
-                              'bg-purple-500/10 text-purple-400 border-purple-500/30'
-                            }`}>
-                              {s.externalRatio.toFixed(1)}% External
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-ey-muted">
-                            {s.topSubService[0]} (${Number(s.topSubService[1]).toFixed(0)})
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Interactive Practice Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                {serviceLineComparisonData.map((s, i) => (
-                  <div
-                    key={i}
-                    onClick={() => setSelectedEntity({ type: 'service_line', name: s.name })}
-                    className="bg-ey-card border border-ey-border hover:border-ey-yellow/80 p-4 rounded-xl cursor-pointer transition group space-y-2 select-none"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-ey-light group-hover:text-ey-yellow transition-colors">{s.name}</span>
-                      <span className="text-[10px] font-mono text-ey-muted">{s.rows} Logs</span>
-                    </div>
-                    <div>
-                      <div className="text-xl font-bold text-ey-yellow font-mono">${s.cost.toFixed(2)}</div>
-                      <div className="text-[10px] text-ey-muted font-mono">{s.tokens.toLocaleString()} tokens</div>
-                    </div>
-                    <div className="pt-2 border-t border-ey-border/40 text-[10px] space-y-0.5 text-ey-muted">
-                      <div>Rate: <strong className="text-ey-light font-mono">${s.unitCostPerM.toFixed(2)}/M</strong></div>
-                      <div>Per User: <strong className="text-ey-light font-mono">${s.avgCostPerUser.toFixed(2)}</strong></div>
-                    </div>
-                    <div className="pt-1 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
-                      <span>Inspect Logs</span>
-                      <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                    </div>
+              {selectedServiceLineFacet === null ? (
+                <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
+                  <div className="border-b border-ey-border/60 pb-3">
+                    <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-ey-yellow" />
+                      <span>Level 3: Cross-Service Line Usage, Spend &amp; Unit Cost Matrix (Click Row to Continue)</span>
+                    </h3>
+                    <p className="text-xs text-ey-muted mt-0.5">
+                      Comparative benchmarks showing token intensity, effective $/M unit cost, per-user economics, and client billability.
+                    </p>
                   </div>
-                ))}
-              </div>
+
+                  <div className="overflow-x-auto border border-ey-border rounded-xl">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
+                        <tr>
+                          <th className="px-4 py-3">Service Line</th>
+                          <th className="px-4 py-3 text-center">Active Users</th>
+                          <th className="px-4 py-3 text-right">Tokens Consumed</th>
+                          <th className="px-4 py-3 text-right">Total AI Spend</th>
+                          <th className="px-4 py-3 text-right">Effective Rate ($/M)</th>
+                          <th className="px-4 py-3 text-right">Avg Cost / User</th>
+                          <th className="px-4 py-3 text-center">Client Billable %</th>
+                          <th className="px-4 py-3">Top Sub-Practice</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-ey-border">
+                        {serviceLineComparisonData.map((s, i) => (
+                          <tr
+                            key={i}
+                            onClick={() => setSelectedServiceLineFacet(s.name)}
+                            className="hover:bg-ey-yellow/5 cursor-pointer transition group"
+                          >
+                            <td className="px-4 py-3 font-bold text-ey-light group-hover:text-ey-yellow transition-colors">
+                              <div className="flex items-center gap-2">
+                                <span>{s.name}</span>
+                                <ChevronRight className="w-3 h-3 text-ey-yellow opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center text-ey-muted">{s.users.size} Users</td>
+                            <td className="px-4 py-3 text-right text-ey-light">{s.tokens.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-right font-bold text-ey-yellow">
+                              ${s.cost.toFixed(2)}{' '}
+                              <span className="text-[10px] text-ey-muted font-normal">
+                                ({totalOrgSpend > 0 ? ((s.cost / totalOrgSpend) * 100).toFixed(1) : 0}%)
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold">
+                              <span className={s.unitCostPerM > 15 ? 'text-rose-400' : s.unitCostPerM < 13.5 ? 'text-emerald-400' : 'text-ey-light'}>
+                                ${s.unitCostPerM.toFixed(2)}/M
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold">
+                              <span className={s.avgCostPerUser > 25 ? 'text-rose-400' : s.avgCostPerUser < 15 ? 'text-emerald-400' : 'text-ey-light'}>
+                                ${s.avgCostPerUser.toFixed(2)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                s.externalRatio >= 80 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
+                                s.externalRatio >= 50 ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
+                                'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                              }`}>
+                                {s.externalRatio.toFixed(1)}% External
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-ey-muted">
+                              {s.topSubService[0]} (${Number(s.topSubService[1]).toFixed(0)})
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setSelectedServiceLineFacet(null)}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-muted hover:text-ey-yellow bg-ey-black border border-ey-border px-3 py-1.5 rounded-lg transition"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    Back to Service Line Matrix
+                  </button>
+                  <HierarchyDrilldownPanel
+                    rows={allRows.filter((r) => r.orgServiceLine === selectedServiceLineFacet)}
+                    title={`Level 3: ${selectedServiceLineFacet} Hierarchy`}
+                    onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+                  />
+                </>
+              )}
 
               {/* Action Trigger Box */}
               <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-3">
@@ -2348,6 +2008,16 @@ export function ExecutiveInferenceDrilldownView({
       {/* ========================================================================= */}
       {/* LEVEL 4: THE CORE / LAST LEVEL — ROW-LEVEL USAGE LOGS FROM CSV             */}
       {/* ========================================================================= */}
+      {selectedEntity && selectedEntity.type !== 'user' && (
+        <HierarchyDrilldownPanel
+          rows={granularRows}
+          title={`Level 4: ${selectedEntity.label || selectedEntity.name} Hierarchy`}
+          subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
+          onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+        />
+      )}
+
+      {selectedEntity?.type === 'user' && (
       <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-lg space-y-4">
         {/* Core Header with Breadcrumb Entity Context */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-ey-border/60 pb-3">
@@ -2429,7 +2099,7 @@ export function ExecutiveInferenceDrilldownView({
                 <th className="px-4 py-3">Activity Date</th>
                 <th className="px-4 py-3">Employee &amp; Email</th>
                 <th className="px-4 py-3">AI Tool</th>
-                <th className="px-4 py-3">Project Code</th>
+                <th className="px-4 py-3">Engagement Code</th>
                 <th className="px-4 py-3">Service Line</th>
                 <th className="px-4 py-3">Region</th>
                 <th className="px-4 py-3 text-center">Billable</th>
@@ -2533,6 +2203,7 @@ export function ExecutiveInferenceDrilldownView({
           </div>
         )}
       </div>
+      )}
 
       {/* ========================================================================= */}
       {/* FLOATING QUICK-RETURN BUTTON (PERSISTENT ON SCREEN)                       */}

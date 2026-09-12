@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { TokenCostSummary } from '@/lib/metrics/types';
+import { loadCsvData } from '@/lib/data/csvLoader';
+import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 import {
   Layers,
   Zap,
@@ -54,11 +56,27 @@ export function MultiToolComparisonPanel({ summary, onDrilldown }: MultiToolComp
   const [isExpanded, setIsExpanded] = useState(true);
   const [showOverlapUsers, setShowOverlapUsers] = useState(false);
 
+  // Raw CSV rows, needed to walk the mandated hierarchy before any overlap user is named.
+  const allRows = useMemo(() => {
+    try {
+      return loadCsvData();
+    } catch (_err) {
+      return [];
+    }
+  }, []);
+
+  const multiToolOverlap = summary?.multiToolOverlap;
+  const overlapHierarchyRows = useMemo(() => {
+    if (!multiToolOverlap?.multiToolUserList?.length) return [];
+    const allowedEmails = new Set(multiToolOverlap.multiToolUserList.map((u) => u.userMail.toLowerCase()));
+    return allRows.filter((r) => allowedEmails.has((r.userMail || '').toLowerCase()));
+  }, [allRows, multiToolOverlap]);
+
   if (!summary || !summary.byAiTool || summary.byAiTool.length === 0) {
     return null;
   }
 
-  const { byAiTool, multiToolOverlap } = summary;
+  const { byAiTool } = summary;
 
   // Find lowest cost per 1k tokens for efficiency highlight
   const minCostPer1k = Math.min(...byAiTool.map((t) => t.costPer1kTokens || 0));
@@ -339,68 +357,13 @@ export function MultiToolComparisonPanel({ summary, onDrilldown }: MultiToolComp
                 </button>
 
                 {showOverlapUsers && (
-                  <div className="mt-3 bg-ey-black border border-ey-border rounded-xl overflow-hidden">
-                    <table className="w-full text-xs text-left font-mono">
-                      <thead className="bg-ey-card text-ey-muted text-[10px] uppercase border-b border-ey-border">
-                        <tr>
-                          <th className="px-4 py-2.5">User</th>
-                          <th className="px-4 py-2.5">AI Platforms Used</th>
-                          <th className="px-4 py-2.5 text-right">Total Tokens</th>
-                          <th className="px-4 py-2.5 text-right">Total Spend ($)</th>
-                          <th className="px-4 py-2.5 text-center">Telemetry</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-ey-border/40">
-                        {multiToolOverlap.multiToolUserList.map((user) => (
-                          <tr
-                            key={user.userMail}
-                            onClick={() => onDrilldown?.(undefined, user.userMail)}
-                            className="hover:bg-ey-card transition-colors cursor-pointer group"
-                            title={`Click to inspect dual-platform telemetry logs for ${user.displayName || user.userMail}`}
-                          >
-                            <td className="px-4 py-2 font-medium text-ey-light">
-                              {user.displayName ? (
-                                <div>
-                                  <span className="font-bold group-hover:text-ey-yellow transition-colors">{user.displayName}</span>
-                                  <span className="block text-[10px] text-ey-muted">{user.userMail}</span>
-                                </div>
-                              ) : (
-                                <span className="group-hover:text-ey-yellow transition-colors">{user.userMail}</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2">
-                              <div className="flex flex-wrap gap-1">
-                                {user.tools.map((t) => {
-                                  const cfg = TOOL_CONFIG[t] || {
-                                    label: t,
-                                    bg: 'bg-purple-500/10',
-                                    text: 'text-purple-400',
-                                    border: 'border-purple-500/30',
-                                  };
-                                  return (
-                                    <span
-                                      key={t}
-                                      className={`text-[10px] font-bold px-2 py-0.5 rounded border ${cfg.bg} ${cfg.text} ${cfg.border}`}
-                                    >
-                                      {cfg.label}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            </td>
-                            <td className="px-4 py-2 text-right text-ey-muted font-bold">
-                              {user.totalTokens.toLocaleString()}
-                            </td>
-                            <td className="px-4 py-2 text-right text-emerald-400 font-bold">
-                              ${user.totalCost.toFixed(2)}
-                            </td>
-                            <td className="px-4 py-2 text-center text-ey-yellow group-hover:translate-x-0.5 transition-transform">
-                              <ChevronRight className="w-4 h-4 inline" />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="mt-3">
+                    <HierarchyDrilldownPanel
+                      rows={overlapHierarchyRows}
+                      title="Dual-Platform Seat Hierarchy"
+                      subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
+                      onSelectUser={(email) => onDrilldown?.(undefined, email)}
+                    />
                   </div>
                 )}
               </div>

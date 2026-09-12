@@ -27,6 +27,7 @@ import {
 import { MetricChart } from '@/components/ui/MetricChart';
 import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
 import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
+import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 
 interface SubDrilldownState {
   type: 'tool' | 'service_line' | 'region' | 'project_code' | 'user';
@@ -50,6 +51,11 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [inspectingRow, setInspectingRow] = useState<CsvUsageRow | null>(null);
 
+  // Pre-hierarchy facet selection: clicking a tool/service line/region/engagement code
+  // narrows to that facet's rows, then hands off to the mandated hierarchy navigator
+  // instead of jumping straight to a list of named users.
+  const [pendingFacet, setPendingFacet] = useState<{ field: keyof CsvUsageRow; value: string; label: string } | null>(null);
+
   // Listen for Escape key to go back intuitively
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -60,6 +66,8 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
           setSubDrilldown(null);
           setSearchTerm('');
           setCurrentPage(1);
+        } else if (pendingFacet) {
+          setPendingFacet(null);
         } else {
           onBack();
         }
@@ -67,7 +75,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [inspectingRow, subDrilldown, onBack]);
+  }, [inspectingRow, subDrilldown, pendingFacet, onBack]);
 
   // Load all CSV rows synchronously from memory for Level 3 filtering
   const allRows = useMemo(() => {
@@ -152,9 +160,12 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                 setSearchTerm('');
                 setCurrentPage(1);
               }
+              if (pendingFacet) {
+                setPendingFacet(null);
+              }
             }}
             className={`${
-              subDrilldown ? 'text-ey-muted hover:text-ey-yellow cursor-pointer' : 'text-ey-yellow font-bold'
+              subDrilldown || pendingFacet ? 'text-ey-muted hover:text-ey-yellow cursor-pointer' : 'text-ey-yellow font-bold'
             } transition-colors flex items-center gap-1`}
           >
             <span>Level 1: {title}</span>
@@ -274,7 +285,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3">User &amp; Email</th>
                     <th className="px-4 py-3">AI Tool</th>
-                    <th className="px-4 py-3">Project Code</th>
+                    <th className="px-4 py-3">Engagement Code</th>
                     <th className="px-4 py-3">Service Line</th>
                     <th className="px-4 py-3 text-center">Billable</th>
                     <th className="px-4 py-3 text-right">Tokens</th>
@@ -372,6 +383,25 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
             />
           </div>
 
+          {pendingFacet ? (
+            <>
+              <button
+                onClick={() => setPendingFacet(null)}
+                className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-muted hover:text-ey-yellow bg-ey-black border border-ey-border px-3 py-1.5 rounded-lg transition"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Back to {pendingFacet.label}
+              </button>
+              <HierarchyDrilldownPanel
+                rows={allRows.filter((r) => String(r[pendingFacet.field] || '').toLowerCase() === pendingFacet.value.toLowerCase())}
+                title={`Level 3: ${pendingFacet.value} Hierarchy`}
+                onSelectUser={(email, label) =>
+                  setSubDrilldown({ type: 'user', id: email, name: email, subtitle: `Raw usage records for ${label}` })
+                }
+              />
+            </>
+          ) : (
+          <>
           {/* Metric Specific Deep-Dive Panels with Level 3 Click Triggers */}
           {id === 'token_consumption' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -390,14 +420,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                     return (
                       <div
                         key={t.tool}
-                        onClick={() =>
-                          setSubDrilldown({
-                            type: 'tool',
-                            id: t.tool,
-                            name: t.tool,
-                            subtitle: `Raw usage records for ${t.tool}`,
-                          })
-                        }
+                        onClick={() => setPendingFacet({ field: 'aiTool', value: t.tool, label: 'Token Share by AI Tool' })}
                         className="space-y-1.5 bg-ey-black/40 border border-ey-border/60 hover:border-ey-yellow/60 p-3 rounded-xl cursor-pointer transition group"
                       >
                         <div className="flex justify-between items-center text-ey-light group-hover:text-ey-yellow">
@@ -429,14 +452,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                   {byServiceLine.map((s: any) => (
                     <div
                       key={s.serviceLine}
-                      onClick={() =>
-                        setSubDrilldown({
-                          type: 'service_line',
-                          id: s.serviceLine,
-                          name: s.serviceLine,
-                          subtitle: `Raw usage records for ${s.serviceLine}`,
-                        })
-                      }
+                      onClick={() => setPendingFacet({ field: 'orgServiceLine', value: s.serviceLine, label: 'Service Line Token Allocation' })}
                       className="flex items-center justify-between p-3 bg-ey-black/40 border border-ey-border/60 hover:border-cyan-400/60 rounded-xl cursor-pointer transition group"
                     >
                       <span className="text-ey-light font-bold text-sm group-hover:text-cyan-300 flex items-center gap-1.5">
@@ -496,14 +512,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                   {byRegion.map((r: any) => (
                     <div
                       key={r.region}
-                      onClick={() =>
-                        setSubDrilldown({
-                          type: 'region',
-                          id: r.region,
-                          name: r.region,
-                          subtitle: `Raw usage records for ${r.region} region`,
-                        })
-                      }
+                      onClick={() => setPendingFacet({ field: 'managementRegion', value: r.region, label: 'Regional Spend Breakdown' })}
                       className="bg-ey-black/60 border border-ey-border hover:border-ey-yellow/60 p-4 rounded-xl space-y-1 cursor-pointer transition group"
                     >
                       <span className="text-ey-muted text-[10px] uppercase font-bold group-hover:text-ey-yellow flex items-center justify-between">
@@ -520,62 +529,22 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
           )}
 
           {id === 'cost_per_user' && (
-            <div className="bg-ey-card border border-ey-border rounded-2xl p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-ey-border pb-3">
-                <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                  <Users className="w-4 h-4 text-ey-yellow" />
-                  <span>Developer Seat &amp; Active User Spend Rankings</span>
-                </h3>
-                <span className="text-[10px] font-mono text-ey-yellow">Click user row for log records 🔍</span>
-              </div>
-              <div className="overflow-x-auto border border-ey-border rounded-xl">
-                <table className="w-full text-left text-xs font-mono">
-                  <thead className="bg-ey-black/60 text-ey-muted border-b border-ey-border">
-                    <tr>
-                      <th className="px-4 py-3">Rank</th>
-                      <th className="px-4 py-3">Developer Name</th>
-                      <th className="px-4 py-3">Email Address</th>
-                      <th className="px-4 py-3 text-right">Token Consumption</th>
-                      <th className="px-4 py-3 text-right">Total AI Cost</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-ey-border">
-                    {topUsers.slice(0, 10).map((u: any, idx: number) => (
-                      <tr
-                        key={u.userMail}
-                        onClick={() =>
-                          setSubDrilldown({
-                            type: 'user',
-                            id: u.userMail,
-                            name: u.userMail,
-                            subtitle: `Raw usage records for ${u.displayName}`,
-                          })
-                        }
-                        className="hover:bg-ey-card-hover/80 transition cursor-pointer group"
-                      >
-                        <td className="px-4 py-3 text-ey-muted font-bold">#{idx + 1}</td>
-                        <td className="px-4 py-3 font-bold text-ey-light group-hover:text-ey-yellow flex items-center gap-1.5">
-                          <span>{u.displayName}</span>
-                          <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow" />
-                        </td>
-                        <td className="px-4 py-3 text-ey-muted">{u.userMail}</td>
-                        <td className="px-4 py-3 text-right text-ey-light">{u.tokens.toLocaleString()} tokens</td>
-                        <td className="px-4 py-3 text-right font-bold text-ey-yellow">${u.cost.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <HierarchyDrilldownPanel
+              rows={allRows}
+              title="Level 3: Developer Seat & Active User Hierarchy"
+              onSelectUser={(email, label) =>
+                setSubDrilldown({ type: 'user', id: email, name: email, subtitle: `Raw usage records for ${label}` })
+              }
+            />
           )}
 
-          {/* Top Project Codes Telemetry Grid -> Level 3 Trigger */}
+          {/* Top Engagement Codes Telemetry Grid -> Level 3 Trigger */}
           {byProjectCode.length > 0 && (
             <div className="bg-ey-card border border-ey-border rounded-2xl p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b border-ey-border pb-3">
                 <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
                   <FolderKanban className="w-4 h-4 text-blue-400" />
-                  <span>Top Associated Project Codes</span>
+                  <span>Top Associated Engagement Codes</span>
                 </h3>
                 <span className="text-[10px] font-mono text-blue-400">Click project code for log records 🔍</span>
               </div>
@@ -584,12 +553,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                   <div
                     key={p.projectCode}
                     onClick={() =>
-                      setSubDrilldown({
-                        type: 'project_code',
-                        id: p.projectCode,
-                        name: p.projectCode,
-                        subtitle: `Raw usage records for project code ${p.projectCode}`,
-                      })
+                      setPendingFacet({ field: 'projectCode', value: p.projectCode, label: 'Top Associated Engagement Codes' })
                     }
                     className="p-3 bg-ey-black/60 border border-ey-border hover:border-blue-400/60 rounded-xl flex items-center justify-between cursor-pointer transition group"
                   >
@@ -613,6 +577,8 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
               </div>
             </div>
           )}
+          </>
+          )}
         </div>
       )}
 
@@ -626,6 +592,8 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
               setSubDrilldown(null);
               setSearchTerm('');
               setCurrentPage(1);
+            } else if (pendingFacet) {
+              setPendingFacet(null);
             } else {
               onBack();
             }
@@ -634,11 +602,11 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
           title="Return to previous screen (Esc)"
         >
           <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
-          <span>{subDrilldown ? `Back to ${title}` : 'Back to Overview'}</span>
+          <span>{subDrilldown || pendingFacet ? `Back to ${title}` : 'Back to Overview'}</span>
           <kbd className="text-[10px] bg-black/20 text-ey-black px-1.5 py-0.5 rounded font-mono font-bold">Esc</kbd>
         </button>
 
-        {subDrilldown && (
+        {(subDrilldown || pendingFacet) && (
           <button
             onClick={onBack}
             className="p-2.5 bg-ey-black hover:bg-ey-card text-ey-light hover:text-ey-yellow border border-ey-border hover:border-ey-yellow rounded-full shadow-2xl transition cursor-pointer"

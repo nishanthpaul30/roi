@@ -111,14 +111,14 @@ export default function DataExplorerPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-ey-light tracking-wide flex items-center gap-2.5">
-                <span>Data Explorer</span>
+                <span>Data Playground</span>
                 <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300">
                   <Sparkles className="w-3 h-3" />
                   Any dimension &times; any dimension &times; any metric
                 </span>
               </h1>
               <p className="text-xs text-ey-muted mt-0.5">
-                Cross-tabulate every field in <span className="font-mono text-ey-yellow">ai_usage_data.csv</span> on demand &mdash; including Region and Project Investment Code, which have no dedicated panel elsewhere.
+                Cross-tabulate every field in <span className="font-mono text-ey-yellow">ai_usage_data.csv</span> on demand &mdash; including the CT/Non-CT &rarr; Country &rarr; Service Line &rarr; Engagement hierarchy, GDS Location, and Cost Center, which have no dedicated panel elsewhere.
               </p>
             </div>
           </div>

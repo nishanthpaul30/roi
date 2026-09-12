@@ -23,23 +23,41 @@ export type DimensionKey =
   | 'projectType'
   | 'billableFlag'
   | 'projectCode'
-  | 'projectInvestmentCode'
   | 'monthLabel'
-  | 'displayName';
+  | 'ctNonCt'
+  | 'subServiceLine1'
+  | 'subServiceLine2'
+  | 'engagementSuperRegion'
+  | 'engagementServiceLine'
+  | 'engagementSubServiceLine'
+  | 'engagementCompetency'
+  | 'gdsLocation'
+  | 'costCenter';
 
+// Ordered per the required application-wide hierarchy:
+// CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1 -> Sub-Service Line 2 ->
+// Engagement Code -> Engagement Super Region -> Engagement Service Line ->
+// Engagement Sub Service Line -> Engagement Competency. Remaining dimensions follow.
 export const DIMENSIONS: { key: DimensionKey; label: string }[] = [
+  { key: 'ctNonCt', label: 'CT / Non-CT' },
+  { key: 'country', label: 'Country' },
+  { key: 'orgServiceLine', label: 'Service Line' },
+  { key: 'subServiceLine1', label: 'Sub-Service Line 1' },
+  { key: 'subServiceLine2', label: 'Sub-Service Line 2' },
+  { key: 'projectCode', label: 'Engagement Code (billing)' },
+  { key: 'engagementSuperRegion', label: 'Engagement Super Region' },
+  { key: 'engagementServiceLine', label: 'Engagement Service Line' },
+  { key: 'engagementSubServiceLine', label: 'Engagement Sub Service Line' },
+  { key: 'engagementCompetency', label: 'Engagement Competency' },
   { key: 'aiTool', label: 'AI Tool' },
   { key: 'managementRegion', label: 'Management Region' },
   { key: 'region', label: 'Region' },
-  { key: 'country', label: 'Country' },
-  { key: 'orgServiceLine', label: 'Org Service Line' },
   { key: 'orgSubServiceLine', label: 'Org Sub-Service Line' },
   { key: 'projectType', label: 'Project Type' },
   { key: 'billableFlag', label: 'Billable / Non-Billable' },
-  { key: 'projectCode', label: 'Project Code (billing)' },
-  { key: 'projectInvestmentCode', label: 'Project Investment Code' },
+  { key: 'gdsLocation', label: 'GDS Location' },
+  { key: 'costCenter', label: 'Cost Center' },
   { key: 'monthLabel', label: 'Month' },
-  { key: 'displayName', label: 'User' },
 ];
 
 export type MetricKey = 'cost' | 'tokenConsumption' | 'dailyBillableTokens';

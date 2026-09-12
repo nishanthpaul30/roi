@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { UserCapacityRow } from '@/lib/metrics/types';
-import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert, Search, ChevronLeft, ChevronRight, ArrowUpRight } from 'lucide-react';
+import { loadCsvData } from '@/lib/data/csvLoader';
+import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
+import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert } from 'lucide-react';
 
 interface RoiCapacityPanelProps {
   userCapacityBreakdown: UserCapacityRow[];
@@ -29,13 +31,10 @@ export function RoiCapacityPanel({
   licenseRoiPercent,
   licenseUnderutilizedCost,
   licenseOverutilizedValue,
-  pageSize = 10,
   onSelectUser,
   onSelectZone,
 }: RoiCapacityPanelProps) {
   const [activeTab, setActiveTab] = useState<'zone1' | 'zone2' | 'all'>('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
 
   const zone1List = userCapacityBreakdown.filter((u) => u.zone === 'zone1_under');
   const zone2List = userCapacityBreakdown.filter((u) => u.zone === 'zone2_over');
@@ -43,24 +42,30 @@ export function RoiCapacityPanel({
   const displayedList =
     activeTab === 'zone1' ? zone1List : activeTab === 'zone2' ? zone2List : userCapacityBreakdown;
 
-  // Search filter logic
-  const filteredList = displayedList.filter((row) =>
-    row.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    row.userMail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    row.aiTools.some((t) => t.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredList.length / pageSize) || 1;
-  const paginatedList = filteredList.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-
   const handleTabChange = (tab: 'zone1' | 'zone2' | 'all') => {
     setActiveTab(tab);
-    setCurrentPage(1);
   };
+
+  // Raw CSV rows, needed to walk the mandated hierarchy before any user is named.
+  const allRows = useMemo(() => {
+    try {
+      return loadCsvData();
+    } catch (_err) {
+      return [];
+    }
+  }, []);
+
+  const capacityByEmail = useMemo(() => {
+    const map = new Map<string, UserCapacityRow>();
+    for (const u of userCapacityBreakdown) map.set(u.userMail.toLowerCase(), u);
+    return map;
+  }, [userCapacityBreakdown]);
+
+  // Scope raw rows down to the same set of seats currently shown in the tab (all / zone1 / zone2)
+  const hierarchyRows = useMemo(() => {
+    const allowedEmails = new Set(displayedList.map((u) => u.userMail.toLowerCase()));
+    return allRows.filter((r) => allowedEmails.has((r.userMail || '').toLowerCase()));
+  }, [allRows, displayedList]);
 
   return (
     <div className="space-y-6">
@@ -180,223 +185,21 @@ export function RoiCapacityPanel({
         </div>
       </div>
 
-      {/* User Capacity Breakdown Table */}
-      <div className="bg-ey-card border border-ey-border rounded-xl p-5 shadow-sm space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-sm font-bold text-ey-light flex items-center gap-2">
-            {activeTab === 'zone1' ? (
-              <span className="text-amber-400 font-semibold">Zone 1: Unconsumed AI License Waste (Limit - Actual Cost)</span>
-            ) : activeTab === 'zone2' ? (
-              <span className="text-purple-400 font-semibold">Zone 2: Budget Breach &amp; Overage Charges (Actual Cost - Limit)</span>
-            ) : (
-              <span className="text-ey-yellow font-semibold">All User Seats — Mixed Capacity &amp; Zone Statuses</span>
-            )}
-          </h3>
-
-          <div className="flex items-center space-x-3">
-            <div className="relative w-56">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-ey-muted" />
-              <input
-                type="text"
-                placeholder="Search user email or tool..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full bg-ey-black border border-ey-border text-ey-light text-xs rounded-md pl-9 pr-3 py-1.5 focus:outline-none focus:border-ey-yellow"
-              />
-            </div>
-            <span className="text-xs text-ey-muted font-mono">
-              Total: {filteredList.length} users
-            </span>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-ey-light">
-            <thead className="bg-ey-black/80 text-[11px] uppercase font-semibold text-ey-muted border-b border-ey-border">
-              <tr>
-                <th className="px-4 py-3">User &amp; Email</th>
-                <th className="px-4 py-3">AI Tools</th>
-                <th className="px-4 py-3 text-right">Actual Cost ($)</th>
-                <th className="px-4 py-3 text-right">Free Limit ($)</th>
-                <th className="px-4 py-3 text-right">Wasted Capacity</th>
-                <th className="px-4 py-3 text-right">Overage Fee</th>
-                <th className="px-4 py-3 text-right">License Cost ($)</th>
-                <th className="px-4 py-3 text-right">License ROI</th>
-                <th className="px-4 py-3 text-center">100K Cap Proximity</th>
-                <th className="px-4 py-3 text-center">Status Zone</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ey-border">
-              {paginatedList.length > 0 ? (
-                paginatedList.map((row, idx) => (
-                  <tr
-                    key={idx}
-                    onClick={() => onSelectUser?.(row)}
-                    className={`hover:bg-ey-card-hover/80 transition ${
-                      onSelectUser ? 'cursor-pointer group' : ''
-                    }`}
-                  >
-                    <td className="px-4 py-3 font-medium">
-                      <div className="font-bold text-ey-light group-hover:text-ey-yellow flex items-center gap-1.5">
-                        <span>{row.displayName}</span>
-                        {onSelectUser && (
-                          <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow" />
-                        )}
-                      </div>
-                      <div className="text-[10px] text-ey-muted font-mono">{row.userMail}</div>
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {row.aiTools.map((t) => (
-                          <span
-                            key={t}
-                            className="px-1.5 py-0.5 text-[10px] font-mono border rounded bg-ey-black border-ey-border text-ey-light capitalize"
-                          >
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-3 text-right font-mono font-bold text-ey-light">
-                      ${row.actualCost.toFixed(2)}
-                    </td>
-
-                    <td className="px-4 py-3 text-right font-mono text-ey-muted">
-                      ${row.usageLimit.toFixed(2)}
-                    </td>
-
-                    <td className="px-4 py-3 text-right font-mono font-bold">
-                      {row.wasteCost > 0 ? (
-                        <span className="text-amber-400">+${row.wasteCost.toFixed(2)}</span>
-                      ) : (
-                        <span className="text-ey-muted">$0.00</span>
-                      )}
-                    </td>
-
-                    <td className="px-4 py-3 text-right font-mono font-bold">
-                      {row.overageCost > 0 ? (
-                        <span className="text-purple-400">+${row.overageCost.toFixed(2)}</span>
-                      ) : (
-                        <span className="text-ey-muted">$0.00</span>
-                      )}
-                    </td>
-
-                    <td className="px-4 py-3 text-right font-mono text-ey-muted">
-                      ${row.licenseCost.toFixed(2)}
-                    </td>
-
-                    <td className="px-4 py-3 text-right font-mono font-bold">
-                      <span
-                        className={
-                          row.licenseRoiZone === 'underutilized'
-                            ? 'text-amber-400'
-                            : row.licenseRoiZone === 'overutilized'
-                            ? 'text-purple-400'
-                            : 'text-emerald-400'
-                        }
-                      >
-                        {row.licenseRoiPercent}%
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex flex-col items-center space-y-1">
-                        <span
-                          className={`text-[10px] font-mono font-bold ${
-                            row.ceilingPercent >= 90
-                              ? 'text-red-400'
-                              : row.ceilingPercent >= 60
-                              ? 'text-ey-yellow'
-                              : 'text-emerald-400'
-                          }`}
-                        >
-                          {row.tokenConsumption.toLocaleString()} tokens ({row.ceilingPercent}%)
-                        </span>
-                        <div className="w-24 bg-ey-black h-1.5 rounded-full overflow-hidden border border-ey-border">
-                          <div
-                            className={`h-full rounded-full ${
-                              row.ceilingPercent >= 90
-                                ? 'bg-red-500'
-                                : row.ceilingPercent >= 60
-                                ? 'bg-ey-yellow'
-                                : 'bg-emerald-500'
-                            }`}
-                            style={{ width: `${Math.min(100, row.ceilingPercent)}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-3 text-center">
-                      {row.zone === 'zone1_under' ? (
-                        <span className="px-2 py-0.5 text-[10px] font-semibold border rounded-full bg-amber-500/15 text-amber-300 border-amber-500/30">
-                          Zone 1: Under
-                        </span>
-                      ) : row.zone === 'zone2_over' ? (
-                        <span className="px-2 py-0.5 text-[10px] font-semibold border rounded-full bg-purple-500/15 text-purple-300 border-purple-500/30">
-                          Zone 2: Over
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 text-[10px] font-semibold border rounded-full bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
-                          Balanced
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-ey-muted">
-                    No matching users found for selected zone or search term.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Footer Controls */}
-        <div className="flex items-center justify-between border-t border-ey-border pt-4 text-xs text-ey-muted">
-          <div>
-            Showing{' '}
-            <strong className="text-ey-light font-mono">
-              {filteredList.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}
-            </strong>{' '}
-            to{' '}
-            <strong className="text-ey-light font-mono">
-              {Math.min(currentPage * pageSize, filteredList.length)}
-            </strong>{' '}
-            of <strong className="text-ey-light font-mono">{filteredList.length}</strong> records
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="p-1.5 rounded-md border border-ey-border bg-ey-black text-ey-light disabled:opacity-40 disabled:cursor-not-allowed hover:border-ey-yellow transition"
-              title="Previous Page"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="font-mono text-[11px] px-2 text-ey-light">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-              disabled={currentPage >= totalPages}
-              className="p-1.5 rounded-md border border-ey-border bg-ey-black text-ey-light disabled:opacity-40 disabled:cursor-not-allowed hover:border-ey-yellow transition"
-              title="Next Page"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Mandated Hierarchy Drilldown — named seats only surface at the final level */}
+      <HierarchyDrilldownPanel
+        rows={hierarchyRows}
+        title={
+          activeTab === 'zone1'
+            ? 'Zone 1: Unconsumed AI License Waste Hierarchy'
+            : activeTab === 'zone2'
+            ? 'Zone 2: Budget Breach & Overage Hierarchy'
+            : 'All User Seats — Capacity & Zone Hierarchy'
+        }
+        onSelectUser={(email) => {
+          const row = capacityByEmail.get(email.toLowerCase());
+          if (row) onSelectUser?.(row);
+        }}
+      />
     </div>
   );
 }
