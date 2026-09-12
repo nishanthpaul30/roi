@@ -17,6 +17,7 @@ import {
   PieChart,
   Globe2,
   Bot,
+  Wallet,
 } from 'lucide-react';
 
 // Derivation Data Item Interface
@@ -42,11 +43,15 @@ const CSV_SCHEMA = [
   { column: 'Org Service Line', fieldName: 'orgServiceLine', description: 'Organizational Service Line (e.g. Tax, Assurance, S&T, CBS, Consulting)', dataType: 'String' },
   { column: 'Management Region', fieldName: 'managementRegion', description: 'Regional management division (e.g. EMEA, APAC, Americas)', dataType: 'String' },
   { column: 'Country', fieldName: 'country', description: 'Country location of user', dataType: 'String' },
-  { column: 'License Cost in USD', fieldName: 'licenseCost', description: 'Fixed seat license cost assigned per user seat', dataType: 'Numeric ($)' },
-  { column: 'Usage Free Token Limit', fieldName: 'usageFreeTokenLimit', description: 'Baseline free token/spending ceiling threshold', dataType: 'Numeric' },
+  { column: 'License Cost in USD', fieldName: 'licenseCost', description: 'Real per-seat license cost billed for that user — the basis for License Investment ROI', dataType: 'Numeric ($)' },
+  { column: 'Usage Free Token Limit', fieldName: 'usageFreeTokenLimit', description: 'Baseline free token/spending ceiling threshold used for Zone 1/2 Capacity Waste & Overage (distinct from License Cost)', dataType: 'Numeric' },
   { column: 'Billable/Non-Billable', fieldName: 'billableFlag', description: 'Client billability flag (True for billable, False for internal)', dataType: 'Boolean' },
   { column: 'ProjectType', fieldName: 'projectType', description: 'Project classification (External for client, Internal for R&D)', dataType: 'String' },
-  { column: 'ProjectCode', fieldName: 'projectCode', description: 'Project code (E-XXXXXX for external, I-XXXXXX for internal)', dataType: 'String' },
+  { column: 'ProjectCode', fieldName: 'projectCode', description: 'Billing project code (E-XXXXXX for external, I-XXXXXX for internal)', dataType: 'String' },
+  { column: 'Project Investment Code', fieldName: 'projectInvestmentCode', description: 'Separate investment-tracking code, e.g. PRJ-CNS-2127 (encodes service line) — distinct from ProjectCode, previously discarded by the CSV loader', dataType: 'String' },
+  { column: 'Region', fieldName: 'region', description: 'Finer-grained region than Management Region (e.g. ANZ, Middle East, North America)', dataType: 'String' },
+  { column: 'Month_Year', fieldName: 'monthYear', description: 'Human-readable calendar month label (e.g. March_2026) — basis for Monthly Trend charts', dataType: 'String' },
+  { column: 'Month Id', fieldName: 'monthId', description: 'Sortable numeric month key (e.g. 202603) used to order Monthly Trend series', dataType: 'Numeric' },
 ];
 
 const FORMULA_CATEGORIES = [
@@ -79,6 +84,17 @@ const FORMULA_CATEGORIES = [
       { name: 'Billable AI Spend Share (%)', formula: 'Billable Spend % = (Billable Spend / Total Spend) × 100', example: '($1,372.40 / $1,750.00) × 100 = 78.4%' },
       { name: 'External Project Share (%)', formula: 'External Share % = (External Spend / Total Spend) × 100', example: '($1,246.00 / $1,750.00) × 100 = 71.2%' },
       { name: 'Project Code Token Ranking', formula: 'Project Cost = ∑ (cost) grouped by ProjectCode (E-XXXXXX / I-XXXXXX)', example: 'E-301461: 325,000 tokens | $48.20' },
+    ],
+  },
+  {
+    title: 'License ROI & Adoption Formulas',
+    icon: Wallet,
+    color: 'text-sky-400',
+    formulas: [
+      { name: 'License Investment ROI (%)', formula: 'License ROI % = (Total Cost / Total License Cost) × 100', example: '($1,376.51 / $2,177.61) × 100 = 63.2%' },
+      { name: 'License Underutilized Spend ($)', formula: 'Underutilized = ∑ max(0, licenseCost - actualCost) per seat', example: '$235.31 license − $103.44 actual = $131.87 unconsumed' },
+      { name: 'Monthly Spend Trend ($)', formula: 'Monthly Cost = ∑ (cost) grouped by Month Id, sorted ascending', example: 'June_2026: $182.75 | August_2026: $277.58' },
+      { name: 'Habitual Retention Cohort', formula: 'Avg Active Days/Month = distinct(activityDate) / distinct(monthId), per user', example: '3 active days ÷ 2 active months = 1.5/mo → Trial-only (<4)' },
     ],
   },
 ];
@@ -204,6 +220,56 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     notes: 'Ranks all 70 enterprise users by total token consumption and spend',
     category: 'Breakdowns',
   },
+  {
+    name: 'License Investment ROI (%)',
+    csvField: 'License Cost in USD',
+    formula: '(Total Cost / Total License Cost) × 100',
+    sampleInput: 'Total Cost = $1,376.51, Total License Cost = $2,177.61',
+    workedCalculation: '$1,376.51 ÷ $2,177.61 × 100',
+    derivedOutput: '63.2% License ROI',
+    notes: 'Measures actual usage cost against the real per-seat License Cost in USD — independent of the Usage Free Token Limit used for Capacity Waste/Overage above',
+    category: 'License & Adoption',
+  },
+  {
+    name: 'License Underutilized / Overutilized Spend ($)',
+    csvField: 'licenseCost vs actualCost, per user seat',
+    formula: 'Underutilized = ∑ max(0, licenseCost − actualCost); Overutilized = ∑ max(0, actualCost − licenseCost)',
+    sampleInput: 'Seat A: licenseCost $235.31, actualCost $103.44',
+    workedCalculation: '$235.31 − $103.44 = $131.87 unconsumed',
+    derivedOutput: '$904.65 total unconsumed across all seats',
+    notes: 'A seat can be simultaneously "under license ROI" and "over its token free-limit" — the two waste metrics measure different baselines',
+    category: 'License & Adoption',
+  },
+  {
+    name: 'Monthly Spend & Token Trend',
+    csvField: 'group_by(monthId) -> sum(cost), sum(token_consumption)',
+    formula: 'Aggregate cost and tokens per Month Id, sorted ascending, split further by AI Tool',
+    sampleInput: 'Month_Year: March_2026 through August_2026',
+    workedCalculation: 'March: $302.62 | June: $182.75 | August: $277.58',
+    derivedOutput: 'Monthly Cost Trend chart, Monthly Spend by AI Tool chart',
+    notes: 'Powers the ROI page monthly trend charts and the Financial Run-Rate & Volatility leadership insight',
+    category: 'License & Adoption',
+  },
+  {
+    name: 'Pareto Cost Concentration (Top 10% / 20%)',
+    csvField: 'userCapacityBreakdown, sorted by actualCost desc',
+    formula: 'Top N% Share = (∑ actualCost of top N% users / Total Cost) × 100',
+    sampleInput: '70 active users sorted by spend, Total Cost = $1,376.51',
+    workedCalculation: 'Top 14 users (20%): $951.78 ÷ $1,376.51 × 100',
+    derivedOutput: '69.1% of spend from top 20% of users',
+    notes: 'Identifies concentration risk — whether cost is broadly distributed or driven by a small set of power users',
+    category: 'License & Adoption',
+  },
+  {
+    name: 'Habitual User Retention Cohorts',
+    csvField: 'activityDate, monthId grouped by userMail',
+    formula: 'Avg Active Days/Month = count(distinct activityDate) / count(distinct monthId), per user; bucketed Embedded (16+), Regular (9-15), Occasional (4-8), Trial-only (<4)',
+    sampleInput: 'User with 3 activityDate rows across 2 distinct monthId values',
+    workedCalculation: '3 ÷ 2 = 1.5 avg active days/month',
+    derivedOutput: 'Trial-only cohort (below 4 days/month threshold)',
+    notes: 'Replaces a previously hardcoded "100% retention" claim — now computed per user from the raw filtered rows',
+    category: 'License & Adoption',
+  },
 ];
 
 export default function MetricsDerivationPage() {
@@ -211,7 +277,7 @@ export default function MetricsDerivationPage() {
   const [copiedFormula, setCopiedFormula] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
-  const categories = ['All', 'Tokens', 'Cost', 'Projects', 'Breakdowns'];
+  const categories = ['All', 'Tokens', 'Cost', 'Projects', 'Breakdowns', 'License & Adoption'];
 
   const filteredMetrics = METRICS_DERIVATION_LIST.filter((item) => {
     const matchesSearch =
@@ -273,7 +339,7 @@ export default function MetricsDerivationPage() {
               CSV Input Data Schema Mapping (`ai_usage_data.csv`)
             </h2>
           </div>
-          <span className="text-[11px] text-ey-muted font-mono">10 Columns • Single Source of Truth</span>
+          <span className="text-[11px] text-ey-muted font-mono">{CSV_SCHEMA.length} Columns Mapped • Single Source of Truth</span>
         </div>
 
         <div className="overflow-x-auto">
