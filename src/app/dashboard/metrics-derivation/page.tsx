@@ -65,6 +65,8 @@ const CSV_SCHEMA = [
   { column: 'Cost Center', fieldName: 'costCenter', description: 'Internal accounting cost center code (e.g. CC-TAX-647) — independent of the hierarchy chain', dataType: 'String' },
   { column: 'Month_Year', fieldName: 'monthYear', description: 'Human-readable calendar month label (e.g. March_2026) — basis for Monthly Trend charts', dataType: 'String' },
   { column: 'Month Id', fieldName: 'monthId', description: 'Sortable numeric month key (e.g. 202603) used to order Monthly Trend series', dataType: 'Numeric' },
+  { column: 'Period Start Date', fieldName: 'periodStartDate', description: 'Billing period start, DD/MM/YYYY (e.g. 01/03/2026) — parsed but not currently surfaced in any view', dataType: 'Date' },
+  { column: 'Period End Date', fieldName: 'periodEndDate', description: 'Billing period end, DD/MM/YYYY (e.g. 31/03/2026) — parsed but not currently surfaced in any view', dataType: 'Date' },
 ];
 
 const FORMULA_CATEGORIES = [
@@ -179,7 +181,7 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     sampleInput: 'copilot rows = [$0.3474, $0.1998], chatgpt rows = [$0.4627]',
     workedCalculation: 'copilot: $0.5472 | chatgpt: $0.4627',
     derivedOutput: 'copilot ($0.5472) vs chatgpt ($0.4627)',
-    notes: 'Distribution between Copilot Chat, Coding Assistant, and other tools',
+    notes: 'Distribution of spend across all six AI platforms: Copilot, ChatGPT, Claude, Replit, Factory AI, Cursor AI',
     category: 'Breakdowns',
   },
   {
@@ -219,7 +221,7 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     sampleInput: 'userMail: aditya.malik@enterprise-corp.com',
     workedCalculation: 'Tokens: 257,880 | Cost: $3.9620',
     derivedOutput: 'Ranked user list',
-    notes: 'Ranks all 70 enterprise users by total token consumption and spend',
+    notes: 'Ranks all enterprise users in the dataset by total token consumption and spend',
     category: 'Breakdowns',
   },
   {
