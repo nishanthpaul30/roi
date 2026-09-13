@@ -14,9 +14,9 @@ import {
   Layers,
   ArrowUpRight,
   ShieldAlert,
-  FolderKanban,
   BarChart3,
   Wallet,
+  Gauge,
 } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
 
@@ -102,15 +102,10 @@ export function ExecutiveInferencesPanel({ summary, totalRosterSeats, onSelectIn
   // 4c. Multi-Tool License Consolidation (dual-platform seat overlap)
   const overlap = summary.multiToolOverlap;
 
-  // 5. Client Billability (real Billable/Non-Billable CSV flag, not project codes)
+  // 5. Client Billability (real Billable/Non-Billable CSV flag)
   const nonBillablePercent = 100 - (summary.billableSpendPercent || 0);
 
-  // 6. External vs Internal Projects (E-XXXXXX / I-XXXXXX project codes)
-  const externalCount = (summary.byProjectCode || []).filter((p) => p.projectType === 'External').length;
-  const internalCount = (summary.byProjectCode || []).filter((p) => p.projectType === 'Internal').length;
-  const internalProjectPercent = 100 - (summary.externalProjectPercent || 0);
-
-  // 7. Service Line Usage & Cost Efficiency Comparison
+  // 6. Service Line Usage & Cost Efficiency Comparison
   const slWithMetrics = summary.byServiceLine.map((sl) => ({
     ...sl,
     perUser: sl.userCount ? sl.cost / sl.userCount : 0,
@@ -193,6 +188,18 @@ export function ExecutiveInferencesPanel({ summary, totalRosterSeats, onSelectIn
       actionableInsight: 'Open the Token & Spend ROI page to reclaim or downgrade underutilized licenses, and standardize dual-platform users onto a single primary AI tool.',
     },
     {
+      id: 'capacity_waste_overage',
+      drilldownId: '__navigate_roi__',
+      title: 'Capacity Waste & Overage Risk',
+      tag: 'Capacity Governance',
+      tagColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+      icon: Gauge,
+      stat: `${fmtCost(summary.totalWasteCost)} Unconsumed Capacity`,
+      statSub: `${fmtCost(summary.totalOverageCost)} overage · ${summary.ceilingRiskCount} users near 100K cap`,
+      finding: `On average, only ${fmtPct(summary.licenseEfficiencyRate || 0)} of each user's per-tool free-token allowance is actually consumed, leaving ${fmtCost(summary.totalWasteCost)} in unconsumed capacity (Zone 1). Separately, ${fmtCost(summary.totalOverageCost)} was billed beyond those free limits (Zone 2), and ${summary.ceilingRiskCount} users have reached or exceeded 90% of the 100,000-token hard cap.`,
+      actionableInsight: 'Open the Token & Spend ROI page to review the Zone 1 waste and Zone 2 overage breakdown, and flag users nearing the 100K token ceiling before they hit hard limits.',
+    },
+    {
       id: 'project_billability',
       title: 'Client Billability Telemetry (Billable / Non-Billable flag)',
       tag: 'Project ROI Governance',
@@ -202,17 +209,6 @@ export function ExecutiveInferencesPanel({ summary, totalRosterSeats, onSelectIn
       statSub: `${fmtCost(summary.billableSpend)} Billable vs ${fmtCost(summary.nonBillableSpend)} Non-Billable`,
       finding: `${fmtPct(summary.billableSpendPercent || 0)} of total AI spend (${fmtCost(summary.billableSpend)}) is flagged Billable in the CSV. Non-billable internal overhead accounts for ${fmtCost(summary.nonBillableSpend)} (${fmtPct(nonBillablePercent)}).`,
       actionableInsight: 'Audit the largest non-billable cost centers to ensure internal AI investment yields reusable intellectual property or client delivery templates.',
-    },
-    {
-      id: 'external_vs_internal',
-      title: 'External Projects vs. Internal Projects',
-      tag: 'Portfolio Capitalization Governance',
-      tagColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-      icon: FolderKanban,
-      stat: `${fmtPct(summary.externalProjectPercent || 0)} External vs ${fmtPct(internalProjectPercent)} Internal`,
-      statSub: `${fmtCost(summary.externalProjectSpend)} (${externalCount} PRJs) vs ${fmtCost(summary.internalProjectSpend)} (${internalCount} PRJs)`,
-      finding: `Out of ${fmtCost(totalCost)} in total AI consumption, ${fmtCost(summary.externalProjectSpend)} (${fmtPct(summary.externalProjectPercent || 0)} across ${externalCount} project codes) was deployed on external client delivery engagements (E-codes), while ${fmtCost(summary.internalProjectSpend)} (${fmtPct(internalProjectPercent)}) was absorbed by ${internalCount} internal R&D codes (I-codes).`,
-      actionableInsight: 'Institute capitalization milestone reviews for internal projects with material cumulative AI spend to verify IP conversion, while ensuring external client AI charges are systematically billed back.',
     },
     {
       id: 'service_line_comparison',

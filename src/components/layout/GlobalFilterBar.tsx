@@ -23,6 +23,9 @@ const TOOL_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT',
   copilot: 'GitHub Copilot',
   claude: 'Claude',
+  replit: 'Replit',
+  factoryai: 'Factory AI',
+  cursor: 'Cursor AI',
 };
 
 const selectClass = 'h-9 w-full bg-ey-black border border-ey-border text-ey-light text-xs rounded-lg px-2.5 focus:outline-none focus:border-ey-yellow';

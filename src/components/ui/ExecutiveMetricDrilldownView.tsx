@@ -14,7 +14,6 @@ import {
   FolderKanban,
   CheckCircle2,
   AlertCircle,
-  Briefcase,
   Search,
   ChevronRight,
   Filter,
@@ -469,7 +468,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
           {id === 'total_investment' && (
             <div className="space-y-6">
               {/* Billability KPI Summary Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
                 <div className="bg-ey-card border border-emerald-500/30 p-4 rounded-2xl space-y-1 shadow-sm">
                   <div className="flex items-center justify-between text-ey-muted">
                     <span>Billable Client Spend</span>
@@ -486,15 +485,6 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                   </div>
                   <p className="text-2xl font-extrabold text-amber-400">${(summaryData?.nonBillableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                   <p className="text-xs text-amber-300">{(100 - (summaryData?.billableSpendPercent || 0)).toFixed(1)}% operational cost</p>
-                </div>
-
-                <div className="bg-ey-card border border-blue-500/30 p-4 rounded-2xl space-y-1 shadow-sm">
-                  <div className="flex items-center justify-between text-ey-muted">
-                    <span>External Projects Spend</span>
-                    <Briefcase className="w-4 h-4 text-blue-400" />
-                  </div>
-                  <p className="text-2xl font-extrabold text-blue-400">${(summaryData?.externalProjectSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                  <p className="text-xs text-blue-300">{summaryData?.externalProjectPercent}% external client work</p>
                 </div>
               </div>
 
@@ -561,10 +551,8 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                         <span>{p.projectCode}</span>
                         <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-blue-300" />
                       </p>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                        p.projectType === 'External' ? 'bg-blue-500/15 text-blue-300' : 'bg-purple-500/15 text-purple-300'
-                      }`}>
-                        {p.projectType}
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-purple-500/15 text-purple-300">
+                        {p.userCount} users
                       </span>
                     </div>
                     <div className="text-right">

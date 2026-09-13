@@ -11,6 +11,9 @@ const TOOL_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT Enterprise',
   copilot: 'GitHub Copilot Enterprise',
   claude: 'Claude Enterprise',
+  replit: 'Replit Enterprise',
+  factoryai: 'Factory AI Enterprise',
+  cursor: 'Cursor AI Enterprise',
 };
 
 export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplateProps) {
@@ -93,7 +96,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
       <div className="space-y-2">
         <div className="flex items-center justify-between border-b border-slate-300 pb-1.5">
           <h2 className="text-xs font-black uppercase tracking-wider text-slate-900">
-            1. AI Tool Portfolio Breakdown &amp; Efficiency (ChatGPT vs Copilot vs Claude)
+            1. AI Tool Portfolio Breakdown &amp; Efficiency
           </h2>
           <span className="text-[10px] font-mono text-slate-500">Source: AI Tool Flag</span>
         </div>

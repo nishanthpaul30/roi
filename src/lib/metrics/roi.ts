@@ -196,7 +196,6 @@ export async function calculateTokenCostSummary(
     .sort((a, b) => b.tokens - a.tokens);
 
   // Users capacity & waste breakdown
-  const DEFAULT_USER_USAGE_LIMIT = 80.0; // Default $80 usage limit per license period
   const HARD_TOKEN_CEILING = 100000; // Hard cap per user
 
   let totalWasteCost = 0;
@@ -214,8 +213,17 @@ export async function calculateTokenCostSummary(
     const actualCost = Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4));
     const tokenConsumption = Math.round(rows.reduce((s, r) => s + r.tokenConsumption, 0));
     
-    // Usage free token limit (reads directly from CSV row field or default allocation)
-    const usageFreeTokenLimit = rows[0]?.usageFreeTokenLimit ? rows[0].usageFreeTokenLimit : (rows[0]?.usageLimit ? rows[0].usageLimit : DEFAULT_USER_USAGE_LIMIT);
+    // Per-tool licensing: License Cost in USD / Usage Free Token Limit are set per
+    // AI Tool in the CSV (Copilot: $35 license / $20 free limit; ChatGPT: usage-based
+    // with a $20 free limit; Claude: fully usage-based, no license or free limit).
+    // A user's overall allowance is the sum of each DISTINCT tool they actually use,
+    // taken once per tool (not once per row) so repeated days on the same tool don't
+    // double-count that tool's flat license/limit.
+    let usageFreeTokenLimit = 0;
+    for (const tool of toolsSet) {
+      const toolRow = rows.find((r) => r.aiTool === tool);
+      usageFreeTokenLimit += toolRow?.usageFreeTokenLimit || 0;
+    }
     const usageLimit = usageFreeTokenLimit;
     totalUsageLimitsSum += usageLimit;
 
@@ -238,9 +246,14 @@ export async function calculateTokenCostSummary(
       ceilingRiskCount++;
     }
 
-    // License Cost ROI: compare actual usage cost against the real per-seat
-    // License Cost in USD from the CSV (independent of the $ free-token limit above).
-    const licenseCost = rows[0]?.licenseCost || 0;
+    // License Cost ROI: sum each distinct tool's own flat License Cost in USD
+    // (independent of the $ free-token limit above) — e.g. Copilot's $35 seat fee.
+    // Usage-based tools (ChatGPT, Claude) contribute $0 here.
+    let licenseCost = 0;
+    for (const tool of toolsSet) {
+      const toolRow = rows.find((r) => r.aiTool === tool);
+      licenseCost += toolRow?.licenseCost || 0;
+    }
     totalLicenseCost += licenseCost;
     const licenseRoiPercent = licenseCost > 0 ? Number(((actualCost / licenseCost) * 100).toFixed(1)) : 0;
 
@@ -286,23 +299,14 @@ export async function calculateTokenCostSummary(
   const nonBillableSpend = Number(nonBillableRows.reduce((s, r) => s + r.cost, 0).toFixed(2));
   const billableSpendPercent = totalCost > 0 ? Number(((billableSpend / totalCost) * 100).toFixed(1)) : 0;
 
-  // External vs Internal Project Insights
-  const externalRows = currentRows.filter(r => r.projectType === 'External');
-  const internalRows = currentRows.filter(r => r.projectType === 'Internal');
-  const externalProjectSpend = Number(externalRows.reduce((s, r) => s + r.cost, 0).toFixed(2));
-  const internalProjectSpend = Number(internalRows.reduce((s, r) => s + r.cost, 0).toFixed(2));
-  const externalProjectPercent = totalCost > 0 ? Number(((externalProjectSpend / totalCost) * 100).toFixed(1)) : 0;
-
   // By ProjectCode breakdown
   const byProjectCodeMap = groupBy(currentRows, r => r.projectCode || 'Unassigned');
   const byProjectCode = Array.from(byProjectCodeMap.entries()).map(([pCode, rows]) => {
     const tokens = Math.round(rows.reduce((s, r) => s + r.tokenConsumption, 0));
     const cost = Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(2));
     const userCount = new Set(rows.map(r => r.userMail)).size;
-    const pType = rows[0]?.projectType || (pCode.startsWith('E-') ? 'External' : 'Internal');
     return {
       projectCode: pCode,
-      projectType: pType,
       tokens,
       cost,
       userCount,
@@ -395,9 +399,6 @@ export async function calculateTokenCostSummary(
     billableSpend,
     nonBillableSpend,
     billableSpendPercent,
-    externalProjectSpend,
-    internalProjectSpend,
-    externalProjectPercent,
     byProjectCode,
     monthlyTrend,
     userEngagementCohorts,

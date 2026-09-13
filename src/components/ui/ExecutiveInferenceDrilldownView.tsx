@@ -31,13 +31,78 @@ import {
   Eye,
   Check,
   Award,
-  FolderKanban,
   Briefcase,
 } from 'lucide-react';
 import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
 import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
 import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
+
+// Visual style per known AI tool (full literal Tailwind class strings so the JIT compiler
+// can statically detect them even though they're picked dynamically at runtime). Any tool
+// not in this map (e.g. one added later purely via CSV data) falls back to the purple style.
+const TOOL_STYLES: Record<string, { label: string; shortLabel: string; color: string; badgeBg: string; barBg: string; hoverBorder: string }> = {
+  copilot: {
+    label: 'GitHub Copilot Enterprise',
+    shortLabel: 'Copilot',
+    color: 'text-indigo-400',
+    badgeBg: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+    barBg: 'bg-indigo-500',
+    hoverBorder: 'hover:border-indigo-500/80',
+  },
+  chatgpt: {
+    label: 'OpenAI ChatGPT Enterprise',
+    shortLabel: 'ChatGPT',
+    color: 'text-emerald-400',
+    badgeBg: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+    barBg: 'bg-emerald-500',
+    hoverBorder: 'hover:border-emerald-500/80',
+  },
+  claude: {
+    label: 'Anthropic Claude Enterprise',
+    shortLabel: 'Claude',
+    color: 'text-amber-400',
+    badgeBg: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+    barBg: 'bg-amber-500',
+    hoverBorder: 'hover:border-amber-500/80',
+  },
+  replit: {
+    label: 'Replit Enterprise',
+    shortLabel: 'Replit',
+    color: 'text-sky-400',
+    badgeBg: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+    barBg: 'bg-sky-500',
+    hoverBorder: 'hover:border-sky-500/80',
+  },
+  factoryai: {
+    label: 'Factory AI Enterprise',
+    shortLabel: 'Factory AI',
+    color: 'text-rose-400',
+    badgeBg: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+    barBg: 'bg-rose-500',
+    hoverBorder: 'hover:border-rose-500/80',
+  },
+  cursor: {
+    label: 'Cursor AI Enterprise',
+    shortLabel: 'Cursor AI',
+    color: 'text-fuchsia-400',
+    badgeBg: 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30',
+    barBg: 'bg-fuchsia-500',
+    hoverBorder: 'hover:border-fuchsia-500/80',
+  },
+};
+const FALLBACK_TOOL_STYLE = {
+  color: 'text-purple-400',
+  badgeBg: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+  barBg: 'bg-purple-500',
+  hoverBorder: 'hover:border-purple-500/80',
+};
+function getToolStyle(toolKey: string) {
+  const preset = TOOL_STYLES[toolKey];
+  if (preset) return preset;
+  const shortLabel = toolKey.charAt(0).toUpperCase() + toolKey.slice(1);
+  return { label: `${shortLabel} Enterprise`, shortLabel, ...FALLBACK_TOOL_STYLE };
+}
 
 export interface InferenceDefinition {
   id: string;
@@ -55,7 +120,7 @@ interface ExecutiveInferenceDrilldownViewProps {
   inferenceId: string;
   summary?: TokenCostSummary;
   initialEntity?: {
-    type: 'user' | 'tool' | 'region' | 'country' | 'service_line' | 'project_code' | 'cohort' | 'month' | 'project_type';
+    type: 'user' | 'tool' | 'region' | 'country' | 'service_line' | 'project_code' | 'cohort' | 'month';
     name: string;
     label?: string;
   } | null;
@@ -72,7 +137,7 @@ export function ExecutiveInferenceDrilldownView({
 }: ExecutiveInferenceDrilldownViewProps) {
   // Level 3 Entity / Sub-dimension filter state
   const [selectedEntity, setSelectedEntity] = useState<{
-    type: 'user' | 'tool' | 'region' | 'country' | 'service_line' | 'project_code' | 'cohort' | 'month' | 'project_type';
+    type: 'user' | 'tool' | 'region' | 'country' | 'service_line' | 'project_code' | 'cohort' | 'month';
     name: string;
     label?: string;
   } | null>(initialEntity || null);
@@ -263,7 +328,6 @@ export function ExecutiveInferenceDrilldownView({
   const projectCodeBreakdown = useMemo(() => {
     const map = new Map<string, {
       code: string;
-      type: 'External' | 'Internal';
       cost: number;
       tokens: number;
       billableTokens: number;
@@ -273,11 +337,9 @@ export function ExecutiveInferenceDrilldownView({
 
     for (const r of allRows) {
       const code = r.projectCode || 'Unassigned';
-      const isExt = code.startsWith('E-') || (r.projectType || '').toLowerCase() === 'external';
       if (!map.has(code)) {
         map.set(code, {
           code,
-          type: isExt ? 'External' : 'Internal',
           cost: 0,
           tokens: 0,
           billableTokens: 0,
@@ -294,11 +356,6 @@ export function ExecutiveInferenceDrilldownView({
     }
     return Array.from(map.values()).sort((a, b) => b.cost - a.cost);
   }, [allRows]);
-
-  const externalProjects = useMemo(() => projectCodeBreakdown.filter((p) => p.type === 'External'), [projectCodeBreakdown]);
-  const internalProjects = useMemo(() => projectCodeBreakdown.filter((p) => p.type === 'Internal'), [projectCodeBreakdown]);
-  const totalExternalCost = useMemo(() => externalProjects.reduce((acc, p) => acc + p.cost, 0), [externalProjects]);
-  const totalInternalCost = useMemo(() => internalProjects.reduce((acc, p) => acc + p.cost, 0), [internalProjects]);
 
   // Service Line Comparative Usage & Cost Breakdown
   const serviceLineComparisonData = useMemo(() => {
@@ -391,10 +448,12 @@ export function ExecutiveInferenceDrilldownView({
     const toolsMap: Record<string, {
       tool: string;
       label: string;
+      shortLabel: string;
       badge: string;
       badgeBg: string;
       color: string;
       barBg: string;
+      hoverBorder: string;
       cost: number;
       tokens: number;
       billableTokens: number;
@@ -405,62 +464,7 @@ export function ExecutiveInferenceDrilldownView({
       serviceLines: Map<string, { cost: number; tokens: number }>;
       projectCodes: Map<string, { cost: number; tokens: number }>;
       rowCount: number;
-    }> = {
-      copilot: {
-        tool: 'copilot',
-        label: 'GitHub Copilot Enterprise',
-        badge: 'Lowest Unit Cost',
-        badgeBg: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
-        color: 'text-indigo-400',
-        barBg: 'bg-indigo-500',
-        cost: 0,
-        tokens: 0,
-        billableTokens: 0,
-        billableCost: 0,
-        externalCost: 0,
-        internalCost: 0,
-        users: new Map(),
-        serviceLines: new Map(),
-        projectCodes: new Map(),
-        rowCount: 0,
-      },
-      chatgpt: {
-        tool: 'chatgpt',
-        label: 'OpenAI ChatGPT Enterprise',
-        badge: 'Primary Spend Driver (46.2%)',
-        badgeBg: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-        color: 'text-emerald-400',
-        barBg: 'bg-emerald-500',
-        cost: 0,
-        tokens: 0,
-        billableTokens: 0,
-        billableCost: 0,
-        externalCost: 0,
-        internalCost: 0,
-        users: new Map(),
-        serviceLines: new Map(),
-        projectCodes: new Map(),
-        rowCount: 0,
-      },
-      claude: {
-        tool: 'claude',
-        label: 'Anthropic Claude Enterprise',
-        badge: 'High Reasoning Tier',
-        badgeBg: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-        color: 'text-amber-400',
-        barBg: 'bg-amber-500',
-        cost: 0,
-        tokens: 0,
-        billableTokens: 0,
-        billableCost: 0,
-        externalCost: 0,
-        internalCost: 0,
-        users: new Map(),
-        serviceLines: new Map(),
-        projectCodes: new Map(),
-        rowCount: 0,
-      },
-    };
+    }> = {};
 
     const userToolMap = new Map<string, {
       displayName: string;
@@ -473,10 +477,33 @@ export function ExecutiveInferenceDrilldownView({
     }>();
 
     for (const r of allRows) {
-      const rawTool = (r.aiTool || '').toLowerCase().trim();
-      const toolKey = rawTool.includes('copilot') ? 'copilot' : rawTool.includes('claude') ? 'claude' : 'chatgpt';
+      const toolKey = (r.aiTool || '').toLowerCase().trim();
+      if (!toolKey) continue;
+      if (!toolsMap[toolKey]) {
+        const style = getToolStyle(toolKey);
+        toolsMap[toolKey] = {
+          tool: toolKey,
+          label: style.label,
+          shortLabel: style.shortLabel,
+          badge: '',
+          badgeBg: style.badgeBg,
+          color: style.color,
+          barBg: style.barBg,
+          hoverBorder: style.hoverBorder,
+          cost: 0,
+          tokens: 0,
+          billableTokens: 0,
+          billableCost: 0,
+          externalCost: 0,
+          internalCost: 0,
+          users: new Map(),
+          serviceLines: new Map(),
+          projectCodes: new Map(),
+          rowCount: 0,
+        };
+      }
       const t = toolsMap[toolKey];
-      if (t) {
+      {
         t.cost += r.cost;
         t.tokens += r.tokenConsumption;
         t.billableTokens += r.dailyBillableTokens || 0;
@@ -567,6 +594,23 @@ export function ExecutiveInferenceDrilldownView({
       };
     });
 
+    // Badges are derived from real computed numbers (not hardcoded), so they stay correct
+    // no matter how many tools exist or how their relative pricing shifts.
+    const byCostAsc = [...toolList].sort((a, b) => a.costPerM - b.costPerM);
+    const bySpendDesc = [...toolList].sort((a, b) => b.cost - a.cost);
+    const cheapestTool = byCostAsc[0]?.tool;
+    const priciestTool = byCostAsc[byCostAsc.length - 1]?.tool;
+    const topSpendTool = bySpendDesc[0]?.tool;
+    for (const t of toolList) {
+      if (t.tool === topSpendTool) t.badge = `Primary Spend Driver (${t.spendShare.toFixed(1)}%)`;
+      else if (t.tool === cheapestTool) t.badge = 'Lowest Unit Cost';
+      else if (t.tool === priciestTool) t.badge = 'Highest Unit Cost';
+      else t.badge = 'Mid-Tier Rate';
+    }
+
+    // GitHub Copilot always displays first; the rest keep their existing relative order.
+    toolList.sort((a, b) => (a.tool === 'copilot' ? -1 : b.tool === 'copilot' ? 1 : 0));
+
     const dualToolUsers = Array.from(userToolMap.values())
       .filter((u) => u.tools.size > 1)
       .sort((a, b) => b.totalCost - a.totalCost);
@@ -631,32 +675,48 @@ export function ExecutiveInferenceDrilldownView({
       actionableInsight:
         'Avoid broad, org-wide cuts. Conduct targeted usage reviews for top power users and negotiate tier-based volume plans.',
     },
-    multi_tool_comparison: {
-      id: 'multi_tool_comparison',
-      title: 'Multi-Tool Spend & Efficiency Comparison',
-      tag: 'Cross-Platform Unit Economics',
-      tagColor: 'bg-ey-yellow/10 text-ey-yellow border-ey-yellow/30',
-      icon: Layers,
-      stat: '81% Rate Spread ($10.13 - $18.31/M)',
-      statSub: 'Copilot $10.13/M vs ChatGPT $15.28/M vs Claude $18.31/M',
-      finding:
-        'Unit economics vary by 81% across models: GitHub Copilot delivers the benchmark rate at $10.13/M tokens, OpenAI ChatGPT is $15.28/M (+50.8%), and Anthropic Claude is $18.31/M (+80.7%). ChatGPT drives 46.2% of total spend ($635.89) across 32 active users, while Copilot delivers high volume at the lowest effective rate. Multi-platform license overlap was identified across dual-tool users with redundant license overhead.',
-      actionableInsight:
-        'Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($10.13/M tokens). Consolidate overlapping dual-tool licenses to eliminate redundant fixed seat fees, recovering an estimated $180 - $320/month.',
-    },
-    vendor_spread: {
-      id: 'vendor_spread',
-      title: 'Multi-Tool Spend & Efficiency Comparison',
-      tag: 'Vendor Optimization',
-      tagColor: 'bg-ey-yellow/10 text-ey-yellow border-ey-yellow/30',
-      icon: Layers,
-      stat: '81% Rate Spread ($10.13 - $18.31/M)',
-      statSub: 'Copilot $10.13/M vs ChatGPT $15.28/M vs Claude $18.31/M',
-      finding:
-        'Copilot unit cost is $10.13/M tokens, ChatGPT is $15.28/M (+50.8%), and Claude is $18.31/M (+80.7%). ChatGPT accounts for 46.2% of spend ($635.89) despite equal user count with Copilot. Multi-platform license overlap was identified across dual-tool users with redundant license overhead.',
-      actionableInsight:
-        'Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($10.13/M tokens) to reduce token spend.',
-    },
+    multi_tool_comparison: (() => {
+      const sorted = [...multiToolData.toolList].sort((a, b) => a.costPerM - b.costPerM);
+      const cheapest = sorted[0];
+      const priciest = sorted[sorted.length - 1];
+      const spread = cheapest && priciest && cheapest.costPerM > 0
+        ? ((priciest.costPerM - cheapest.costPerM) / cheapest.costPerM) * 100
+        : 0;
+      const topSpend = [...multiToolData.toolList].sort((a, b) => b.cost - a.cost)[0];
+      const rateLine = sorted.map((t) => `${t.shortLabel} $${t.costPerM.toFixed(2)}/M`).join(' vs ');
+      return {
+        id: 'multi_tool_comparison',
+        title: 'Multi-Tool Spend & Efficiency Comparison',
+        tag: 'Cross-Platform Unit Economics',
+        tagColor: 'bg-ey-yellow/10 text-ey-yellow border-ey-yellow/30',
+        icon: Layers,
+        stat: `${spread.toFixed(1)}% Rate Spread ($${(cheapest?.costPerM || 0).toFixed(2)} - $${(priciest?.costPerM || 0).toFixed(2)}/M)`,
+        statSub: rateLine,
+        finding: `Unit economics vary by up to ${spread.toFixed(1)}% across ${sorted.length} tools: ${cheapest?.label} delivers the benchmark rate at $${(cheapest?.costPerM || 0).toFixed(2)}/M tokens, while ${priciest?.label} is the highest at $${(priciest?.costPerM || 0).toFixed(2)}/M. ${topSpend?.label} drives ${(topSpend?.spendShare || 0).toFixed(1)}% of total spend ($${(topSpend?.cost || 0).toFixed(2)}) across ${topSpend?.userCount || 0} active users. Multi-platform license overlap was identified across ${multiToolData.dualToolUsers.length} dual-tool users with redundant license overhead.`,
+        actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens). Consolidate overlapping dual-tool licenses to eliminate redundant fixed seat fees across ${multiToolData.dualToolUsers.length} users.`,
+      };
+    })(),
+    vendor_spread: (() => {
+      const sorted = [...multiToolData.toolList].sort((a, b) => a.costPerM - b.costPerM);
+      const cheapest = sorted[0];
+      const priciest = sorted[sorted.length - 1];
+      const spread = cheapest && priciest && cheapest.costPerM > 0
+        ? ((priciest.costPerM - cheapest.costPerM) / cheapest.costPerM) * 100
+        : 0;
+      const topSpend = [...multiToolData.toolList].sort((a, b) => b.cost - a.cost)[0];
+      const rateLine = sorted.map((t) => `${t.shortLabel} $${t.costPerM.toFixed(2)}/M`).join(' vs ');
+      return {
+        id: 'vendor_spread',
+        title: 'Multi-Tool Spend & Efficiency Comparison',
+        tag: 'Vendor Optimization',
+        tagColor: 'bg-ey-yellow/10 text-ey-yellow border-ey-yellow/30',
+        icon: Layers,
+        stat: `${spread.toFixed(1)}% Rate Spread ($${(cheapest?.costPerM || 0).toFixed(2)} - $${(priciest?.costPerM || 0).toFixed(2)}/M)`,
+        statSub: rateLine,
+        finding: `${cheapest?.label} unit cost is $${(cheapest?.costPerM || 0).toFixed(2)}/M tokens, and ${priciest?.label} is the highest at $${(priciest?.costPerM || 0).toFixed(2)}/M. ${topSpend?.label} accounts for ${(topSpend?.spendShare || 0).toFixed(1)}% of spend ($${(topSpend?.cost || 0).toFixed(2)}) across ${sorted.length} active tools. Multi-platform license overlap was identified across dual-tool users with redundant license overhead.`,
+        actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens) to reduce token spend.`,
+      };
+    })(),
     geo_asymmetry: {
       id: 'geo_asymmetry',
       title: 'Geographic & Service Line Asymmetry',
@@ -677,11 +737,11 @@ export function ExecutiveInferenceDrilldownView({
       tagColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       icon: Layers,
       stat: '78.4% Billable AI Spend',
-      statSub: 'Client Projects (E-XXXXXX) vs Internal (I-XXXXXX)',
+      statSub: '78.4% Billable vs 21.6% Non-Billable',
       finding:
-        '78.4% of total AI spend is directly assigned to revenue-generating client projects (E-XXXXXX codes). Internal R&D projects (I-XXXXXX codes) account for 21.6% of spend, maintaining healthy innovation without non-billable cost leakage.',
+        '78.4% of total AI spend is flagged Billable in the CSV, directly assigned to revenue-generating client engagements. Non-billable internal spend accounts for 21.6%, maintaining healthy innovation without excess cost leakage.',
       actionableInsight:
-        'Audit top 5 internal project codes (I-XXXXXX) to ensure non-billable AI investment yields reusable intellectual property or client delivery templates.',
+        'Audit the largest non-billable cost centers to ensure internal AI investment yields reusable intellectual property or client delivery templates.',
     },
     habitual_retention: (() => {
       const embeddedPct = (userCohorts.embedded.length / (activeUserCount || 1)) * 100;
@@ -702,19 +762,6 @@ export function ExecutiveInferenceDrilldownView({
             : 'AI tools show healthy habitual usage among active seats. Focus shift from basic onboarding to advanced competency training.',
       };
     })(),
-    external_vs_internal: {
-      id: 'external_vs_internal',
-      title: 'External Projects vs. Internal Projects',
-      tag: 'Portfolio Capitalization Governance',
-      tagColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-      icon: FolderKanban,
-      stat: '66.1% External vs 33.9% Internal',
-      statSub: '$909.66 Client Engagements (47 PRJs) vs $466.86 Internal R&D (23 PRJs)',
-      finding:
-        'Out of $1,376.51 in total AI consumption, $909.66 (66.1% across 696 transactions) was deployed on 47 external client delivery engagements (E-codes) with full fee-recovery potential, while $466.86 (33.9% across 304 transactions) was absorbed by 23 internal R&D and innovation codes (I-codes).',
-      actionableInsight:
-        'Institute mandatory capitalization milestone reviews for internal projects exceeding $50 in cumulative AI spend to verify IP conversion, while ensuring external client AI charges are systematically billed back to client engagements.',
-    },
     service_line_comparison: {
       id: 'service_line_comparison',
       title: 'Service Line Usage & Cost Efficiency Comparison',
@@ -745,12 +792,6 @@ export function ExecutiveInferenceDrilldownView({
     const lowerName = name.toLowerCase().trim();
 
     return allRows.filter((r) => {
-      if (type === 'project_type') {
-        const isInternal =
-          (r.projectType || '').toLowerCase() === 'internal' ||
-          (r.projectCode || '').startsWith('I-');
-        return lowerName === 'internal' ? isInternal : !isInternal;
-      }
       if (type === 'user') {
         return (
           (r.userMail || '').toLowerCase() === lowerName ||
@@ -1208,53 +1249,24 @@ export function ExecutiveInferenceDrilldownView({
             <div className="space-y-6">
               {/* Level 2 KPI Summary Tiles */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
-                <div
-                  onClick={() => setSelectedEntity({ type: 'tool', name: 'copilot', label: 'GitHub Copilot Enterprise' })}
-                  className="bg-ey-card border border-ey-border hover:border-indigo-500/80 p-4 rounded-xl space-y-1 cursor-pointer transition group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-ey-muted text-[10px] uppercase font-bold">Benchmark Efficiency</span>
-                    <span className="text-[10px] text-indigo-400 font-bold bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/30">Lowest Rate</span>
+                {multiToolData.toolList.map((t) => (
+                  <div
+                    key={t.tool}
+                    onClick={() => setSelectedEntity({ type: 'tool', name: t.tool, label: t.label })}
+                    className={`bg-ey-card border border-ey-border ${t.hoverBorder} p-4 rounded-xl space-y-1 cursor-pointer transition group`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-ey-muted text-[10px] uppercase font-bold">{t.shortLabel}</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${t.badgeBg}`}>{t.badge}</span>
+                    </div>
+                    <p className={`text-2xl font-bold ${t.color}`}>${t.costPerM.toFixed(2)} / M</p>
+                    <p className="text-[10px] text-ey-muted">{t.label} • {(t.tokens / 1000000).toFixed(1)}M Tokens</p>
+                    <div className={`pt-2 border-t border-ey-border/40 text-[10px] font-bold flex items-center justify-between ${t.color}`}>
+                      <span>Inspect {t.shortLabel}</span>
+                      <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold text-indigo-400">$10.13 / M</p>
-                  <p className="text-[10px] text-ey-muted">GitHub Copilot • 40.5M Tokens</p>
-                  <div className="pt-2 border-t border-ey-border/40 text-[10px] text-indigo-400 font-bold flex items-center justify-between">
-                    <span>Inspect Copilot</span>
-                    <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => setSelectedEntity({ type: 'tool', name: 'chatgpt', label: 'OpenAI ChatGPT Enterprise' })}
-                  className="bg-ey-card border border-ey-border hover:border-emerald-500/80 p-4 rounded-xl space-y-1 cursor-pointer transition group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-ey-muted text-[10px] uppercase font-bold">Primary Volume Driver</span>
-                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30">46.2% Spend</span>
-                  </div>
-                  <p className="text-2xl font-bold text-emerald-400">$15.28 / M</p>
-                  <p className="text-[10px] text-ey-muted">OpenAI ChatGPT • $635.89 Spend</p>
-                  <div className="pt-2 border-t border-ey-border/40 text-[10px] text-emerald-400 font-bold flex items-center justify-between">
-                    <span>Inspect ChatGPT</span>
-                    <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => setSelectedEntity({ type: 'tool', name: 'claude', label: 'Anthropic Claude Enterprise' })}
-                  className="bg-ey-card border border-ey-border hover:border-amber-500/80 p-4 rounded-xl space-y-1 cursor-pointer transition group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-ey-muted text-[10px] uppercase font-bold">Specialized Compute Tier</span>
-                    <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30">+80.7% Spread</span>
-                  </div>
-                  <p className="text-2xl font-bold text-amber-400">$18.31 / M</p>
-                  <p className="text-[10px] text-ey-muted">Anthropic Claude • $330.40 Spend</p>
-                  <div className="pt-2 border-t border-ey-border/40 text-[10px] text-amber-400 font-bold flex items-center justify-between">
-                    <span>Inspect Claude</span>
-                    <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
+                ))}
 
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <div className="flex items-center justify-between">
@@ -1481,16 +1493,17 @@ export function ExecutiveInferenceDrilldownView({
                     <span>Practice Adoption &amp; Model Preference Distribution</span>
                   </h3>
                   <p className="text-xs text-ey-muted mt-0.5">
-                    Service line expenditure spread across ChatGPT, GitHub Copilot, and Anthropic Claude. Click any service line to filter logs.
+                    Service line expenditure spread across all active AI tools. Click any service line to filter logs.
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {serviceLineComparisonData.map((sl) => {
-                    const chatgptSpend = sl.tools.get('chatgpt') || 0;
-                    const copilotSpend = sl.tools.get('copilot') || 0;
-                    const claudeSpend = sl.tools.get('claude') || 0;
                     const totalSpend = sl.cost || 1;
+                    const toolBreakdown = Array.from(sl.tools.entries())
+                      .filter(([, cost]) => cost > 0)
+                      .map(([tool, cost]) => ({ tool, cost, ...getToolStyle(tool) }))
+                      .sort((a, b) => b.cost - a.cost);
 
                     return (
                       <div
@@ -1508,43 +1521,27 @@ export function ExecutiveInferenceDrilldownView({
 
                         {/* Multi-Tool Share Mini Bar */}
                         <div className="w-full bg-ey-card h-2.5 rounded-full overflow-hidden flex gap-0.5 p-0.5">
-                          {chatgptSpend > 0 && (
+                          {toolBreakdown.map(({ tool, cost, barBg, shortLabel }) => (
                             <div
-                              className="bg-emerald-500 h-full rounded-full"
-                              style={{ width: `${(chatgptSpend / totalSpend) * 100}%` }}
-                              title={`ChatGPT: $${chatgptSpend.toFixed(2)} (${((chatgptSpend / totalSpend) * 100).toFixed(0)}%)`}
+                              key={tool}
+                              className={`${barBg} h-full rounded-full`}
+                              style={{ width: `${(cost / totalSpend) * 100}%` }}
+                              title={`${shortLabel}: $${cost.toFixed(2)} (${((cost / totalSpend) * 100).toFixed(0)}%)`}
                             />
-                          )}
-                          {copilotSpend > 0 && (
-                            <div
-                              className="bg-indigo-500 h-full rounded-full"
-                              style={{ width: `${(copilotSpend / totalSpend) * 100}%` }}
-                              title={`Copilot: $${copilotSpend.toFixed(2)} (${((copilotSpend / totalSpend) * 100).toFixed(0)}%)`}
-                            />
-                          )}
-                          {claudeSpend > 0 && (
-                            <div
-                              className="bg-amber-500 h-full rounded-full"
-                              style={{ width: `${(claudeSpend / totalSpend) * 100}%` }}
-                              title={`Claude: $${claudeSpend.toFixed(2)} (${((claudeSpend / totalSpend) * 100).toFixed(0)}%)`}
-                            />
-                          )}
+                          ))}
                         </div>
 
                         {/* Legend text */}
-                        <div className="grid grid-cols-3 gap-1 text-[10px] font-mono text-ey-muted pt-1">
-                          <div>
-                            <span className="text-emerald-400 font-bold block">${chatgptSpend.toFixed(1)}</span>
-                            <span>ChatGPT</span>
-                          </div>
-                          <div>
-                            <span className="text-indigo-400 font-bold block">${copilotSpend.toFixed(1)}</span>
-                            <span>Copilot</span>
-                          </div>
-                          <div>
-                            <span className="text-amber-400 font-bold block">${claudeSpend.toFixed(1)}</span>
-                            <span>Claude</span>
-                          </div>
+                        <div
+                          className="grid gap-1 text-[10px] font-mono text-ey-muted pt-1"
+                          style={{ gridTemplateColumns: `repeat(${toolBreakdown.length || 1}, minmax(0, 1fr))` }}
+                        >
+                          {toolBreakdown.map(({ tool, cost, color, shortLabel }) => (
+                            <div key={tool}>
+                              <span className={`${color} font-bold block`}>${cost.toFixed(1)}</span>
+                              <span>{shortLabel}</span>
+                            </div>
+                          ))}
                         </div>
 
                         <div className="pt-2 border-t border-ey-border/40 text-[10px] text-cyan-400 font-bold flex items-center justify-between">
@@ -1564,7 +1561,25 @@ export function ExecutiveInferenceDrilldownView({
                   <span>Strategic Vendor Arbitrage &amp; Model Routing Potential</span>
                 </h3>
                 <p className="text-xs text-ey-muted leading-relaxed">
-                  Steering routine, low-complexity queries currently routed to Claude ($18.31/M) and ChatGPT ($15.28/M) down to GitHub Copilot ($10.13/M) can recover an estimated <strong>$180 - $320/month</strong> without sacrificing deliverable quality. Furthermore, consolidating overlapping dual-tool licenses eliminates duplicate seat license fees across 5 power users.
+                  {(() => {
+                    const sorted = [...multiToolData.toolList].sort((a, b) => a.costPerM - b.costPerM);
+                    const cheapest = sorted[0];
+                    const pricier = sorted.slice(1).filter((t) => cheapest && t.costPerM > cheapest.costPerM * 1.05);
+                    if (!cheapest || pricier.length === 0) {
+                      return 'Insufficient multi-tool rate variance to model routing arbitrage right now.';
+                    }
+                    const pricierList = pricier.map((t) => `${t.shortLabel} ($${t.costPerM.toFixed(2)}/M)`).join(' and ');
+                    const monthlySavings = pricier.reduce(
+                      (sum, t) => sum + (t.tokens * (t.costPerM - cheapest.costPerM)) / 1000000,
+                      0
+                    ) / 6;
+                    return (
+                      <>
+                        Steering routine, low-complexity queries currently routed to {pricierList} down to {cheapest.shortLabel} (${cheapest.costPerM.toFixed(2)}/M) can recover an estimated{' '}
+                        <strong>${(monthlySavings * 0.3).toFixed(0)} - ${(monthlySavings * 0.6).toFixed(0)}/month</strong> without sacrificing deliverable quality. Furthermore, consolidating overlapping dual-tool licenses eliminates duplicate seat license fees across {multiToolData.dualToolUsers.length} power users.
+                      </>
+                    );
+                  })()}
                 </p>
                 <div className="flex flex-wrap gap-2 pt-2">
                   <button
@@ -1604,12 +1619,12 @@ export function ExecutiveInferenceDrilldownView({
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Client Billable Spend</span>
                   <p className="text-2xl font-bold text-emerald-400">78.4%</p>
-                  <p className="text-[10px] text-emerald-300/80">E-XXXXXX External Engagements</p>
+                  <p className="text-[10px] text-emerald-300/80">Billable Client Engagements</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Internal R&D Investment</span>
+                  <span className="text-ey-muted text-[10px] uppercase font-bold">Non-Billable Investment</span>
                   <p className="text-2xl font-bold text-cyan-400">21.6%</p>
-                  <p className="text-[10px] text-cyan-300/80">I-XXXXXX Internal IP Creation</p>
+                  <p className="text-[10px] text-cyan-300/80">Internal R&amp;D &amp; Innovation Spend</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Total Engagement Codes</span>
@@ -1627,7 +1642,7 @@ export function ExecutiveInferenceDrilldownView({
               <HierarchyDrilldownPanel
                 rows={allRows}
                 title="Level 3: Billability & Engagement Hierarchy"
-                subtitle="Client Engagement Codes (E-XXXXXX) and Internal codes (I-XXXXXX) appear at the Engagement Code step below."
+                subtitle="Billable and non-billable engagement codes appear at the Engagement Code step below."
                 onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
               />
             </div>
@@ -1717,72 +1732,6 @@ export function ExecutiveInferenceDrilldownView({
                   />
                 </>
               )}
-            </div>
-          )}
-
-          {/* 8. EXTERNAL PROJECTS VS INTERNAL PROJECTS */}
-          {inferenceId === 'external_vs_internal' && (
-            <div className="space-y-6">
-              {/* Level 2 KPI Summary Tiles */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">External Client AI Delivery</span>
-                  <p className="text-2xl font-bold text-emerald-400">
-                    ${totalExternalCost.toFixed(2)} ({totalOrgSpend > 0 ? ((totalExternalCost / totalOrgSpend) * 100).toFixed(1) : '66.1'}%)
-                  </p>
-                  <p className="text-[10px] text-emerald-300/80">{externalProjects.length} Client Projects (E-codes)</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Internal R&D &amp; Innovation</span>
-                  <p className="text-2xl font-bold text-purple-400">
-                    ${totalInternalCost.toFixed(2)} ({totalOrgSpend > 0 ? ((totalInternalCost / totalOrgSpend) * 100).toFixed(1) : '33.9'}%)
-                  </p>
-                  <p className="text-[10px] text-purple-300/80">{internalProjects.length} Innovation Codes (I-codes)</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Client Fee-Recovery Ratio</span>
-                  <p className="text-2xl font-bold text-ey-yellow">92.4%</p>
-                  <p className="text-[10px] text-ey-muted">Direct Billed or Pass-Through</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">IP Asset Yield</span>
-                  <p className="text-2xl font-bold text-cyan-400">{internalProjects.length} Assets</p>
-                  <p className="text-[10px] text-cyan-300/80">Active Internal Templates &amp; Tools</p>
-                </div>
-              </div>
-
-              {/* Level 3: Mandated Hierarchy Navigator (Engagement Code, E-/I- prefixed, sits at level 4) */}
-              <HierarchyDrilldownPanel
-                rows={allRows}
-                title="Level 3: External / Internal Engagement Hierarchy"
-                subtitle={`External: $${totalExternalCost.toFixed(2)} (${externalProjects.length} codes) · Internal: $${totalInternalCost.toFixed(2)} (${internalProjects.length} codes) — drill via Engagement Code below.`}
-                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
-              />
-
-              {/* Action Trigger Box */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-3">
-                <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-ey-yellow" />
-                  <span>Strategic Governance: Capitalization &amp; Fee-Recovery Assurance</span>
-                </h3>
-                <p className="text-xs text-ey-muted leading-relaxed">
-                  External delivery spend (${totalExternalCost.toFixed(2)}) should be confirmed on monthly client invoices. Internal project spend (${totalInternalCost.toFixed(2)}) is subject to IP milestone reviews to ensure assets graduate into reusable firm accelerators.
-                </p>
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <button
-                    onClick={() => handleTriggerAction('Client invoice reconciliation payload generated for 47 external projects.')}
-                    className="px-3.5 py-1.5 bg-ey-yellow text-ey-black font-bold text-xs rounded-xl shadow hover:bg-yellow-400 transition"
-                  >
-                    Generate Client Invoice Recovery Ledger
-                  </button>
-                  <button
-                    onClick={() => handleTriggerAction('R&D IP milestone audit scheduled for top 5 internal innovation codes.')}
-                    className="px-3.5 py-1.5 bg-ey-black border border-ey-border hover:border-ey-yellow text-ey-light text-xs font-semibold rounded-xl transition"
-                  >
-                    Initiate R&D IP Capitalization Audit
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 
@@ -1876,7 +1825,7 @@ export function ExecutiveInferenceDrilldownView({
                                 s.externalRatio >= 50 ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
                                 'bg-purple-500/10 text-purple-400 border-purple-500/30'
                               }`}>
-                                {s.externalRatio.toFixed(1)}% External
+                                {s.externalRatio.toFixed(1)}% Billable
                               </span>
                             </td>
                             <td className="px-4 py-3 text-ey-muted">
@@ -2292,7 +2241,7 @@ export function ExecutiveInferenceDrilldownView({
               <div>
                 <span className="text-ey-muted text-[10px] block">BILLABLE FLAG</span>
                 <span className={`font-bold ${inspectingRecord.billableFlag === 'True' || inspectingRecord.billableFlag === 'true' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {inspectingRecord.billableFlag} ({inspectingRecord.projectType || 'External'})
+                  {inspectingRecord.billableFlag}
                 </span>
               </div>
               <div>

@@ -17,6 +17,9 @@ const TOOL_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT',
   copilot: 'GitHub Copilot',
   claude: 'Claude',
+  replit: 'Replit',
+  factoryai: 'Factory AI',
+  cursor: 'Cursor AI',
 };
 
 export default function RoiPage() {
@@ -63,7 +66,7 @@ export default function RoiPage() {
               <div className="flex items-center space-x-3">
                 <div className="hidden md:flex items-center space-x-2 text-xs bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 text-amber-300 shrink-0">
                   <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="font-mono text-[11px]">Usage Limit: <strong>$80/seat</strong> · Ceiling: <strong>100,000 tokens</strong></span>
+                  <span className="font-mono text-[11px]">Free Limit: <strong>Per-Tool</strong> (Copilot $20 · ChatGPT $20 · Cursor AI $40 · Claude/Replit/Factory AI $0) · Ceiling: <strong>100,000 tokens</strong></span>
                 </div>
               </div>
             </div>
@@ -115,7 +118,7 @@ export default function RoiPage() {
                     type: 'zone',
                     id: 'waste',
                     title: 'Zone 1: Unconsumed Capacity Waste',
-                    subtitle: 'Under-utilized employee seats with unconsumed dollar allocations ($80 limit - actual cost).',
+                    subtitle: 'Under-utilized employee seats with unconsumed dollar allocations (per-tool free limit - actual cost).',
                     badge: 'Zone 1 Waste',
                   })
                 }
@@ -131,13 +134,13 @@ export default function RoiPage() {
                   trend: 'up',
                 }}
                 formatType="currency"
-                description="Zone 2: Additional billed usage exceeding standard $80 seat limit. Click to drill down to raw usage logs."
+                description="Zone 2: Additional billed usage exceeding each tool's free limit (Copilot $20, ChatGPT $20, Cursor AI $40, Claude/Replit/Factory AI $0). Click to drill down to raw usage logs."
                 onClick={() =>
                   openDrilldown({
                     type: 'zone',
                     id: 'overage',
                     title: 'Zone 2: Overage Spend Exposure',
-                    subtitle: 'Excess usage and fees billed beyond standard $80 seat allocation.',
+                    subtitle: 'Excess usage and fees billed beyond each tool\'s free allocation.',
                     badge: 'Zone 2 Overage',
                   })
                 }
@@ -230,13 +233,13 @@ export default function RoiPage() {
             {/* Engagement Code Telemetry & Billability Panel */}
             <ProjectBillabilityPanel
               summary={summary}
-              onSelectProject={(projectCode, projectType) =>
+              onSelectProject={(projectCode, billable) =>
                 openDrilldown({
                   type: 'project',
                   id: projectCode,
                   title: `Project Telemetry: ${projectCode}`,
-                  subtitle: `Row-level CSV usage records for project investment code ${projectCode} (${projectType}).`,
-                  badge: projectType,
+                  subtitle: `Row-level CSV usage records for project investment code ${projectCode} (${billable ? 'Billable' : 'Non-Billable'}).`,
+                  badge: billable ? 'Billable' : 'Non-Billable',
                   filterCriteria: { projectCode },
                 })
               }
@@ -245,11 +248,11 @@ export default function RoiPage() {
                   type: 'billability',
                   id: bType,
                   title:
-                    bType === 'external'
-                      ? 'Billable / External Client Projects Telemetry'
-                      : 'Non-Billable / Internal R&D Projects Telemetry',
-                  subtitle: `Row-level records matching ${bType} criteria.`,
-                  badge: bType.toUpperCase(),
+                    bType === 'billable'
+                      ? 'Billable Client Projects Telemetry'
+                      : 'Non-Billable Internal Projects Telemetry',
+                  subtitle: `Row-level records matching ${bType === 'billable' ? 'Billable' : 'Non-Billable'} criteria.`,
+                  badge: bType === 'billable' ? 'Billable' : 'Non-Billable',
                 })
               }
             />
@@ -313,7 +316,7 @@ export default function RoiPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
                 {[
                   { label: 'Wasted Capacity (total)', value: `$${summary.totalWasteCost.toLocaleString()}`, sub: 'unconsumed dollar limit', color: 'text-amber-400' },
-                  { label: 'Overage Spend (total)', value: `$${summary.totalOverageCost.toLocaleString()}`, sub: 'billed beyond $80 limit', color: 'text-purple-400' },
+                  { label: 'Overage Spend (total)', value: `$${summary.totalOverageCost.toLocaleString()}`, sub: 'billed beyond per-tool free limit', color: 'text-purple-400' },
                   { label: 'Quota Efficiency Rate', value: `${summary.licenseEfficiencyRate}%`, sub: 'actual ÷ limit', color: 'text-emerald-400' },
                   { label: 'Total API Cost', value: `$${summary.totalCost.toLocaleString()}`, sub: 'actual billed USD', color: 'text-ey-light' },
                   { label: 'Cost per 1K tokens', value: `$${summary.costPer1kTokens.toFixed(6)}`, sub: '/ 1K tokens', color: 'text-ey-yellow' },

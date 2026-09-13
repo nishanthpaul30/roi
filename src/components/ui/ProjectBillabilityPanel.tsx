@@ -6,8 +6,8 @@ import { FolderKanban, Building, Briefcase, Search, ArrowUpDown, ArrowUpRight } 
 
 interface ProjectBillabilityPanelProps {
   summary: TokenCostSummary;
-  onSelectProject?: (projectCode: string, projectType: string) => void;
-  onSelectBillability?: (type: 'external' | 'internal') => void;
+  onSelectProject?: (projectCode: string, billable: boolean) => void;
+  onSelectBillability?: (type: 'billable' | 'non_billable') => void;
 }
 
 export function ProjectBillabilityPanel({
@@ -16,40 +16,44 @@ export function ProjectBillabilityPanel({
   onSelectBillability,
 }: ProjectBillabilityPanelProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'External' | 'Internal'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'Billable' | 'Non-Billable'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
   const projectList = summary?.byProjectCode || [];
-  
-  // Filter project list by search & type
+
+  // Billability is derived from the Engagement Code prefix (E-XXXXXX = billable, I-XXXXXX = non-billable),
+  // which is a 1:1 match with the CSV's Billable/Non-Billable flag.
+  const isBillableCode = (projectCode: string) => projectCode.startsWith('E-');
+
+  // Filter project list by search & billability
   const filteredList = projectList.filter((p) => {
-    const matchesSearch =
-      p.projectCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.projectType.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'all' || p.projectType === filterType;
+    const matchesSearch = p.projectCode.toLowerCase().includes(searchTerm.toLowerCase());
+    const billable = isBillableCode(p.projectCode);
+    const matchesType =
+      filterType === 'all' || (filterType === 'Billable' ? billable : !billable);
     return matchesSearch && matchesType;
   });
 
   const totalPages = Math.ceil(filteredList.length / itemsPerPage) || 1;
   const paginatedList = filteredList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const externalPercent = summary.externalProjectPercent || 0;
+  const billablePercent = summary.billableSpendPercent || 0;
 
   return (
     <div className="space-y-6">
-      {/* 2 Summary KPI Cards — Billable and External are the same 1:1 classification, as are Non-Billable and Internal */}
+      {/* 2 Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Billable / External Client Projects */}
+        {/* Billable Spend */}
         <div
-          onClick={() => onSelectBillability?.('external')}
+          onClick={() => onSelectBillability?.('billable')}
           className={`bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2 transition ${
             onSelectBillability ? 'cursor-pointer hover:border-blue-500/60 hover:shadow-md group' : ''
           }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted group-hover:text-blue-300 transition-colors flex items-center gap-1">
-              <span>Billable Spend (External Projects)</span>
+              <span>Billable Spend</span>
               {onSelectBillability && <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-blue-400" />}
             </span>
             <div className="p-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 rounded-lg">
@@ -58,25 +62,25 @@ export function ProjectBillabilityPanel({
           </div>
           <div className="flex items-baseline justify-between">
             <div className="text-xl font-bold text-ey-light font-mono group-hover:text-blue-300 transition-colors">
-              ${(summary.externalProjectSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${(summary.billableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="text-xs font-semibold font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
-              {externalPercent}% of Total
+              {billablePercent}% of Total
             </div>
           </div>
-          <p className="text-xs text-ey-muted">Client engagements, billable to the client (Code prefix: E-XXXXXX)</p>
+          <p className="text-xs text-ey-muted">Client engagements billed to the client</p>
         </div>
 
-        {/* Non-Billable / Internal R&D Projects */}
+        {/* Non-Billable Overhead */}
         <div
-          onClick={() => onSelectBillability?.('internal')}
+          onClick={() => onSelectBillability?.('non_billable')}
           className={`bg-ey-card border border-ey-border rounded-xl p-4 shadow-sm space-y-2 transition ${
             onSelectBillability ? 'cursor-pointer hover:border-purple-500/60 hover:shadow-md group' : ''
           }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted group-hover:text-purple-300 transition-colors flex items-center gap-1">
-              <span>Non-Billable Overhead (Internal Projects)</span>
+              <span>Non-Billable Overhead</span>
               {onSelectBillability && <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-purple-400" />}
             </span>
             <div className="p-1.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 rounded-lg">
@@ -85,13 +89,13 @@ export function ProjectBillabilityPanel({
           </div>
           <div className="flex items-baseline justify-between">
             <div className="text-xl font-bold text-ey-light font-mono group-hover:text-purple-300 transition-colors">
-              ${(summary.internalProjectSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${(summary.nonBillableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="text-xs font-semibold font-mono text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
-              {(100 - externalPercent).toFixed(1)}% of Total
+              {(100 - billablePercent).toFixed(1)}% of Total
             </div>
           </div>
-          <p className="text-xs text-ey-muted">Internal tools &amp; R&amp;D, not billed to any client (Code prefix: I-XXXXXX)</p>
+          <p className="text-xs text-ey-muted">Internal tools &amp; R&amp;D, not billed to any client</p>
         </div>
       </div>
 
@@ -104,7 +108,7 @@ export function ProjectBillabilityPanel({
               <span>Engagement Code Telemetry &amp; Spend Rankings</span>
             </h3>
             <p className="text-xs text-ey-muted mt-0.5">
-              Rankings of project codes (<span className="font-mono text-blue-400">E-XXXXXX</span> vs <span className="font-mono text-purple-400">I-XXXXXX</span>) by total AI token spend.
+              Rankings of project codes by total AI token spend, billable vs non-billable.
             </p>
           </div>
 
@@ -124,7 +128,7 @@ export function ProjectBillabilityPanel({
               />
             </div>
 
-            {/* Project Type Filter */}
+            {/* Billability Filter */}
             <select
               value={filterType}
               onChange={(e) => {
@@ -133,9 +137,9 @@ export function ProjectBillabilityPanel({
               }}
               className="bg-ey-black border border-ey-border text-ey-light text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-ey-yellow font-medium"
             >
-              <option value="all">All Project Types</option>
-              <option value="External">External (E-XXXXXX)</option>
-              <option value="Internal">Internal (I-XXXXXX)</option>
+              <option value="all">All Project Codes</option>
+              <option value="Billable">Billable</option>
+              <option value="Non-Billable">Non-Billable</option>
             </select>
           </div>
         </div>
@@ -146,7 +150,7 @@ export function ProjectBillabilityPanel({
             <thead className="bg-ey-black/60 text-ey-muted font-semibold uppercase tracking-wider border-b border-ey-border">
               <tr>
                 <th className="px-4 py-3">Engagement Code</th>
-                <th className="px-4 py-3">Project Type</th>
+                <th className="px-4 py-3">Billability</th>
                 <th className="px-4 py-3 text-right">Active Users</th>
                 <th className="px-4 py-3 text-right">Token Consumption</th>
                 <th className="px-4 py-3 text-right">Total AI Investment</th>
@@ -154,50 +158,53 @@ export function ProjectBillabilityPanel({
             </thead>
             <tbody className="divide-y divide-ey-border">
               {paginatedList.length > 0 ? (
-                paginatedList.map((row, idx) => (
-                  <tr
-                    key={idx}
-                    onClick={() => onSelectProject?.(row.projectCode, row.projectType)}
-                    className={`hover:bg-ey-card-hover/80 transition ${
-                      onSelectProject ? 'cursor-pointer group' : ''
-                    }`}
-                  >
-                    <td className="px-4 py-3 font-mono font-bold text-ey-light flex items-center space-x-2">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono border flex items-center gap-1 group-hover:border-ey-yellow/60 ${
-                        row.projectCode.startsWith('E-')
-                          ? 'bg-blue-500/10 text-blue-300 border-blue-500/30'
-                          : 'bg-purple-500/10 text-purple-300 border-purple-500/30'
-                      }`}>
-                        <span>{row.projectCode}</span>
-                        {onSelectProject && (
-                          <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow" />
-                        )}
-                      </span>
-                    </td>
+                paginatedList.map((row, idx) => {
+                  const billable = isBillableCode(row.projectCode);
+                  return (
+                    <tr
+                      key={idx}
+                      onClick={() => onSelectProject?.(row.projectCode, billable)}
+                      className={`hover:bg-ey-card-hover/80 transition ${
+                        onSelectProject ? 'cursor-pointer group' : ''
+                      }`}
+                    >
+                      <td className="px-4 py-3 font-mono font-bold text-ey-light flex items-center space-x-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono border flex items-center gap-1 group-hover:border-ey-yellow/60 ${
+                          billable
+                            ? 'bg-blue-500/10 text-blue-300 border-blue-500/30'
+                            : 'bg-purple-500/10 text-purple-300 border-purple-500/30'
+                        }`}>
+                          <span>{row.projectCode}</span>
+                          {onSelectProject && (
+                            <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow" />
+                          )}
+                        </span>
+                      </td>
 
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${
-                        row.projectType === 'External'
-                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                          : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                      }`}>
-                        {row.projectType}
-                      </span>
-                    </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${
+                          billable
+                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                        }`}>
+                          {billable ? 'Billable' : 'Non-Billable'}
+                        </span>
+                      </td>
 
-                    <td className="px-4 py-3 text-right font-mono text-ey-muted">
-                      {row.userCount} users
-                    </td>
+                      <td className="px-4 py-3 text-right font-mono text-ey-muted">
+                        {row.userCount} users
+                      </td>
 
-                    <td className="px-4 py-3 text-right font-mono text-ey-light">
-                      {row.tokens.toLocaleString()} tokens
-                    </td>
+                      <td className="px-4 py-3 text-right font-mono text-ey-light">
+                        {row.tokens.toLocaleString()} tokens
+                      </td>
 
-                    <td className="px-4 py-3 text-right font-mono font-bold text-ey-yellow">
-                      ${row.cost.toFixed(2)}
-                    </td>
-                  </tr>
-                ))
+                      <td className="px-4 py-3 text-right font-mono font-bold text-ey-yellow">
+                        ${row.cost.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-ey-muted">

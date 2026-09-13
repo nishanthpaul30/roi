@@ -117,7 +117,7 @@ export function MetricDrilldownModal({ isOpen, onClose, data }: MetricDrilldownM
 
           {id === 'total_investment' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
                 <div className="bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-xl">
                   <p className="text-ey-muted text-[10px]">Billable Client Spend</p>
                   <p className="text-lg font-bold text-emerald-400">${(summaryData?.billableSpend || 0).toLocaleString()}</p>
@@ -127,11 +127,6 @@ export function MetricDrilldownModal({ isOpen, onClose, data }: MetricDrilldownM
                   <p className="text-ey-muted text-[10px]">Non-Billable Overhead</p>
                   <p className="text-lg font-bold text-amber-400">${(summaryData?.nonBillableSpend || 0).toLocaleString()}</p>
                   <p className="text-[10px] text-amber-300">{(100 - (summaryData?.billableSpendPercent || 0)).toFixed(1)}% of total</p>
-                </div>
-                <div className="bg-blue-500/10 border border-blue-500/30 p-3 rounded-xl">
-                  <p className="text-ey-muted text-[10px]">External Client Projects</p>
-                  <p className="text-lg font-bold text-blue-400">${(summaryData?.externalProjectSpend || 0).toLocaleString()}</p>
-                  <p className="text-[10px] text-blue-300">{summaryData?.externalProjectPercent}% external</p>
                 </div>
               </div>
 
@@ -206,7 +201,7 @@ export function MetricDrilldownModal({ isOpen, onClose, data }: MetricDrilldownM
                   <div key={p.projectCode} className="p-2 bg-ey-black border border-ey-border rounded-lg flex items-center justify-between">
                     <div>
                       <p className="font-bold text-ey-light">{p.projectCode}</p>
-                      <p className="text-[10px] text-ey-muted">{p.projectType}</p>
+                      <p className="text-[10px] text-ey-muted">{p.userCount} users</p>
                     </div>
                     <span className="font-bold text-ey-yellow">${p.cost.toFixed(2)}</span>
                   </div>

@@ -34,6 +34,15 @@ import { TokenCostSummary, UserCapacityRow, GlobalFilterState } from '@/lib/metr
 import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 
+const TOOL_LABELS: Record<string, string> = {
+  chatgpt: 'ChatGPT',
+  copilot: 'Copilot',
+  claude: 'Claude',
+  replit: 'Replit',
+  factoryai: 'Factory AI',
+  cursor: 'Cursor AI',
+};
+
 export interface RoiDrilldownTarget {
   type:
     | 'metric'
@@ -56,7 +65,6 @@ export interface RoiDrilldownTarget {
     aiTool?: string;
     zone?: 'zone1_under' | 'zone2_over' | 'ceiling_risk';
     billable?: 'True' | 'False';
-    projectType?: 'External' | 'Internal';
     serviceLine?: string;
     subServiceLine?: string;
     region?: string;
@@ -123,6 +131,11 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
     }
   }, [filters]);
 
+  // Distinct AI tools present in the dataset, for the tool filter dropdown
+  const availableTools = useMemo(() => {
+    return Array.from(new Set(allRows.map((r) => (r.aiTool || '').toLowerCase().trim()).filter(Boolean))).sort();
+  }, [allRows]);
+
   // Compute map of active user capacity breakdown (zone1 vs zone2 vs ceiling risk)
   const userCapacityMap = useMemo(() => {
     const map = new Map<string, UserCapacityRow>();
@@ -141,8 +154,6 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
       const project = (r.projectCode || '').trim();
       const tool = (r.aiTool || '').toLowerCase().trim();
       const isBillable = r.billableFlag === 'True' || r.billableFlag === 'true';
-      const isExternal =
-        (r.projectType || '').toLowerCase() === 'external' || project.startsWith('E-');
 
       // 1. If a sub-entity is selected within this drilldown
       if (selectedSubEntity) {
@@ -207,8 +218,6 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
       if (type === 'billability') {
         if (id === 'billable') return isBillable;
         if (id === 'non_billable') return !isBillable;
-        if (id === 'external') return isExternal;
-        if (id === 'internal') return !isExternal;
       }
 
       if (type === 'zone' || type === 'metric') {
@@ -313,13 +322,14 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
 
   // Associated project codes breakdown
   const associatedProjects = useMemo(() => {
-    const map = new Map<string, { code: string; type: string; cost: number; tokens: number; count: number }>();
+    const map = new Map<string, { code: string; billable: boolean; cost: number; tokens: number; count: number }>();
     for (const r of targetRows) {
       const code = (r.projectCode || 'N/A').trim();
       if (!map.has(code)) {
+        const isBillable = r.billableFlag === 'True' || r.billableFlag === 'true' || code.startsWith('E-');
         map.set(code, {
           code,
-          type: r.projectType || (code.startsWith('E-') ? 'External' : 'Internal'),
+          billable: isBillable,
           cost: 0,
           tokens: 0,
           count: 0,
@@ -653,10 +663,10 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                         </p>
                         <span
                           className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
-                            p.type === 'External' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'
+                            p.billable ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'
                           }`}
                         >
-                          {p.type}
+                          {p.billable ? 'Billable' : 'Non-Billable'}
                         </span>
                       </div>
                       <div className="text-right shrink-0">
@@ -891,10 +901,10 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                         </p>
                         <span
                           className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
-                            p.type === 'External' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'
+                            p.billable ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'
                           }`}
                         >
-                          {p.type}
+                          {p.billable ? 'Billable' : 'Non-Billable'}
                         </span>
                       </div>
                       <div className="text-right shrink-0">
@@ -1002,9 +1012,11 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
               className="bg-ey-black border border-ey-border text-ey-light text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-ey-yellow font-mono cursor-pointer"
             >
               <option value="all">All Tools</option>
-              <option value="copilot">Copilot</option>
-              <option value="chatgpt">ChatGPT</option>
-              <option value="claude">Claude</option>
+              {availableTools.map((t) => (
+                <option key={t} value={t}>
+                  {TOOL_LABELS[t] || t}
+                </option>
+              ))}
             </select>
 
             {/* Billability Filter */}
@@ -1243,7 +1255,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
               <div>
                 <span className="text-ey-muted text-[10px] block">BILLABLE FLAG</span>
                 <span className={`font-bold ${inspectingRecord.billableFlag === 'True' || inspectingRecord.billableFlag === 'true' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {inspectingRecord.billableFlag} ({inspectingRecord.projectType || 'External'})
+                  {inspectingRecord.billableFlag}
                 </span>
               </div>
               <div>

@@ -5,7 +5,7 @@ export interface GlobalFilterState {
   endDate: string;
   comparisonPeriod: ComparisonPeriod;
   // CSV-derived filter dimensions
-  aiTool: string;           // 'all' | 'chatgpt' | 'copilot' | 'claude'
+  aiTool: string;           // 'all' | 'chatgpt' | 'copilot' | 'claude' | 'replit' | 'factoryai' | 'cursor'
   managementRegion: string; // 'all' | 'EMEA' | 'APAC' | 'Americas'
   serviceLine: string;      // 'all' | 'Consulting' | 'Power' | 'Financial Services' | 'Technology'
   userMail: string;         // 'all' or specific user email
@@ -102,12 +102,8 @@ export interface TokenCostSummary {
   billableSpend: number;
   nonBillableSpend: number;
   billableSpendPercent: number;
-  externalProjectSpend: number;
-  internalProjectSpend: number;
-  externalProjectPercent: number;
   byProjectCode?: {
     projectCode: string;
-    projectType: string;
     tokens: number;
     cost: number;
     userCount: number;

@@ -52,6 +52,27 @@ const TOOL_CONFIG: Record<
     border: 'border-amber-500/30',
     barBg: 'bg-amber-500',
   },
+  replit: {
+    label: 'Replit Enterprise',
+    bg: 'bg-sky-500/10',
+    text: 'text-sky-400',
+    border: 'border-sky-500/30',
+    barBg: 'bg-sky-500',
+  },
+  factoryai: {
+    label: 'Factory AI Enterprise',
+    bg: 'bg-rose-500/10',
+    text: 'text-rose-400',
+    border: 'border-rose-500/30',
+    barBg: 'bg-rose-500',
+  },
+  cursor: {
+    label: 'Cursor AI Enterprise',
+    bg: 'bg-fuchsia-500/10',
+    text: 'text-fuchsia-400',
+    border: 'border-fuchsia-500/30',
+    barBg: 'bg-fuchsia-500',
+  },
 };
 
 export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: MultiToolComparisonPanelProps) {
@@ -79,7 +100,8 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
     return null;
   }
 
-  const { byAiTool } = summary;
+  // GitHub Copilot always displays first; the rest keep their existing relative order.
+  const byAiTool = [...summary.byAiTool].sort((a, b) => (a.tool === 'copilot' ? -1 : b.tool === 'copilot' ? 1 : 0));
 
   // Find lowest cost per 1k tokens for efficiency highlight
   const minCostPer1k = Math.min(...byAiTool.map((t) => t.costPer1kTokens || 0));
@@ -96,7 +118,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
             <h2 className="text-base font-bold text-ey-light tracking-tight flex items-center gap-2">
               <span>Multi-Tool Spend &amp; Efficiency Comparison</span>
               <span className="px-2 py-0.5 text-[10px] font-semibold bg-ey-yellow/10 text-ey-yellow border border-ey-yellow/30 rounded-full font-mono hidden md:inline-block">
-                ChatGPT vs Copilot vs Claude
+                {byAiTool.map((t) => TOOL_CONFIG[t.tool]?.label.replace(' Enterprise', '') || t.tool).join(' vs ')}
               </span>
             </h2>
             <p className="text-xs text-ey-muted mt-0.5">
@@ -139,7 +161,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
         <>
 
       {/* Tool Comparison Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {byAiTool.map((toolData) => {
           const config = TOOL_CONFIG[toolData.tool] || {
             label: toolData.tool.toUpperCase(),

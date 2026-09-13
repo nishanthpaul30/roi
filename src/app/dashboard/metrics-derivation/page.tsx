@@ -37,7 +37,7 @@ interface MetricDerivationItem {
 // Engagement Code -> Engagement Super Region -> Engagement Service Line ->
 // Engagement Sub Service Line -> Engagement Competency. Remaining columns follow.
 const CSV_SCHEMA = [
-  { column: 'AI Tool Flag', fieldName: 'aiTool', description: 'AI Tool classification flag (e.g. copilot, chatgpt, claude)', dataType: 'String' },
+  { column: 'AI Tool Flag', fieldName: 'aiTool', description: 'AI Tool classification flag (e.g. copilot, chatgpt, claude, replit, factoryai, cursor)', dataType: 'String' },
   { column: 'User Mail', fieldName: 'userMail', description: 'Developer email identifier (e.g. aditya.malik@enterprise-corp.com)', dataType: 'String' },
   { column: 'Display Name', fieldName: 'displayName', description: 'Developer display name (e.g. Aditya Malik)', dataType: 'String' },
   { column: 'Activity Date', fieldName: 'activityDate', description: 'Date of usage formatted as YYYY-MM-DD (e.g. 2026-03-09)', dataType: 'Date' },
@@ -57,8 +57,8 @@ const CSV_SCHEMA = [
   { column: 'Engagement Competency', fieldName: 'engagementCompetency', description: 'Skill/competency classification, derived from Engagement Sub Service Line — hierarchy level 10 (leaf)', dataType: 'String' },
   { column: 'Region', fieldName: 'region', description: 'Finer-grained region than Management Region (e.g. ANZ, Middle East, North America)', dataType: 'String' },
   { column: 'Management Region', fieldName: 'managementRegion', description: 'Regional management division (e.g. EMEA, APAC, Americas)', dataType: 'String' },
-  { column: 'License Cost in USD', fieldName: 'licenseCost', description: 'Real per-seat license cost billed for that user — the basis for License Investment ROI', dataType: 'Numeric ($)' },
-  { column: 'Usage Free Token Limit', fieldName: 'usageFreeTokenLimit', description: 'Baseline free token/spending ceiling threshold used for Zone 1/2 Capacity Waste & Overage (distinct from License Cost)', dataType: 'Numeric' },
+  { column: 'License Cost in USD', fieldName: 'licenseCost', description: 'Set per AI Tool — Copilot: $35, ChatGPT: $25, Claude: $40, Replit: $50, Factory AI: $10, Cursor AI: $60 flat seat license. Summed per distinct tool a user has — basis for License Investment ROI', dataType: 'Numeric ($)' },
+  { column: 'Usage Free Token Limit', fieldName: 'usageFreeTokenLimit', description: 'Set per AI Tool — Copilot: $20 free allowance; ChatGPT: $20 free allowance; Cursor AI: $40 free allowance; Claude/Replit/Factory AI: $0 (fully usage-based). Summed per distinct tool a user has, used for Zone 1/2 Capacity Waste & Overage (distinct from License Cost)', dataType: 'Numeric' },
   { column: 'Billable/Non-Billable', fieldName: 'billableFlag', description: 'Client billability flag, derived from Project Type: True for External (E-XXXXXX) engagements, False for Internal (I-XXXXXX) projects', dataType: 'Boolean' },
   { column: 'ProjectType', fieldName: 'projectType', description: 'Project classification (External for client, Internal for R&D)', dataType: 'String' },
   { column: 'GDS Location', fieldName: 'gdsLocation', description: 'Global Delivery Services location fulfilling the work, or "Onshore" if not GDS-delivered — independent of the hierarchy chain', dataType: 'String' },
@@ -85,8 +85,8 @@ const FORMULA_CATEGORIES = [
     formulas: [
       { name: 'Total AI Investment ($)', formula: 'Total Spend = ∑ (cost)', example: '$0.4627 + $0.5055 + $0.6155 = $1.5837' },
       { name: 'Cost per Active User ($ / user)', formula: 'Cost per User = Total Spend / Unique Active Users', example: '$1,750.00 / 70 Users = $25.00 / user' },
-      { name: 'Capacity Waste ($)', formula: 'Waste = ∑ max(0, usageFreeTokenLimit - actualCost)', example: '$80.00 limit - $13.44 cost = $66.56 wasted capacity' },
-      { name: 'Overage Cost ($)', formula: 'Overage = ∑ max(0, actualCost - usageFreeTokenLimit)', example: '$95.20 cost - $80.00 limit = $15.20 overage' },
+      { name: 'Capacity Waste ($)', formula: 'Waste = ∑ max(0, usageFreeTokenLimit - actualCost)', example: 'Copilot user: $20.00 limit - $13.44 cost = $6.56 wasted capacity' },
+      { name: 'Overage Cost ($)', formula: 'Overage = ∑ max(0, actualCost - usageFreeTokenLimit)', example: 'ChatGPT user: $35.20 cost - $20.00 limit = $15.20 overage' },
     ],
   },
   {
@@ -95,8 +95,7 @@ const FORMULA_CATEGORIES = [
     color: 'text-cyan-400',
     formulas: [
       { name: 'Billable AI Spend Share (%)', formula: 'Billable Spend % = (Billable Spend / Total Spend) × 100', example: '($1,372.40 / $1,750.00) × 100 = 78.4%' },
-      { name: 'External Project Share (%)', formula: 'External Share % = (External Spend / Total Spend) × 100', example: '($1,246.00 / $1,750.00) × 100 = 71.2%' },
-      { name: 'Engagement Code Token Ranking', formula: 'Engagement Cost = ∑ (cost) grouped by Engagement Code (E-XXXXXX / I-XXXXXX)', example: 'E-301461: 325,000 tokens | $48.20' },
+      { name: 'Engagement Code Token Ranking', formula: 'Engagement Cost = ∑ (cost) grouped by Engagement Code', example: 'E-301461: 325,000 tokens | $48.20' },
     ],
   },
   {
@@ -204,23 +203,13 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     category: 'Projects',
   },
   {
-    name: 'Project Type Distribution (External vs Internal)',
-    csvField: 'group_by(projectType) -> sum(cost), sum(token_consumption)',
-    formula: 'Sum of cost and tokens grouped by ProjectType',
-    sampleInput: 'External Spend = $1,246.00, Internal Spend = $504.00',
-    workedCalculation: 'External: 71.2% ($1,246.00) | Internal: 28.8% ($504.00)',
-    derivedOutput: '71.2% External / 28.8% Internal',
-    notes: 'Separates client project investment from internal R&D / operational overhead',
-    category: 'Projects',
-  },
-  {
     name: 'Engagement Code Spend & Token Rankings',
     csvField: 'group_by(projectCode) -> sum(token_consumption), sum(cost)',
     formula: 'Aggregate token consumption and cost per unique Engagement Code',
-    sampleInput: 'Engagement Code: E-301461, projectType: External',
+    sampleInput: 'Engagement Code: E-301461',
     workedCalculation: 'Tokens: 325,000 | Cost: $48.20 | Users: 4',
     derivedOutput: 'Ranked engagement code list',
-    notes: 'Ranks all client (E-XXXXXX) and internal (I-XXXXXX) engagement codes by AI consumption',
+    notes: 'Ranks all engagement codes by AI consumption, billable and non-billable alike',
     category: 'Projects',
   },
   {

@@ -17,7 +17,7 @@ export default function ExecutiveOverviewPage() {
   const [activeDrilldown, setActiveDrilldown] = useState<DrilldownMetricData | null>(null);
   const [activeInferenceDrilldown, setActiveInferenceDrilldown] = useState<string | null>(null);
   const [inferenceInitialEntity, setInferenceInitialEntity] = useState<{
-    type: 'user' | 'tool' | 'region' | 'country' | 'service_line' | 'project_code' | 'cohort' | 'month' | 'project_type';
+    type: 'user' | 'tool' | 'region' | 'country' | 'service_line' | 'project_code' | 'cohort' | 'month';
     name: string;
     label?: string;
   } | null>(null);
@@ -201,7 +201,7 @@ export default function ExecutiveOverviewPage() {
                   }}
                 />
 
-                {/* Multi-Tool Spend & Efficiency Comparison (ChatGPT vs Copilot vs Claude) */}
+                {/* Multi-Tool Spend & Efficiency Comparison across all active AI tools */}
                 <MultiToolComparisonPanel
                   summary={data.tokenCostSummary}
                   filters={filters}
@@ -209,14 +209,15 @@ export default function ExecutiveOverviewPage() {
                     if (userMail) {
                       setInferenceInitialEntity({ type: 'user', name: userMail, label: userMail });
                     } else if (tool) {
-                      const toolLabel =
-                        tool.toLowerCase() === 'chatgpt'
-                          ? 'ChatGPT Enterprise'
-                          : tool.toLowerCase() === 'copilot'
-                          ? 'GitHub Copilot Enterprise'
-                          : tool.toLowerCase() === 'claude'
-                          ? 'Claude Enterprise'
-                          : tool;
+                      const TOOL_ENTERPRISE_LABELS: Record<string, string> = {
+                        chatgpt: 'ChatGPT Enterprise',
+                        copilot: 'GitHub Copilot Enterprise',
+                        claude: 'Claude Enterprise',
+                        replit: 'Replit Enterprise',
+                        factoryai: 'Factory AI Enterprise',
+                        cursor: 'Cursor AI Enterprise',
+                      };
+                      const toolLabel = TOOL_ENTERPRISE_LABELS[tool.toLowerCase()] || tool;
                       setInferenceInitialEntity({ type: 'tool', name: tool, label: toolLabel });
                     } else {
                       setInferenceInitialEntity(null);
