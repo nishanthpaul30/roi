@@ -122,11 +122,25 @@ html.light input[type="date"], body.light input[type="date"] {
   .print-only {
     display: block !important;
   }
-  body {
+  html, body {
     background: #ffffff !important;
     color: #000000 !important;
     padding: 0 !important;
     margin: 0 !important;
     width: 100% !important;
+  }
+  /* The app shell's root wrapper (a plain <div>, not aside/nav/header) carries
+     the current theme's dark background/text via bg-ey-black/text-ey-light and
+     sits between <body> and the print-only report, so body's white override
+     above doesn't reach through it. Neutralize it explicitly so no dark
+     background or mismatched text color shows around the printed report. */
+  .bg-ey-black,
+  .bg-ey-card,
+  .bg-ey-card-hover {
+    background: transparent !important;
+  }
+  .text-ey-light,
+  .text-ey-muted {
+    color: #000000 !important;
   }
 }

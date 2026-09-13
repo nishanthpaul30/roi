@@ -68,7 +68,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
         </div>
 
         <div className="border border-slate-300 rounded-xl p-4 bg-slate-50/80 shadow-xs">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Billable Tokens</span>
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Token Consumption</span>
           <div className="text-2xl font-black text-slate-900 font-mono mt-1">
             {Math.round(totalTokens).toLocaleString()}
           </div>
@@ -88,7 +88,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
           <div className="text-lg font-black text-slate-900 font-mono mt-1 truncate">
             {dominantTool}
           </div>
-          <p className="text-[11px] text-slate-600 mt-1 font-medium">Highest token volume</p>
+          <p className="text-[11px] text-slate-600 mt-1 font-medium">Highest total spend</p>
         </div>
       </div>
 
@@ -224,7 +224,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
         </h3>
         <ul className="list-disc pl-4 text-slate-700 space-y-1 text-xs font-medium">
           <li>Average spend per active user stands at <strong>${costPerActiveUser.toFixed(2)}</strong> across the filtered period.</li>
-          <li>Dominant portfolio tool is <strong>{dominantTool}</strong> driving high enterprise adoption and token consumption.</li>
+          <li>Dominant portfolio tool is <strong>{dominantTool}</strong>, driving the largest share of total AI spend.</li>
           <li>Telemetry data verified directly from source usage log entries.</li>
         </ul>
       </div>

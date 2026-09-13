@@ -39,23 +39,34 @@ export async function calculateTokenCostSummary(
   const currentRows = filterRows(allRows, filters, startDate, endDate);
   const previousRows = filterRows(allRows, filters, prevStartDate, prevEndDate);
 
+  // Seat Utilization: a user can hold an AI tool license (an "AI Tool Flag" row
+  // with its License Cost / Usage Free Token Limit) without ever using it — 0
+  // tokens, $0 cost. Those rows represent the roster of provisioned-but-inactive
+  // seats. Every usage-based aggregate below (spend, tokens, rankings, cohorts,
+  // capacity waste, etc.) should reflect only real usage, so it's computed from
+  // usageRows; the seat_utilization split further down needs the full roster too.
+  const totalRosterUserCount = new Set(currentRows.map(r => r.userMail.toLowerCase())).size;
+  const usageRows = currentRows.filter(r => r.tokenConsumption > 0);
+  const activeUserCount = new Set(usageRows.map(r => r.userMail.toLowerCase())).size;
+  const inactiveUserCount = totalRosterUserCount - activeUserCount;
+
   // Core aggregates
-  const totalTokenConsumption = currentRows.reduce((s, r) => s + r.tokenConsumption, 0);
-  const totalBillableTokens = currentRows.reduce((s, r) => s + r.dailyBillableTokens, 0);
-  const totalCost = currentRows.reduce((s, r) => s + r.cost, 0);
+  const totalTokenConsumption = usageRows.reduce((s, r) => s + r.tokenConsumption, 0);
+  const totalBillableTokens = usageRows.reduce((s, r) => s + r.dailyBillableTokens, 0);
+  const totalCost = usageRows.reduce((s, r) => s + r.cost, 0);
 
   const prevTotalTokenConsumption = previousRows.reduce((s, r) => s + r.tokenConsumption, 0);
   const prevTotalBillableTokens = previousRows.reduce((s, r) => s + r.dailyBillableTokens, 0);
   const prevTotalCost = previousRows.reduce((s, r) => s + r.cost, 0);
 
   // Unique activity days for avg daily cost
-  const uniqueDays = new Set(currentRows.map(r => r.activityDate)).size || 1;
+  const uniqueDays = new Set(usageRows.map(r => r.activityDate)).size || 1;
   const avgDailyCost = totalCost / uniqueDays;
   const costPer1kTokens = totalBillableTokens > 0 ? (totalCost / (totalBillableTokens / 1000)) : 0;
   const billableUtilizationRate = totalTokenConsumption > 0 ? (totalBillableTokens / totalTokenConsumption) * 100 : 0;
 
   // By AI Tool breakdown with Unit Economics
-  const byToolMap = groupBy(currentRows, r => r.aiTool);
+  const byToolMap = groupBy(usageRows, r => r.aiTool);
   const byAiTool = Array.from(byToolMap.entries())
     .map(([tool, rows]) => {
       const tokens = rows.reduce((s, r) => s + r.tokenConsumption, 0);
@@ -82,7 +93,7 @@ export async function calculateTokenCostSummary(
 
   // Multi-Tool User Overlap Detection
   const userToolsMap = new Map<string, { displayName: string; tools: Set<string>; spend: number; tokens: number }>();
-  for (const r of currentRows) {
+  for (const r of usageRows) {
     const email = r.userMail.toLowerCase();
     if (!userToolsMap.has(email)) {
       userToolsMap.set(email, {
@@ -129,7 +140,7 @@ export async function calculateTokenCostSummary(
   };
 
   // By Management Region breakdown
-  const byRegionMap = groupBy(currentRows, r => r.managementRegion);
+  const byRegionMap = groupBy(usageRows, r => r.managementRegion);
   const byManagementRegion = Array.from(byRegionMap.entries())
     .map(([region, rows]) => ({
       region,
@@ -141,7 +152,7 @@ export async function calculateTokenCostSummary(
     .sort((a, b) => b.tokens - a.tokens);
 
   // By Country breakdown
-  const byCountryMap = groupBy(currentRows, r => r.country);
+  const byCountryMap = groupBy(usageRows, r => r.country);
   const byCountry = Array.from(byCountryMap.entries())
     .map(([country, rows]) => ({
       country,
@@ -154,7 +165,7 @@ export async function calculateTokenCostSummary(
     .sort((a, b) => b.tokens - a.tokens);
 
   // By Service Line breakdown
-  const bySlMap = groupBy(currentRows, r => r.orgServiceLine);
+  const bySlMap = groupBy(usageRows, r => r.orgServiceLine);
   const byServiceLine = Array.from(bySlMap.entries())
     .map(([serviceLine, rows]) => ({
       serviceLine,
@@ -166,7 +177,7 @@ export async function calculateTokenCostSummary(
     .sort((a, b) => b.tokens - a.tokens);
 
   // By Sub-Service Line breakdown
-  const bySubSlMap = groupBy(currentRows, r => `${r.orgServiceLine}:::${r.orgSubServiceLine || 'General'}`);
+  const bySubSlMap = groupBy(usageRows, r => `${r.orgServiceLine}:::${r.orgSubServiceLine || 'General'}`);
   const bySubServiceLine = Array.from(bySubSlMap.entries())
     .map(([key, rows]) => {
       const [serviceLine, subServiceLine] = key.split(':::');
@@ -180,8 +191,9 @@ export async function calculateTokenCostSummary(
     })
     .sort((a, b) => b.tokens - a.tokens);
 
-  // Users breakdown by token consumption
-  const byUserMap = groupBy(currentRows, r => r.userMail);
+  // Users breakdown by spend — every consumer (Top Power Spenders, Top Active Users
+  // by Spend) ranks by dollar cost, not token volume, so sort accordingly here.
+  const byUserMap = groupBy(usageRows, r => r.userMail);
   const topUsers = Array.from(byUserMap.entries())
     .map(([userMail, rows]) => {
       const toolsSet = new Set(rows.map(r => r.aiTool).filter(Boolean));
@@ -193,7 +205,7 @@ export async function calculateTokenCostSummary(
         aiTools: Array.from(toolsSet),
       };
     })
-    .sort((a, b) => b.tokens - a.tokens);
+    .sort((a, b) => b.cost - a.cost);
 
   // Users capacity & waste breakdown
   const HARD_TOKEN_CEILING = 100000; // Hard cap per user
@@ -293,14 +305,14 @@ export async function calculateTokenCostSummary(
     : 0;
 
   // Billable vs Non-Billable Insights
-  const billableRows = currentRows.filter(r => r.billableFlag === 'True' || r.billableFlag === 'true' || r.billableFlag === '1');
-  const nonBillableRows = currentRows.filter(r => r.billableFlag === 'False' || r.billableFlag === 'false' || r.billableFlag === '0');
+  const billableRows = usageRows.filter(r => r.billableFlag === 'True' || r.billableFlag === 'true' || r.billableFlag === '1');
+  const nonBillableRows = usageRows.filter(r => r.billableFlag === 'False' || r.billableFlag === 'false' || r.billableFlag === '0');
   const billableSpend = Number(billableRows.reduce((s, r) => s + r.cost, 0).toFixed(2));
   const nonBillableSpend = Number(nonBillableRows.reduce((s, r) => s + r.cost, 0).toFixed(2));
   const billableSpendPercent = totalCost > 0 ? Number(((billableSpend / totalCost) * 100).toFixed(1)) : 0;
 
   // By ProjectCode breakdown
-  const byProjectCodeMap = groupBy(currentRows, r => r.projectCode || 'Unassigned');
+  const byProjectCodeMap = groupBy(usageRows, r => r.projectCode || 'Unassigned');
   const byProjectCode = Array.from(byProjectCodeMap.entries()).map(([pCode, rows]) => {
     const tokens = Math.round(rows.reduce((s, r) => s + r.tokenConsumption, 0));
     const cost = Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(2));
@@ -314,7 +326,7 @@ export async function calculateTokenCostSummary(
   }).sort((a, b) => b.cost - a.cost);
 
   // Monthly Trend breakdown (Month_Year / Month Id columns) with per-AI-tool cost split
-  const byMonthMap = groupBy(currentRows, r => String(r.monthId));
+  const byMonthMap = groupBy(usageRows, r => String(r.monthId));
   const monthlyTrend = Array.from(byMonthMap.entries())
     .map(([, rows]) => {
       const monthId = rows[0].monthId;
@@ -345,7 +357,7 @@ export async function calculateTokenCostSummary(
   // User Engagement Cohorts: classify each active user by their average distinct
   // active-days per active month, so retention/adoption health is measurable from
   // the raw CSV instead of asserted.
-  const byUserDaysMap = groupBy(currentRows, r => r.userMail.toLowerCase());
+  const byUserDaysMap = groupBy(usageRows, r => r.userMail.toLowerCase());
   let embeddedCount = 0, regularCount = 0, occasionalCount = 0, dropoutCount = 0;
   for (const [, rows] of byUserDaysMap.entries()) {
     const activeDays = new Set(rows.map(r => r.activityDate)).size;
@@ -402,5 +414,8 @@ export async function calculateTokenCostSummary(
     byProjectCode,
     monthlyTrend,
     userEngagementCohorts,
+    totalRosterUserCount,
+    activeUserCount,
+    inactiveUserCount,
   };
 }

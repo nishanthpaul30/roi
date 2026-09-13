@@ -22,15 +22,13 @@ import { TokenCostSummary } from '@/lib/metrics/types';
 
 interface ExecutiveInferencesPanelProps {
   summary?: TokenCostSummary;
-  /** Total distinct users across the whole dataset (unfiltered) — used as the seat roster baseline. */
-  totalRosterSeats?: number;
   onSelectInference?: (inferenceId: string) => void;
 }
 
 const fmtCost = (v: number) => `$${(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtPct = (v: number) => `${(Number.isFinite(v) ? v : 0).toFixed(1)}%`;
 
-export function ExecutiveInferencesPanel({ summary, totalRosterSeats, onSelectInference }: ExecutiveInferencesPanelProps) {
+export function ExecutiveInferencesPanel({ summary, onSelectInference }: ExecutiveInferencesPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const router = useRouter();
 
@@ -38,10 +36,11 @@ export function ExecutiveInferencesPanel({ summary, totalRosterSeats, onSelectIn
 
   const totalCost = summary.totalCost || 0;
 
-  // 1. User Engagement Telemetry — active seats (this filtered window) vs the full unfiltered roster
-  const activeUserCount = summary.userCapacityBreakdown.length;
-  const rosterSeats = totalRosterSeats && totalRosterSeats > 0 ? totalRosterSeats : activeUserCount;
-  const inactiveUserCount = Math.max(0, rosterSeats - activeUserCount);
+  // 1. User Engagement Telemetry — active (>=1 token used) vs inactive (licensed,
+  // 0 tokens used) seats within the current filter window.
+  const activeUserCount = summary.activeUserCount;
+  const inactiveUserCount = summary.inactiveUserCount;
+  const rosterSeats = summary.totalRosterUserCount;
   const activeSeatPercent = rosterSeats > 0 ? (activeUserCount / rosterSeats) * 100 : 0;
   const avgLicenseCostPerSeat = activeUserCount > 0 ? summary.totalLicenseCost / activeUserCount : 0;
   const inactiveLeakageCost = Math.round(inactiveUserCount * avgLicenseCostPerSeat);

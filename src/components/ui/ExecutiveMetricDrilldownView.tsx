@@ -469,18 +469,30 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
             <div className="space-y-6">
               {/* Billability KPI Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
-                <div className="bg-ey-card border border-emerald-500/30 p-4 rounded-2xl space-y-1 shadow-sm">
+                <div
+                  onClick={() => setPendingFacet({ field: 'billableFlag', value: 'True', label: 'Billable Client Spend' })}
+                  className="bg-ey-card border border-emerald-500/30 hover:border-emerald-400/80 p-4 rounded-2xl space-y-1 shadow-sm cursor-pointer transition group"
+                >
                   <div className="flex items-center justify-between text-ey-muted">
-                    <span>Billable Client Spend</span>
+                    <span className="flex items-center gap-1.5">
+                      <span>Billable Client Spend</span>
+                      <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-400" />
+                    </span>
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                   </div>
                   <p className="text-2xl font-extrabold text-emerald-400">${(summaryData?.billableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                   <p className="text-xs text-emerald-300">{summaryData?.billableSpendPercent}% of total AI investment</p>
                 </div>
 
-                <div className="bg-ey-card border border-amber-500/30 p-4 rounded-2xl space-y-1 shadow-sm">
+                <div
+                  onClick={() => setPendingFacet({ field: 'billableFlag', value: 'False', label: 'Non-Billable Overhead' })}
+                  className="bg-ey-card border border-amber-500/30 hover:border-amber-400/80 p-4 rounded-2xl space-y-1 shadow-sm cursor-pointer transition group"
+                >
                   <div className="flex items-center justify-between text-ey-muted">
-                    <span>Non-Billable Overhead</span>
+                    <span className="flex items-center gap-1.5">
+                      <span>Non-Billable Overhead</span>
+                      <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-amber-400" />
+                    </span>
                     <AlertCircle className="w-4 h-4 text-amber-400" />
                   </div>
                   <p className="text-2xl font-extrabold text-amber-400">${(summaryData?.nonBillableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>

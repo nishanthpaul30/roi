@@ -122,6 +122,11 @@ export interface TokenCostSummary {
     occasionalPercent: number;
     dropoutPercent: number;
   };
+  // Seat Utilization: users with an AI Tool license (a CSV row) split by whether
+  // they've used at least 1 token (active) or recorded 0 usage (inactive).
+  totalRosterUserCount: number;
+  activeUserCount: number;
+  inactiveUserCount: number;
 }
 
 export interface MonthlyTrendPoint {
