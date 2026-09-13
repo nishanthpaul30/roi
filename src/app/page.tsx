@@ -117,24 +117,6 @@ export default function ExecutiveOverviewPage() {
                 {/* Clickable Interactive KPI Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <KpiCard
-                    title="Total Token Consumption"
-                    delta={data.metrics.tokenConsumption.summary}
-                    unit="tokens"
-                    description="Total raw tokens consumed. Click to enter in-page breakdown across AI tools & service lines."
-                    comparisonLabel="vs prev period"
-                    onClick={() =>
-                      openDrilldown(
-                        'token_consumption',
-                        'Total Token Consumption',
-                        'Comprehensive volume breakdown across tools, regions, and service lines',
-                        `${(data.metrics.tokenConsumption.summary.current || 0).toLocaleString()} tokens`,
-                        data.metrics.tokenConsumption.summary,
-                        data.metrics.tokenConsumption.series
-                      )
-                    }
-                  />
-
-                  <KpiCard
                     title="Total AI Investment"
                     delta={data.metrics.cost.summary}
                     formatType="currency"
@@ -184,6 +166,25 @@ export default function ExecutiveOverviewPage() {
                         `$${(data.metrics.costPerActiveUser?.summary?.current || 0).toFixed(2)} / user`,
                         data.metrics.costPerActiveUser?.summary,
                         data.metrics.cost.series
+                      )
+                    }
+                  />
+
+                  <KpiCard
+                    title="Total Token Consumption"
+                    delta={data.metrics.tokenConsumption.summary}
+                    unit="tokens"
+                    formatType="compact"
+                    description="Total raw tokens consumed. Click to enter in-page breakdown across AI tools & service lines."
+                    comparisonLabel="vs prev period"
+                    onClick={() =>
+                      openDrilldown(
+                        'token_consumption',
+                        'Total Token Consumption',
+                        'Comprehensive volume breakdown across tools, regions, and service lines',
+                        `${(data.metrics.tokenConsumption.summary.current || 0).toLocaleString()} tokens`,
+                        data.metrics.tokenConsumption.summary,
+                        data.metrics.tokenConsumption.series
                       )
                     }
                   />

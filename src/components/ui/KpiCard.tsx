@@ -5,7 +5,7 @@ interface KpiCardProps {
   title: string;
   delta: MetricDelta;
   unit?: string;
-  formatType?: 'number' | 'percentage' | 'currency' | 'duration';
+  formatType?: 'number' | 'percentage' | 'currency' | 'duration' | 'compact';
   description?: string;
   comparisonLabel?: string;
   onClick?: () => void;
@@ -28,6 +28,7 @@ export function KpiCard({
     if (formatType === 'currency') return `$${val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     if (formatType === 'percentage') return `${val.toFixed(1)}%`;
     if (formatType === 'duration') return `${val.toLocaleString()} hrs`;
+    if (formatType === 'compact') return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(val);
     return val.toLocaleString();
   };
 
@@ -60,7 +61,10 @@ export function KpiCard({
 
       {/* Main KPI Value */}
       <div className="my-1 flex items-baseline justify-between">
-        <span className="text-2xl lg:text-3xl font-extrabold text-ey-light tracking-tight group-hover:text-white transition-colors">
+        <span
+          className="text-2xl lg:text-3xl font-extrabold text-ey-light tracking-tight group-hover:text-white transition-colors"
+          title={formatType === 'compact' ? current.toLocaleString() : undefined}
+        >
           {formatVal(current)} {unit && <span className="text-sm font-normal text-ey-muted">{unit}</span>}
         </span>
 
