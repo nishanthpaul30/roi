@@ -249,7 +249,7 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     sampleInput: 'Month_Year: March_2026 through August_2026',
     workedCalculation: 'March: $302.62 | June: $182.75 | August: $277.58',
     derivedOutput: 'Monthly Cost Trend chart, Monthly Spend by AI Tool chart',
-    notes: 'Powers the ROI page monthly trend charts and the Financial Run-Rate & Volatility leadership insight',
+    notes: 'Powers the ROI page monthly trend charts',
     category: 'License & Adoption',
   },
   {
