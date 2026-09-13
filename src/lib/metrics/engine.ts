@@ -1,11 +1,22 @@
-import { loadCsvData, CsvUsageRow } from '../data/csvLoader';
+import { loadCsvData, getDatasetDateBounds, CsvUsageRow } from '../data/csvLoader';
 import { GlobalFilterState, MetricDelta, TimeSeriesPoint, MetricResult, ComparisonPeriod } from './types';
-import { format, parseISO, subDays, differenceInDays } from 'date-fns';
+import {
+  format,
+  parseISO,
+  subDays,
+  differenceInDays,
+  startOfMonth,
+  endOfMonth,
+  subMonths,
+  differenceInCalendarMonths,
+  isSameDay,
+} from 'date-fns';
 
 export function calculateDelta(
   current: number,
   previous: number,
-  isRateMetric = false
+  isRateMetric = false,
+  previousDataAvailable = true
 ): MetricDelta {
   const absoluteDelta = current - previous;
   const percentageDelta =
@@ -27,39 +38,59 @@ export function calculateDelta(
       percentagePointDelta !== undefined ? Number(percentagePointDelta.toFixed(2)) : undefined,
     trend,
     isRateMetric,
+    previousDataAvailable,
   };
 }
 
+/**
+ * The comparison window is the period immediately preceding the selected
+ * range — not a flat day/week/28-day shift, which would leave "previous"
+ * mostly overlapping "current" for any selection wider than that fixed shift
+ * (comparisonPeriod is accepted for API compatibility but no longer changes
+ * the shift amount).
+ *
+ * Every option the UI actually exposes (a single month, or "All Months") is
+ * one or more whole calendar months, so that case snaps to the same number of
+ * whole calendar months immediately before it — e.g. April compares to the
+ * full March 1-31, not a 30-day slice of it (March 2-31) that a same-day-count
+ * shift would produce since April is a day shorter than March. A genuinely
+ * custom, non-month-aligned range falls back to an equal-length day shift.
+ */
 export function getPreviousDateRange(
   startDate: string,
   endDate: string,
-  comparisonPeriod: ComparisonPeriod
+  _comparisonPeriod: ComparisonPeriod
 ): { prevStartDate: string; prevEndDate: string } {
   const start = parseISO(startDate);
   const end = parseISO(endDate);
-  const diffDays = differenceInDays(end, start) + 1;
 
-  if (comparisonPeriod === 'doD') {
+  const isWholeMonthRange = isSameDay(start, startOfMonth(start)) && isSameDay(end, endOfMonth(end));
+  if (isWholeMonthRange) {
+    const monthSpan = differenceInCalendarMonths(end, start) + 1;
     return {
-      prevStartDate: format(subDays(start, 1), 'yyyy-MM-dd'),
-      prevEndDate: format(subDays(end, 1), 'yyyy-MM-dd'),
-    };
-  } else if (comparisonPeriod === 'woW') {
-    return {
-      prevStartDate: format(subDays(start, 7), 'yyyy-MM-dd'),
-      prevEndDate: format(subDays(end, 7), 'yyyy-MM-dd'),
-    };
-  } else if (comparisonPeriod === 'moM') {
-    return {
-      prevStartDate: format(subDays(start, 28), 'yyyy-MM-dd'),
-      prevEndDate: format(subDays(end, 28), 'yyyy-MM-dd'),
-    };
-  } else {
-    return {
-      prevStartDate: format(subDays(start, diffDays), 'yyyy-MM-dd'),
-      prevEndDate: format(subDays(end, diffDays), 'yyyy-MM-dd'),
+      prevStartDate: format(startOfMonth(subMonths(start, monthSpan)), 'yyyy-MM-dd'),
+      prevEndDate: format(endOfMonth(subMonths(end, monthSpan)), 'yyyy-MM-dd'),
     };
   }
+
+  const diffDays = differenceInDays(end, start) + 1;
+  return {
+    prevStartDate: format(subDays(start, diffDays), 'yyyy-MM-dd'),
+    prevEndDate: format(subDays(end, diffDays), 'yyyy-MM-dd'),
+  };
+}
+
+/**
+ * True only if the computed previous-period window overlaps the dataset's
+ * real date coverage at all. A window that falls entirely before the
+ * earliest (or after the latest) Activity Date has no genuine prior data to
+ * compare against — as opposed to a covered period that simply has zero
+ * matching rows for the current dimension filters, which is a real "$0" result.
+ */
+export function hasPreviousPeriodData(prevStartDate: string, prevEndDate: string): boolean {
+  const bounds = getDatasetDateBounds();
+  if (!bounds) return false;
+  return !(prevEndDate < bounds.minDate || prevStartDate > bounds.maxDate);
 }
 
 /**
@@ -87,6 +118,7 @@ export async function getMetric(
 ): Promise<MetricResult> {
   const { startDate, endDate, comparisonPeriod } = filters;
   const { prevStartDate, prevEndDate } = getPreviousDateRange(startDate, endDate, comparisonPeriod);
+  const previousDataAvailable = hasPreviousPeriodData(prevStartDate, prevEndDate);
 
   const allRows = loadCsvData();
   const currentRows = filterRows(allRows, filters, startDate, endDate);
@@ -169,6 +201,23 @@ export async function getMetric(
       break;
     }
 
+    case 'AVG_MONTHLY_COST': {
+      // Group by monthId first, then average — for a single-month selection
+      // this equals the month's total spend; it only differs from Total AI
+      // Investment when the selected range spans multiple months.
+      const monthMap = new Map<number, number>();
+      currentRows.forEach(r => {
+        monthMap.set(r.monthId, (monthMap.get(r.monthId) || 0) + r.cost);
+      });
+      const monthMapPrev = new Map<number, number>();
+      previousRows.forEach(r => {
+        monthMapPrev.set(r.monthId, (monthMapPrev.get(r.monthId) || 0) + r.cost);
+      });
+      currentVal = monthMap.size > 0 ? Array.from(monthMap.values()).reduce((a, b) => a + b, 0) / monthMap.size : 0;
+      prevVal = monthMapPrev.size > 0 ? Array.from(monthMapPrev.values()).reduce((a, b) => a + b, 0) / monthMapPrev.size : 0;
+      break;
+    }
+
     default:
       currentVal = currentRows.reduce((s, r) => s + r.cost, 0);
       prevVal = previousRows.reduce((s, r) => s + r.cost, 0);
@@ -180,7 +229,7 @@ export async function getMetric(
     let val = 0;
     if (metricId === 'TOKEN_CONSUMPTION') val = r.tokenConsumption;
     else if (metricId === 'DAILY_BILLABLE_TOKENS') val = r.dailyBillableTokens;
-    else if (metricId === 'COST' || metricId === 'AVG_DAILY_COST') val = r.cost;
+    else if (metricId === 'COST' || metricId === 'AVG_DAILY_COST' || metricId === 'AVG_MONTHLY_COST') val = r.cost;
     else if (metricId === 'COST_PER_1K_TOKENS') val = r.cost; // will recalc per day below
     else if (metricId === 'BILLABLE_UTILIZATION_RATE') val = r.tokenConsumption;
     else val = r.cost;
@@ -191,7 +240,7 @@ export async function getMetric(
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, value]) => ({ date, value: Number(value.toFixed(4)) }));
 
-  const summary = calculateDelta(currentVal, prevVal, isRate);
+  const summary = calculateDelta(currentVal, prevVal, isRate, previousDataAvailable);
 
   return { metricId, metricName: metricId.replace(/_/g, ' '), summary, series };
 }

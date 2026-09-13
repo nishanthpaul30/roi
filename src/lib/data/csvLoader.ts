@@ -98,6 +98,15 @@ const COL = {
   billableFlag: 26, projectType: 27, gdsLocation: 28, costCenter: 29,
 };
 
+// parseFloat(x) || fallback silently replaces a legitimate 0 (falsy in JS)
+// with fallback — Claude/Replit/Factory AI genuinely have a $0.00 free-token
+// limit by design, so that pattern corrupted every such row's limit to a
+// nonzero default. Only fall back when the field is truly unparseable (NaN).
+function parseNumOrDefault(value: string, fallback: number): number {
+  const parsed = parseFloat(value);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
 export function parseRawCsvText(raw: string): CsvUsageRow[] {
   const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   const rows: CsvUsageRow[] = [];
@@ -108,7 +117,7 @@ export function parseRawCsvText(raw: string): CsvUsageRow[] {
     if (cols.length < 21) continue;
 
     const get = (idx: number, fallback = '') => (cols[idx] !== undefined ? cols[idx].trim() : fallback);
-    const usageFreeTokenLimit = parseFloat(get(COL.usageFreeTokenLimit)) || 80.0;
+    const usageFreeTokenLimit = parseNumOrDefault(get(COL.usageFreeTokenLimit), 80.0);
 
     rows.push({
       aiTool: get(COL.aiTool).toLowerCase(),
@@ -128,7 +137,7 @@ export function parseRawCsvText(raw: string): CsvUsageRow[] {
       region: get(COL.region),
       managementRegion: get(COL.managementRegion),
       projectCode: get(COL.projectCode),
-      licenseCost: parseFloat(get(COL.licenseCost)) || 100.0,
+      licenseCost: parseNumOrDefault(get(COL.licenseCost), 100.0),
       usageFreeTokenLimit,
       usageLimit: usageFreeTokenLimit,
       billableFlag: get(COL.billableFlag, 'True'),
@@ -199,6 +208,24 @@ export function resetCustomCsvData() {
   _isCustomActive = false;
   _customFileName = 'ai_usage_data.csv';
   _cache = null;
+}
+
+/**
+ * Earliest/latest Activity Date present anywhere in the loaded dataset (unfiltered).
+ * Used to tell a genuinely absent prior comparison period (outside the dataset
+ * entirely) apart from a real period that simply has zero matching rows for the
+ * current filter selection.
+ */
+export function getDatasetDateBounds(): { minDate: string; maxDate: string } | null {
+  const rows = loadCsvData();
+  if (rows.length === 0) return null;
+  let minDate = rows[0].activityDate;
+  let maxDate = rows[0].activityDate;
+  for (const r of rows) {
+    if (r.activityDate < minDate) minDate = r.activityDate;
+    if (r.activityDate > maxDate) maxDate = r.activityDate;
+  }
+  return { minDate, maxDate };
 }
 
 /** Get metadata about active dataset */

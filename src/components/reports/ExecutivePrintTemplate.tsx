@@ -24,7 +24,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
 
   const totalCost = metrics?.cost?.summary?.current ?? 0;
   const totalTokens = metrics?.tokenConsumption?.summary?.current ?? 0;
-  const avgDailyCost = metrics?.avgDailyCost?.summary?.current ?? 0;
+  const avgMonthlyCost = metrics?.avgMonthlyCost?.summary?.current ?? 0;
   const costPerActiveUser = metrics?.costPerActiveUser?.summary?.current ?? 0;
 
   const toolBreakdown = summary?.byAiTool ?? [];
@@ -76,11 +76,11 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
         </div>
 
         <div className="border border-slate-300 rounded-xl p-4 bg-slate-50/80 shadow-xs">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Avg Daily Cost</span>
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Avg Monthly Cost</span>
           <div className="text-2xl font-black text-slate-900 font-mono mt-1">
-            ${avgDailyCost.toFixed(2)}
+            ${avgMonthlyCost.toFixed(2)}
           </div>
-          <p className="text-[11px] text-slate-600 mt-1 font-medium">Cost per active day</p>
+          <p className="text-[11px] text-slate-600 mt-1 font-medium">Cost per active month</p>
         </div>
 
         <div className="border border-slate-300 rounded-xl p-4 bg-slate-50/80 shadow-xs">

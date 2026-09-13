@@ -35,6 +35,33 @@ export default function OrgAndRegionalPage() {
   const topRegion = regions[0];
   const topSubPractice = subServiceLines[0];
 
+  // Every KPI card below compares its current value against that same
+  // entity's own real previous-period value (e.g. this period's leading
+  // Service Line vs. what that same Service Line spent last period) rather
+  // than a fixed reference point.
+  const previousDataAvailable = summary?.previousDataAvailable ?? false;
+  const trendFor = (delta: number): 'up' | 'down' | 'neutral' =>
+    !previousDataAvailable || Math.abs(delta) < 0.0001 ? 'neutral' : delta > 0 ? 'up' : 'down';
+  const pctDeltaFor = (current: number, previous: number): number =>
+    previous === 0 ? (current > 0 ? 100 : 0) : ((current - previous) / previous) * 100;
+
+  const prevTotalCost = summary?.prevTotalCost || 0;
+  const totalCostDelta = (summary?.totalCost || 0) - prevTotalCost;
+
+  const prevTopServiceLineCost =
+    summary?.prevByServiceLine?.find((s) => s.serviceLine === topServiceLine?.serviceLine)?.cost || 0;
+  const topServiceLineDelta = (topServiceLine?.cost || 0) - prevTopServiceLineCost;
+
+  const prevTopRegionCost =
+    summary?.prevByManagementRegion?.find((r) => r.region === topRegion?.region)?.cost || 0;
+  const topRegionDelta = (topRegion?.cost || 0) - prevTopRegionCost;
+
+  const prevTopSubPracticeCost =
+    summary?.prevBySubServiceLine?.find(
+      (p) => p.serviceLine === topSubPractice?.serviceLine && p.subServiceLine === topSubPractice?.subServiceLine
+    )?.cost || 0;
+  const topSubPracticeDelta = (topSubPractice?.cost || 0) - prevTopSubPracticeCost;
+
   // Hierarchical breakdowns: Service Line -> its Sub-Service Line practices,
   // and Management Region -> its Countries, folded into one expandable table each
   // instead of two separate flat tables per relationship.
@@ -134,10 +161,11 @@ export default function OrgAndRegionalPage() {
                     title={topServiceLine ? `Top Spend: ${topServiceLine.serviceLine}` : 'Leading Service Line'}
                     delta={{
                       current: topServiceLine?.cost || 0,
-                      previous: 0,
-                      absoluteDelta: topServiceLine?.cost || 0,
-                      percentageDelta: 0,
-                      trend: 'up',
+                      previous: prevTopServiceLineCost,
+                      absoluteDelta: topServiceLineDelta,
+                      percentageDelta: Number(pctDeltaFor(topServiceLine?.cost || 0, prevTopServiceLineCost).toFixed(2)),
+                      trend: trendFor(topServiceLineDelta),
+                      previousDataAvailable,
                     }}
                     formatType="currency"
                     description={`Leading organizational expenditure (${((topServiceLine?.tokens / (summary.totalTokenConsumption || 1)) * 100).toFixed(1)}% of total). Click to drill down into raw usage logs.`}
@@ -158,10 +186,11 @@ export default function OrgAndRegionalPage() {
                     title={topRegion ? `Top Region: ${topRegion.region}` : 'Leading Region'}
                     delta={{
                       current: topRegion?.cost || 0,
-                      previous: 0,
-                      absoluteDelta: topRegion?.cost || 0,
-                      percentageDelta: 0,
-                      trend: 'up',
+                      previous: prevTopRegionCost,
+                      absoluteDelta: topRegionDelta,
+                      percentageDelta: Number(pctDeltaFor(topRegion?.cost || 0, prevTopRegionCost).toFixed(2)),
+                      trend: trendFor(topRegionDelta),
+                      previousDataAvailable,
                     }}
                     formatType="currency"
                     description={`Top management region (${((topRegion?.tokens / (summary.totalTokenConsumption || 1)) * 100).toFixed(1)}% regional share). Click to drill down into regional telemetry.`}
@@ -179,16 +208,17 @@ export default function OrgAndRegionalPage() {
                   />
 
                   <KpiCard
-                    title="Active Sub-Practices"
+                    title={topSubPractice ? `Top Service Line: ${topSubPractice.subServiceLine}` : 'Leading Practice'}
                     delta={{
-                      current: subServiceLines.length,
-                      previous: 0,
-                      absoluteDelta: subServiceLines.length,
-                      percentageDelta: 0,
-                      trend: 'neutral',
+                      current: topSubPractice?.cost || 0,
+                      previous: prevTopSubPracticeCost,
+                      absoluteDelta: topSubPracticeDelta,
+                      percentageDelta: Number(pctDeltaFor(topSubPractice?.cost || 0, prevTopSubPracticeCost).toFixed(2)),
+                      trend: trendFor(topSubPracticeDelta),
+                      previousDataAvailable,
                     }}
-                    unit="practices"
-                    description={`14 specialized practices active across 5 service lines. Top: ${topSubPractice?.subServiceLine || 'Strategy'}. Click to inspect top practice.`}
+                    formatType="currency"
+                    description={`Leading sub-practice by spend, within ${topSubPractice?.serviceLine || 'Consulting'} (${subServiceLines.length} practices active across ${serviceLines.length} service lines). Click to inspect this practice.`}
                     onClick={() =>
                       topSubPractice &&
                       openDrilldown({
@@ -206,10 +236,11 @@ export default function OrgAndRegionalPage() {
                     title="Total Org Token Spend"
                     delta={{
                       current: summary.totalCost,
-                      previous: summary.prevTotalCost || 0,
-                      absoluteDelta: summary.totalCost - (summary.prevTotalCost || 0),
-                      percentageDelta: 0,
-                      trend: 'neutral',
+                      previous: prevTotalCost,
+                      absoluteDelta: totalCostDelta,
+                      percentageDelta: Number(pctDeltaFor(summary.totalCost, prevTotalCost).toFixed(2)),
+                      trend: trendFor(totalCostDelta),
+                      previousDataAvailable,
                     }}
                     formatType="currency"
                     description="Total billed expenditure across all service lines, regions, and countries. Click to inspect entire live log stream."

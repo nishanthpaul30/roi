@@ -30,6 +30,10 @@ export interface MetricDelta {
   percentagePointDelta?: number; // populated for rate / % metrics
   trend: 'up' | 'down' | 'neutral';
   isRateMetric?: boolean;
+  // False when the computed comparison window falls entirely outside the
+  // dataset's real date coverage — a genuine absence of prior data, distinct
+  // from a covered period that simply totals to zero.
+  previousDataAvailable?: boolean;
 }
 
 export interface TimeSeriesPoint {
@@ -60,6 +64,9 @@ export interface TokenCostSummary {
   prevTotalCost: number;
   prevTotalTokenConsumption: number;
   prevTotalBillableTokens: number;
+  // False when the previous-period window falls entirely outside the
+  // dataset's real date coverage (see MetricDelta.previousDataAvailable)
+  previousDataAvailable: boolean;
   // Dimension breakdowns
   byAiTool: {
     tool: string;
@@ -82,7 +89,7 @@ export interface TokenCostSummary {
       totalTokens: number;
     }[];
   };
-  byCtNonCt: { ctNonCt: string; tokens: number; cost: number; userCount?: number; uniqueDays?: number }[];
+  byCtNonCt: { ctNonCt: string; tokens: number; cost: number; userCount?: number; uniqueDays?: number; uniqueMonths?: number }[];
   byManagementRegion: { region: string; tokens: number; cost: number; userCount?: number; countries?: string[] }[];
   byCountry: { country: string; tokens: number; cost: number; userCount?: number; region?: string; managementRegion?: string }[];
   byServiceLine: { serviceLine: string; tokens: number; cost: number; userCount?: number; subServiceLines?: string[] }[];
@@ -99,6 +106,18 @@ export interface TokenCostSummary {
   licenseRoiPercent: number;
   licenseUnderutilizedCost: number;
   licenseOverutilizedValue: number;
+  // Previous period (for delta comparisons on the Zone 1/Zone 2/License ROI KPI cards)
+  prevTotalWasteCost: number;
+  prevTotalOverageCost: number;
+  prevCeilingRiskCount: number;
+  prevLicenseRoiPercent: number;
+  // Previous-period cost by Service Line / Management Region / Sub-Service
+  // Line, and previous distinct sub-practice count — for the Service Line
+  // Analytics KPI cards
+  prevByServiceLine: { serviceLine: string; cost: number }[];
+  prevByManagementRegion: { region: string; cost: number }[];
+  prevBySubServiceLine: { serviceLine: string; subServiceLine: string; cost: number }[];
+  prevSubServiceLineCount: number;
   // Project & Billability Telemetry Insights
   billableSpend: number;
   nonBillableSpend: number;

@@ -4,7 +4,7 @@ import { X, TrendingUp, TrendingDown, Layers, Building2, Globe2, Users, Coins, Z
 import { MetricChart } from '@/components/ui/MetricChart';
 
 export interface DrilldownMetricData {
-  id: 'token_consumption' | 'total_investment' | 'avg_daily_cost' | 'cost_per_user' | 'tool_chatgpt' | 'tool_copilot' | 'tool_claude';
+  id: 'token_consumption' | 'total_investment' | 'avg_daily_cost' | 'avg_monthly_cost' | 'cost_per_user' | 'tool_chatgpt' | 'tool_copilot' | 'tool_claude';
   title: string;
   subtitle: string;
   currentValue: string;

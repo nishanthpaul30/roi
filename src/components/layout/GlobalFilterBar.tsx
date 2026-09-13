@@ -41,7 +41,6 @@ const MONTH_OPTIONS = [
   { value: '2026-07', label: 'July 2026', start: '2026-07-01', end: '2026-07-31' },
   { value: '2026-08', label: 'August 2026', start: '2026-08-01', end: '2026-08-31' },
 ];
-
 export function GlobalFilterBar({
   filters,
   onFilterChange,

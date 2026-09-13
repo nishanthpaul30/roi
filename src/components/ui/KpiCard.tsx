@@ -22,7 +22,7 @@ export function KpiCard({
 }: KpiCardProps) {
   if (!delta) return null;
 
-  const { current, previous, absoluteDelta, percentageDelta, percentagePointDelta, trend, isRateMetric } = delta;
+  const { current, previous, absoluteDelta, percentageDelta, percentagePointDelta, trend, isRateMetric, previousDataAvailable = true } = delta;
 
   const formatVal = (val: number) => {
     if (formatType === 'currency') return `$${val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -68,45 +68,51 @@ export function KpiCard({
           {formatVal(current)} {unit && <span className="text-sm font-normal text-ey-muted">{unit}</span>}
         </span>
 
-        {/* Trend Arrow Badge */}
-        <div
-          className={`flex items-center space-x-1 text-xs font-bold px-2 py-0.5 rounded-full border ${
-            isPositiveTrend
-              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-              : isNegativeTrend
-              ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-              : 'bg-ey-black text-ey-muted border-ey-border'
-          }`}
-        >
-          {isPositiveTrend ? (
-            <TrendingUp className="w-3.5 h-3.5" />
-          ) : isNegativeTrend ? (
-            <TrendingDown className="w-3.5 h-3.5" />
-          ) : (
-            <Minus className="w-3.5 h-3.5" />
-          )}
-          <span>
-            {percentagePointDelta !== undefined
-              ? `${percentagePointDelta > 0 ? '+' : ''}${percentagePointDelta} pp`
-              : `${percentageDelta > 0 ? '+' : ''}${percentageDelta}%`}
-          </span>
-        </div>
+        {/* Trend Arrow Badge — omitted entirely when there's no genuine prior
+            period to compare against, rather than showing a hollow "N/A" */}
+        {previousDataAvailable && (
+          <div
+            className={`flex items-center space-x-1 text-xs font-bold px-2 py-0.5 rounded-full border ${
+              isPositiveTrend
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                : isNegativeTrend
+                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                : 'bg-ey-black text-ey-muted border-ey-border'
+            }`}
+          >
+            {isPositiveTrend ? (
+              <TrendingUp className="w-3.5 h-3.5" />
+            ) : isNegativeTrend ? (
+              <TrendingDown className="w-3.5 h-3.5" />
+            ) : (
+              <Minus className="w-3.5 h-3.5" />
+            )}
+            <span>
+              {percentagePointDelta !== undefined
+                ? `${percentagePointDelta > 0 ? '+' : ''}${percentagePointDelta} pp`
+                : `${percentageDelta > 0 ? '+' : ''}${percentageDelta}%`}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Detailed Delta Breakdown Footer */}
-      <div className="mt-3 pt-2 border-t border-ey-border/80 flex items-center justify-between text-[11px] text-ey-muted">
-        <div>
-          Prev: <span className="font-medium text-ey-light">{formatVal(previous)}</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <span>
-            Delta:{' '}
-            <span className={`font-semibold ${absoluteDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {absoluteDelta > 0 ? `+${formatVal(absoluteDelta)}` : formatVal(absoluteDelta)}
+      {/* Detailed Delta Breakdown Footer — same: left blank rather than
+          stating "N/A" when there's no real prior period to compare against */}
+      {previousDataAvailable && (
+        <div className="mt-3 pt-2 border-t border-ey-border/80 flex items-center justify-between text-[11px] text-ey-muted">
+          <div>
+            Prev: <span className="font-medium text-ey-light">{formatVal(previous)}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span>
+              Delta:{' '}
+              <span className={`font-semibold ${absoluteDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {absoluteDelta > 0 ? `+${formatVal(absoluteDelta)}` : formatVal(absoluteDelta)}
+              </span>
             </span>
-          </span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -135,19 +135,19 @@ export default function ExecutiveOverviewPage() {
                   />
 
                   <KpiCard
-                    title="Avg Daily AI Cost"
-                    delta={data.metrics.avgDailyCost.summary}
+                    title="Avg Monthly AI Cost"
+                    delta={data.metrics.avgMonthlyCost.summary}
                     formatType="currency"
-                    description="Average cost per active day. Click to inspect daily cost run-rate and peak usage days."
+                    description="Average cost per active calendar month. Click to inspect monthly cost run-rate and peak usage days."
                     comparisonLabel="vs prev period"
                     onClick={() =>
                       openDrilldown(
-                        'avg_daily_cost',
-                        'Avg Daily AI Cost',
-                        'Daily spending volatility and active calendar day run-rate analysis',
-                        `$${(data.metrics.avgDailyCost.summary.current || 0).toFixed(2)} / day`,
-                        data.metrics.avgDailyCost.summary,
-                        data.metrics.avgDailyCost.series
+                        'avg_monthly_cost',
+                        'Avg Monthly AI Cost',
+                        'Monthly spending volatility and active calendar month run-rate analysis',
+                        `$${(data.metrics.avgMonthlyCost.summary.current || 0).toFixed(2)} / month`,
+                        data.metrics.avgMonthlyCost.summary,
+                        data.metrics.avgMonthlyCost.series
                       )
                     }
                   />

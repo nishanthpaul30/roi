@@ -46,7 +46,7 @@ const fmtTokens = (v: number) => new Intl.NumberFormat(undefined, { notation: 'c
 // each tile should match whatever that specific metric measures (a day-rate,
 // a per-user rate, a token count, or a raw spend total), not just always repeat
 // the segment's total spend regardless of which metric is being viewed.
-function ctNonCtSegmentDisplay(metricId: string, segment: { cost: number; tokens: number; userCount?: number; uniqueDays?: number }, totalCost?: number) {
+function ctNonCtSegmentDisplay(metricId: string, segment: { cost: number; tokens: number; userCount?: number; uniqueDays?: number; uniqueMonths?: number }, totalCost?: number) {
   const pct = totalCost ? ((segment.cost / totalCost) * 100).toFixed(1) : '0.0';
 
   if (metricId === 'avg_daily_cost') {
@@ -55,6 +55,14 @@ function ctNonCtSegmentDisplay(metricId: string, segment: { cost: number; tokens
     return {
       primary: `$${perDay.toFixed(2)} / day`,
       footnote: `${fmtMoney(segment.cost)} total across ${days} active day${days === 1 ? '' : 's'}`,
+    };
+  }
+  if (metricId === 'avg_monthly_cost') {
+    const months = segment.uniqueMonths || 0;
+    const perMonth = months > 0 ? segment.cost / months : 0;
+    return {
+      primary: `$${perMonth.toFixed(2)} / month`,
+      footnote: `${fmtMoney(segment.cost)} total across ${months} active month${months === 1 ? '' : 's'}`,
     };
   }
   if (metricId === 'cost_per_user') {

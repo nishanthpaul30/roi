@@ -237,7 +237,7 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
                 {/* Executive Recommendation */}
                 <div className="pt-2 border-t border-ey-border/60">
                   <div className="text-[11px] bg-ey-yellow/5 p-2 rounded-lg border border-ey-yellow/20 group-hover:border-ey-yellow/30 transition-colors">
-                    <span className="font-bold text-ey-yellow block mb-0.5 text-[10px] uppercase tracking-wider">Strategic Action:</span>
+                    <span className="font-bold text-ey-yellow block mb-0.5 text-[10px] uppercase tracking-wider">Suggestive Action:</span>
                     <span className="text-ey-light text-[10px] leading-normal line-clamp-2">{item.actionableInsight}</span>
                   </div>
                 </div>

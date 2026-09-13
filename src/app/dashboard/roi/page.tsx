@@ -28,6 +28,20 @@ export default function RoiPage() {
 
   const summary: TokenCostSummary | null = data?.tokenCostSummary ?? null;
 
+  // Each KPI card below compares the current period against the same metric's
+  // real previous-period value (not a fixed reference point), so the badge
+  // and footer both reflect a genuine "vs last period" change.
+  const previousDataAvailable = summary?.previousDataAvailable ?? false;
+  const trendFor = (delta: number): 'up' | 'down' | 'neutral' =>
+    !previousDataAvailable || Math.abs(delta) < 0.0001 ? 'neutral' : delta > 0 ? 'up' : 'down';
+  const pctDeltaFor = (current: number, previous: number): number =>
+    previous === 0 ? (current > 0 ? 100 : 0) : ((current - previous) / previous) * 100;
+
+  const licenseRoiDelta = Number(((summary?.licenseRoiPercent || 0) - (summary?.prevLicenseRoiPercent || 0)).toFixed(2));
+  const wasteDelta = Number(((summary?.totalWasteCost || 0) - (summary?.prevTotalWasteCost || 0)).toFixed(2));
+  const overageDelta = Number(((summary?.totalOverageCost || 0) - (summary?.prevTotalOverageCost || 0)).toFixed(2));
+  const ceilingRiskDelta = (summary?.ceilingRiskCount || 0) - (summary?.prevCeilingRiskCount || 0);
+
   const openDrilldown = (target: RoiDrilldownTarget) => {
     setActiveDrilldown(target);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -83,11 +97,13 @@ export default function RoiPage() {
                 title="License Investment ROI"
                 delta={{
                   current: summary.licenseRoiPercent,
-                  previous: 100,
-                  absoluteDelta: summary.licenseRoiPercent - 100,
+                  previous: summary.prevLicenseRoiPercent,
+                  absoluteDelta: licenseRoiDelta,
                   percentageDelta: 0,
-                  trend: summary.licenseRoiPercent >= 80 ? 'up' : 'down',
+                  percentagePointDelta: licenseRoiDelta,
+                  trend: trendFor(licenseRoiDelta),
                   isRateMetric: true,
+                  previousDataAvailable,
                 }}
                 unit="%"
                 description={`Total actual usage cost ÷ total per-seat License Cost in USD ($${summary.totalLicenseCost.toLocaleString()}). Click to inspect per-seat license ROI.`}
@@ -106,10 +122,11 @@ export default function RoiPage() {
                 title="Wasted AI Capacity"
                 delta={{
                   current: summary.totalWasteCost,
-                  previous: 0,
-                  absoluteDelta: summary.totalWasteCost,
-                  percentageDelta: 0,
-                  trend: 'down',
+                  previous: summary.prevTotalWasteCost,
+                  absoluteDelta: wasteDelta,
+                  percentageDelta: Number(pctDeltaFor(summary.totalWasteCost, summary.prevTotalWasteCost).toFixed(2)),
+                  trend: trendFor(wasteDelta),
+                  previousDataAvailable,
                 }}
                 formatType="currency"
                 description="Zone 1: Unconsumed dollar limit across under-utilized seats (limit - actualCost). Click to drill down to raw usage logs."
@@ -128,10 +145,11 @@ export default function RoiPage() {
                 title="Overage Spend Exposure"
                 delta={{
                   current: summary.totalOverageCost,
-                  previous: 0,
-                  absoluteDelta: summary.totalOverageCost,
-                  percentageDelta: 0,
-                  trend: 'up',
+                  previous: summary.prevTotalOverageCost,
+                  absoluteDelta: overageDelta,
+                  percentageDelta: Number(pctDeltaFor(summary.totalOverageCost, summary.prevTotalOverageCost).toFixed(2)),
+                  trend: trendFor(overageDelta),
+                  previousDataAvailable,
                 }}
                 formatType="currency"
                 description="Zone 2: Additional billed usage exceeding each tool's free limit (Copilot $20, ChatGPT $20, Cursor AI $40, Claude/Replit/Factory AI $0). Click to drill down to raw usage logs."
@@ -150,10 +168,11 @@ export default function RoiPage() {
                 title="100K Cap Risk Count"
                 delta={{
                   current: summary.ceilingRiskCount,
-                  previous: 0,
-                  absoluteDelta: summary.ceilingRiskCount,
-                  percentageDelta: 0,
-                  trend: summary.ceilingRiskCount > 0 ? 'up' : 'neutral',
+                  previous: summary.prevCeilingRiskCount,
+                  absoluteDelta: ceilingRiskDelta,
+                  percentageDelta: Number(pctDeltaFor(summary.ceilingRiskCount, summary.prevCeilingRiskCount).toFixed(2)),
+                  trend: trendFor(ceilingRiskDelta),
+                  previousDataAvailable,
                 }}
                 unit="users"
                 description="Users who have reached or exceeded 90% of the 100,000 token ceiling. Click to inspect power users."
