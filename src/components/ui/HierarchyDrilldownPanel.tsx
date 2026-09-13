@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CsvUsageRow } from '@/lib/data/csvLoader';
 import { ChevronRight, RotateCcw, ArrowUpRight, GitBranch } from 'lucide-react';
 
@@ -31,7 +31,7 @@ const LEVELS: Level[] = [
   { id: 'engagementCompetency', fields: [{ key: 'engagementCompetency', label: 'Engagement Competency' }] },
 ];
 
-interface PathEntry {
+export interface PathEntry {
   levelId: string;
   field: keyof CsvUsageRow;
   fieldLabel: string;
@@ -62,6 +62,17 @@ interface HierarchyDrilldownPanelProps {
   onSelectUser: (email: string, displayName: string) => void;
   title?: string;
   subtitle?: string;
+  /**
+   * Pre-seed the path when a level has already been chosen outside this panel
+   * (e.g. a "CT" / "Non-CT" card the caller already filtered `rows` by) — the
+   * navigator starts one level past this instead of re-asking a question with
+   * only one possible answer.
+   */
+  initialPath?: PathEntry[];
+  /** Notified with the full current path every time it changes, so a caller
+   * that shows other context (e.g. a trend chart) alongside this panel can
+   * re-scope itself to match how deep the user has drilled. */
+  onPathChange?: (path: PathEntry[]) => void;
 }
 
 /**
@@ -70,8 +81,14 @@ interface HierarchyDrilldownPanelProps {
  * any individual user is ever named. Used by every Executive Overview
  * inference drilldown so user-level detail only ever appears at the last level.
  */
-export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle }: HierarchyDrilldownPanelProps) {
-  const [path, setPath] = useState<PathEntry[]>([]);
+export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, initialPath, onPathChange }: HierarchyDrilldownPanelProps) {
+  const basePath = useMemo(() => initialPath || [], [initialPath]);
+  const [path, setPath] = useState<PathEntry[]>(basePath);
+
+  useEffect(() => {
+    onPathChange?.(path);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path]);
 
   const pathRows = useMemo(
     () => rows.filter((r) => path.every((p) => String(r[p.field] || '').trim() === p.value)),
@@ -84,7 +101,13 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle }:
   const selectValue = (levelId: string, field: keyof CsvUsageRow, fieldLabel: string, value: string) => {
     setPath((prev) => [...prev, { levelId, field, fieldLabel, value }]);
   };
-  const jumpTo = (index: number) => setPath((prev) => prev.slice(0, index + 1));
+  const jumpTo = (index: number) => {
+    if (index < 0) {
+      setPath(basePath);
+      return;
+    }
+    setPath((prev) => prev.slice(0, index + 1));
+  };
 
   const userRows = useMemo(() => {
     if (!isComplete) return [];
@@ -113,7 +136,7 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle }:
             {subtitle || 'Drill down step by step through the org structure — individual user identity is only revealed at the final level.'}
           </p>
         </div>
-        {path.length > 0 && (
+        {path.length > basePath.length && (
           <button
             onClick={() => jumpTo(-1)}
             className="flex items-center gap-1.5 text-[10px] font-semibold text-ey-muted hover:text-ey-yellow bg-ey-black border border-ey-border px-2.5 py-1.5 rounded-lg transition shrink-0"
@@ -129,7 +152,7 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle }:
         <button
           onClick={() => jumpTo(-1)}
           className={`px-2 py-1 rounded-md font-semibold transition ${
-            path.length === 0 ? 'bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/40' : 'text-ey-muted hover:text-ey-light'
+            path.length === basePath.length ? 'bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/40' : 'text-ey-muted hover:text-ey-light'
           }`}
         >
           All

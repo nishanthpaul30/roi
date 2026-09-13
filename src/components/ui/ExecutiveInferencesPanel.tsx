@@ -3,9 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  TrendingUp,
-  TrendingDown,
-  Building2,
   Users,
   UserCheck,
   ChevronDown,
@@ -14,7 +11,6 @@ import {
   Layers,
   ArrowUpRight,
   ShieldAlert,
-  BarChart3,
   Wallet,
   Gauge,
 } from 'lucide-react';
@@ -45,36 +41,6 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
   const avgLicenseCostPerSeat = activeUserCount > 0 ? summary.totalLicenseCost / activeUserCount : 0;
   const inactiveLeakageCost = Math.round(inactiveUserCount * avgLicenseCostPerSeat);
 
-  // 2. Financial Run-Rate & Volatility — derived from the monthly trend
-  const months = summary.monthlyTrend || [];
-  let volatility: { stat: string; statSub: string; finding: string; actionableInsight: string };
-  if (months.length >= 2) {
-    const momChanges = months.slice(1).map((m, i) => {
-      const prev = months[i];
-      const pct = prev.cost > 0 ? ((m.cost - prev.cost) / prev.cost) * 100 : 0;
-      return { label: m.monthLabel, pct };
-    });
-    const last = months[months.length - 1];
-    const lastChange = momChanges[momChanges.length - 1];
-    const peak = months.reduce((a, b) => (b.cost > a.cost ? b : a));
-    const trough = months.reduce((a, b) => (b.cost < a.cost ? b : a));
-    const maxSwing = Math.max(...momChanges.map((c) => c.pct));
-    const minSwing = Math.min(...momChanges.map((c) => c.pct));
-    volatility = {
-      stat: `${lastChange.pct >= 0 ? '+' : ''}${lastChange.pct.toFixed(1)}% MoM ${lastChange.pct >= 0 ? 'Surge' : 'Drop'}`,
-      statSub: `${last.monthLabel} at ${fmtCost(last.cost)}`,
-      finding: `Spend moved from ${fmtCost(trough.cost)} in ${trough.monthLabel} to ${fmtCost(peak.cost)} in ${peak.monthLabel}, with month-over-month swings ranging ${minSwing.toFixed(1)}% to +${maxSwing.toFixed(1)}% across the ${months.length} months in the selected range.`,
-      actionableInsight: 'Re-forecast mid-cycle budgets and establish monthly automated budget thresholds to smooth run-rate volatility.',
-    };
-  } else {
-    volatility = {
-      stat: months.length === 1 ? fmtCost(months[0].cost) : fmtCost(0),
-      statSub: 'Single month in range — no MoM trend available',
-      finding: 'The selected date range spans fewer than two calendar months, so month-over-month volatility cannot be computed. Widen the date filter to see a trend.',
-      actionableInsight: 'Expand the date range filter to compare spend across multiple months.',
-    };
-  }
-
   // 3. Pareto Cost Concentration — top 10%/20% of active users by actual spend
   const usersSorted = [...summary.userCapacityBreakdown].sort((a, b) => b.actualCost - a.actualCost);
   const top10Count = Math.max(1, Math.round(usersSorted.length * 0.1));
@@ -83,16 +49,6 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
   const top20Spend = usersSorted.slice(0, top20Count).reduce((s, u) => s + u.actualCost, 0);
   const top10Percent = totalCost > 0 ? (top10Spend / totalCost) * 100 : 0;
   const top20Percent = totalCost > 0 ? (top20Spend / totalCost) * 100 : 0;
-
-  // 4. Geographic Asymmetry (region + country only — service line has its own dedicated card below)
-  const regionsSorted = [...summary.byManagementRegion].sort((a, b) => b.cost - a.cost);
-  const topRegion = regionsSorted[0];
-  const bottomRegion = regionsSorted[regionsSorted.length - 1];
-  const topRegionPercent = topRegion && totalCost > 0 ? (topRegion.cost / totalCost) * 100 : 0;
-  const regionMultiple = topRegion && bottomRegion && bottomRegion.cost > 0 ? topRegion.cost / bottomRegion.cost : 0;
-  const countriesSorted = [...summary.byCountry].sort((a, b) => b.cost - a.cost);
-  const topCountry = countriesSorted[0];
-  const topCountryPercent = topCountry && totalCost > 0 ? (topCountry.cost / totalCost) * 100 : 0;
 
   // 4b. License Investment ROI Governance
   const licenseUnderutilizedCost = summary.licenseUnderutilizedCost || 0;
@@ -103,18 +59,6 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
 
   // 5. Client Billability (real Billable/Non-Billable CSV flag)
   const nonBillablePercent = 100 - (summary.billableSpendPercent || 0);
-
-  // 6. Service Line Usage & Cost Efficiency Comparison
-  const slWithMetrics = summary.byServiceLine.map((sl) => ({
-    ...sl,
-    perUser: sl.userCount ? sl.cost / sl.userCount : 0,
-    unitCostPer1k: sl.tokens > 0 ? sl.cost / (sl.tokens / 1000) : 0,
-  }));
-  const topByCost = [...slWithMetrics].sort((a, b) => b.cost - a.cost)[0];
-  const highestIntensity = [...slWithMetrics].sort((a, b) => b.perUser - a.perUser)[0];
-  const lowestUnitCost = [...slWithMetrics].filter((x) => x.unitCostPer1k > 0).sort((a, b) => a.unitCostPer1k - b.unitCostPer1k)[0];
-  const highestUnitCost = [...slWithMetrics].sort((a, b) => b.unitCostPer1k - a.unitCostPer1k)[0];
-  const topByCostPercent = topByCost && totalCost > 0 ? (topByCost.cost / totalCost) * 100 : 0;
 
   // 8. Habitual User Retention & Health (real per-user active-day cohorts)
   const cohorts = summary.userEngagementCohorts;
@@ -137,42 +81,6 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
         inactiveUserCount > 0
           ? 'Automate a 30-day inactivity license reclamation workflow: reallocate dormant seats to waitlisted teams or convert low-activity seats to consumption-only API keys.'
           : 'Maintain active monitoring and expand license seat capacity proactively as new engineering cohorts onboard.',
-    },
-    {
-      id: 'financial_volatility',
-      title: 'Financial Run-Rate & Volatility Alert',
-      tag: 'Financial Governance',
-      tagColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-      icon: volatility.stat.startsWith('-') ? TrendingDown : TrendingUp,
-      stat: volatility.stat,
-      statSub: volatility.statSub,
-      finding: volatility.finding,
-      actionableInsight: volatility.actionableInsight,
-    },
-    {
-      id: 'pareto_risk',
-      title: 'Pareto Cost Concentration (80/20 Risk)',
-      tag: 'Cost Risk Exposure',
-      tagColor: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-      icon: ShieldAlert,
-      stat: `${fmtPct(top20Percent)} Spend in Top 20%`,
-      statSub: `${top20Count} power users drive majority cost`,
-      finding: `Spend concentration: the top 10% of active users (${top10Count} people) account for ${fmtPct(top10Percent)} of total spend, and the top 20% (${top20Count} people) account for ${fmtPct(top20Percent)} of all expenditure (${fmtCost(top20Spend)}).`,
-      actionableInsight: `Avoid broad, org-wide cuts. Conduct targeted usage reviews for the top ${top20Count} power users and negotiate tier-based volume plans.`,
-    },
-    {
-      id: 'geo_asymmetry',
-      title: 'Geographic Spend Asymmetry',
-      tag: 'Organizational Skew',
-      tagColor: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-      icon: Building2,
-      stat: topRegion ? `${fmtPct(topRegionPercent)} Spend in ${topRegion.region}` : 'No regional data',
-      statSub: topCountry ? `${topCountry.country} alone drives ${fmtPct(topCountryPercent)} of total spend` : '-',
-      finding:
-        topRegion && bottomRegion
-          ? `${topRegion.region} accounts for ${fmtCost(topRegion.cost)} (${fmtPct(topRegionPercent)} of spend)${regionMultiple >= 1.5 ? ` — ${regionMultiple.toFixed(1)}x ${bottomRegion.region} (${fmtCost(bottomRegion.cost)})` : ''}.${topCountry ? ` ${topCountry.country} alone drives ${fmtPct(topCountryPercent)} of total company spend.` : ''}`
-          : 'Not enough regional data in the selected filters to compute asymmetry.',
-      actionableInsight: 'Rebalance regional AI budget allocations and validate whether the leading region/country reflects genuine client delivery intensity or unmanaged growth.',
     },
     {
       id: 'license_roi_governance',
@@ -210,20 +118,6 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
       actionableInsight: 'Audit the largest non-billable cost centers to ensure internal AI investment yields reusable intellectual property or client delivery templates.',
     },
     {
-      id: 'service_line_comparison',
-      title: 'Service Line Usage & Cost Efficiency Comparison',
-      tag: 'Practice Cost Benchmarking',
-      tagColor: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-      icon: BarChart3,
-      stat: topByCost ? `${topByCost.serviceLine} ${fmtPct(topByCostPercent)} Spend` : 'No service line data',
-      statSub: highestIntensity ? `${highestIntensity.serviceLine} highest at ${fmtCost(highestIntensity.perUser)}/user` : '-',
-      finding:
-        topByCost && lowestUnitCost && highestUnitCost
-          ? `Consumption diverges across service lines: ${topByCost.serviceLine} leads in overall spend at ${fmtCost(topByCost.cost)} (${fmtPct(topByCostPercent)}). ${highestIntensity.serviceLine} shows the highest per-user intensity at ${fmtCost(highestIntensity.perUser)}/user. Unit cost ranges from ${fmtCost(lowestUnitCost.unitCostPer1k)}/1K tokens (${lowestUnitCost.serviceLine}, most efficient) to ${fmtCost(highestUnitCost.unitCostPer1k)}/1K tokens (${highestUnitCost.serviceLine}).`
-          : 'Not enough service line data in the selected filters to compare.',
-      actionableInsight: `Cross-pollinate ${lowestUnitCost?.serviceLine || 'the most efficient practice'}'s prompt patterns to higher-unit-cost service lines to curb spend.`,
-    },
-    {
       id: 'habitual_retention',
       title: 'Habitual User Retention & Health',
       tag: 'Adoption Health',
@@ -238,6 +132,17 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
         cohorts && cohorts.dropoutPercent > 20
           ? 'Investigate the Trial-only cohort for onboarding friction before expanding license seats further.'
           : 'AI tools show healthy habitual usage. Focus shift from basic onboarding to advanced competency training.',
+    },
+    {
+      id: 'pareto_risk',
+      title: 'Pareto Cost Concentration (80/20 Risk)',
+      tag: 'Cost Risk Exposure',
+      tagColor: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+      icon: ShieldAlert,
+      stat: `${fmtPct(top20Percent)} Spend in Top 20%`,
+      statSub: `${top20Count} power users drive majority cost`,
+      finding: `Spend concentration: the top 10% of active users (${top10Count} people) account for ${fmtPct(top10Percent)} of total spend, and the top 20% (${top20Count} people) account for ${fmtPct(top20Percent)} of all expenditure (${fmtCost(top20Spend)}).`,
+      actionableInsight: `Avoid broad, org-wide cuts. Conduct targeted usage reviews for the top ${top20Count} power users and negotiate tier-based volume plans.`,
     },
   ];
 

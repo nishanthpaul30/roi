@@ -78,7 +78,7 @@ export default function RoiPage() {
         ) : (
           <>
             {/* Financial ROI Governance KPI Cards with Drilldown Handlers */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <KpiCard
                 title="License Investment ROI"
                 delta={{
@@ -142,29 +142,6 @@ export default function RoiPage() {
                     title: 'Zone 2: Overage Spend Exposure',
                     subtitle: 'Excess usage and fees billed beyond each tool\'s free allocation.',
                     badge: 'Zone 2 Overage',
-                  })
-                }
-              />
-
-              <KpiCard
-                title="Org Quota Efficiency"
-                delta={{
-                  current: summary.licenseEfficiencyRate,
-                  previous: 100,
-                  absoluteDelta: summary.licenseEfficiencyRate - 100,
-                  percentageDelta: 0,
-                  trend: summary.licenseEfficiencyRate >= 80 ? 'up' : 'down',
-                  isRateMetric: true,
-                }}
-                unit="%"
-                description="Total actual cost ÷ total allocated usage limit across active seats. Click to inspect all active rosters."
-                onClick={() =>
-                  openDrilldown({
-                    type: 'metric',
-                    id: 'efficiency',
-                    title: 'Org Quota Efficiency Analysis',
-                    subtitle: 'Actual telemetry spend vs total allocated limits across all active and inactive seats.',
-                    badge: 'Quota Efficiency',
                   })
                 }
               />

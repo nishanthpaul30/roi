@@ -139,6 +139,19 @@ export async function calculateTokenCostSummary(
     multiToolUserList: multiToolUserList.sort((a, b) => b.totalCost - a.totalCost),
   };
 
+  // By CT / Non-CT breakdown — the hierarchy's own top-level split (Client-Tagged
+  // vs Non-Client-Tagged engagements).
+  const byCtNonCtMap = groupBy(usageRows, r => r.ctNonCt || 'Unclassified');
+  const byCtNonCt = Array.from(byCtNonCtMap.entries())
+    .map(([ctNonCt, rows]) => ({
+      ctNonCt,
+      tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
+      cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
+      userCount: new Set(rows.map(r => r.userMail.toLowerCase())).size,
+      uniqueDays: new Set(rows.map(r => r.activityDate)).size,
+    }))
+    .sort((a, b) => b.cost - a.cost);
+
   // By Management Region breakdown
   const byRegionMap = groupBy(usageRows, r => r.managementRegion);
   const byManagementRegion = Array.from(byRegionMap.entries())
@@ -394,6 +407,7 @@ export async function calculateTokenCostSummary(
     prevTotalBillableTokens: Math.round(prevTotalBillableTokens),
     byAiTool,
     multiToolOverlap,
+    byCtNonCt,
     byManagementRegion,
     byCountry,
     byServiceLine,

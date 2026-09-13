@@ -125,13 +125,19 @@ export async function getMetric(
     }
 
     case 'COST_PER_ACTIVE_USER': {
+      // "Active" means the user recorded at least 1 token of usage — a licensed
+      // seat with 0 tokens/$0 cost (see roi.ts's usageRows) must not inflate the
+      // denominator here, or this "per active user" figure silently becomes a
+      // per-seat figure instead.
       isRate = true;
-      const cCost = currentRows.reduce((s, r) => s + r.cost, 0);
-      const cUsers = new Set(currentRows.map(r => r.userMail)).size || 1;
+      const cActiveRows = currentRows.filter(r => r.tokenConsumption > 0);
+      const cCost = cActiveRows.reduce((s, r) => s + r.cost, 0);
+      const cUsers = new Set(cActiveRows.map(r => r.userMail)).size || 1;
       currentVal = cCost / cUsers;
 
-      const pCost = previousRows.reduce((s, r) => s + r.cost, 0);
-      const pUsers = new Set(previousRows.map(r => r.userMail)).size || 1;
+      const pActiveRows = previousRows.filter(r => r.tokenConsumption > 0);
+      const pCost = pActiveRows.reduce((s, r) => s + r.cost, 0);
+      const pUsers = new Set(pActiveRows.map(r => r.userMail)).size || 1;
       prevVal = pCost / pUsers;
       break;
     }

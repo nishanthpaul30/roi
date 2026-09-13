@@ -82,6 +82,7 @@ export interface TokenCostSummary {
       totalTokens: number;
     }[];
   };
+  byCtNonCt: { ctNonCt: string; tokens: number; cost: number; userCount?: number; uniqueDays?: number }[];
   byManagementRegion: { region: string; tokens: number; cost: number; userCount?: number; countries?: string[] }[];
   byCountry: { country: string; tokens: number; cost: number; userCount?: number; region?: string; managementRegion?: string }[];
   byServiceLine: { serviceLine: string; tokens: number; cost: number; userCount?: number; subServiceLines?: string[] }[];

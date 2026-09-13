@@ -43,6 +43,11 @@ const TOOL_LABELS: Record<string, string> = {
   cursor: 'Cursor AI',
 };
 
+function formatSubEntityType(type: string): string {
+  if (type === 'ct_non_ct') return 'CT / Non-CT';
+  return type.replace(/_/g, ' ');
+}
+
 export interface RoiDrilldownTarget {
   type:
     | 'metric'
@@ -86,7 +91,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
 
   // Selected sub-entity within the drilldown (e.g. drilling down from "Wasted AI Capacity" or a Service Line into a specific sub-practice or employee)
   const [selectedSubEntity, setSelectedSubEntity] = useState<{
-    type: 'user' | 'project' | 'tool' | 'service_line' | 'sub_service_line' | 'country' | 'region';
+    type: 'user' | 'project' | 'tool' | 'service_line' | 'sub_service_line' | 'country' | 'region' | 'ct_non_ct';
     id: string;
     name: string;
   } | null>(null);
@@ -150,6 +155,12 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
   // Filter raw rows based on primary drilldown target and any active sub-entity selection
   const targetRows = useMemo(() => {
     return allRows.filter((r) => {
+      // A licensed-but-unused seat (0 tokens/$0 cost) isn't real usage telemetry —
+      // exclude it everywhere here so it can't silently inflate "Unique Active
+      // Users"/"Projects Involved" on drilldowns (billability, tool, service line,
+      // etc.) that don't already gate through userCapacityMap (which is active-only).
+      if (r.tokenConsumption <= 0) return false;
+
       const email = (r.userMail || '').toLowerCase().trim();
       const project = (r.projectCode || '').trim();
       const tool = (r.aiTool || '').toLowerCase().trim();
@@ -180,6 +191,9 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
             (r.managementRegion || '').toLowerCase() === selectedSubEntity.id.toLowerCase() ||
             (r.region || '').toLowerCase() === selectedSubEntity.id.toLowerCase()
           );
+        }
+        if (selectedSubEntity.type === 'ct_non_ct') {
+          return (r.ctNonCt || '').toLowerCase() === selectedSubEntity.id.toLowerCase();
         }
       }
 
@@ -234,7 +248,9 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
           return cap ? cap.ceilingPercent >= 90 : false;
         }
         if (id === 'efficiency') {
-          return true; // shows entire active roster with efficiency telemetry
+          // Licensed-but-unused (0-token) seats aren't part of "active roster"
+          // telemetry — userCapacityMap only contains genuinely active users.
+          return userCapacityMap.has(email);
         }
       }
 
@@ -318,6 +334,116 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
     () => new Set(targetRows.map((r) => (r.userMail || '').toLowerCase())).size,
     [targetRows]
   );
+
+  // Total License Cost for this slice — summed once per distinct (user, tool) pair,
+  // same rule as everywhere else License Cost is aggregated. Used by the header pill
+  // when viewing the License Investment ROI drilldown specifically.
+  const sliceLicenseCost = useMemo(() => {
+    const userTools = new Map<string, Map<string, number>>();
+    for (const r of targetRows) {
+      const email = (r.userMail || '').toLowerCase();
+      if (!email || !r.aiTool) continue;
+      if (!userTools.has(email)) userTools.set(email, new Map());
+      userTools.get(email)!.set(r.aiTool, r.licenseCost || 0);
+    }
+    let total = 0;
+    for (const toolMap of userTools.values()) {
+      for (const cost of toolMap.values()) total += cost;
+    }
+    return total;
+  }, [targetRows]);
+  const sliceLicenseRoiPercent = sliceLicenseCost > 0 ? (totalSliceCost / sliceLicenseCost) * 100 : 0;
+
+  // Total Zone 1 waste / Zone 2 overage for this slice — summed once per distinct
+  // user (wasteCost/overageCost live on userCapacityMap per user, not per row).
+  // Used by the header pill on the Wasted Capacity / Overage drilldowns.
+  const sliceWasteAndOverage = useMemo(() => {
+    const seen = new Set<string>();
+    let wasteCost = 0;
+    let overageCost = 0;
+    for (const r of targetRows) {
+      const email = (r.userMail || '').toLowerCase();
+      if (!email || seen.has(email)) continue;
+      seen.add(email);
+      const cap = userCapacityMap.get(email);
+      if (cap) {
+        wasteCost += cap.wasteCost;
+        overageCost += cap.overageCost;
+      }
+    }
+    return { wasteCost, overageCost, userCount: seen.size };
+  }, [targetRows, userCapacityMap]);
+
+  // CT / Non-CT segregation of the current slice — only meaningful before a sub-entity
+  // (including a CT/Non-CT choice itself) has narrowed targetRows further.
+  const ctNonCtBreakdown = useMemo(() => {
+    if (selectedSubEntity) return [];
+    const map = new Map<string, {
+      ctNonCt: string;
+      cost: number;
+      tokens: number;
+      billableCost: number;
+      rowCount: number;
+      users: Set<string>;
+      projects: Set<string>;
+      // email -> tool -> that tool's flat License Cost in USD, so it's summed once
+      // per distinct tool a user has (not once per row) when computing License ROI.
+      userTools: Map<string, Map<string, number>>;
+    }>();
+    for (const r of targetRows) {
+      const key = r.ctNonCt || 'Unclassified';
+      if (!map.has(key)) {
+        map.set(key, { ctNonCt: key, cost: 0, tokens: 0, billableCost: 0, rowCount: 0, users: new Set(), projects: new Set(), userTools: new Map() });
+      }
+      const bucket = map.get(key)!;
+      bucket.cost += r.cost;
+      bucket.tokens += r.tokenConsumption;
+      bucket.rowCount += 1;
+      if (r.billableFlag === 'True' || r.billableFlag === 'true') bucket.billableCost += r.cost;
+      const email = (r.userMail || '').toLowerCase();
+      if (email) bucket.users.add(email);
+      if (r.projectCode) bucket.projects.add(r.projectCode);
+      if (email && r.aiTool) {
+        if (!bucket.userTools.has(email)) bucket.userTools.set(email, new Map());
+        bucket.userTools.get(email)!.set(r.aiTool, r.licenseCost || 0);
+      }
+    }
+    return Array.from(map.values())
+      .map((b) => {
+        let licenseCost = 0;
+        for (const toolMap of b.userTools.values()) {
+          for (const cost of toolMap.values()) licenseCost += cost;
+        }
+        // wasteCost/overageCost live on userCapacityMap per user (not per row), so
+        // sum each distinct user in this segment once.
+        let wasteCost = 0;
+        let overageCost = 0;
+        for (const email of b.users) {
+          const cap = userCapacityMap.get(email);
+          if (cap) {
+            wasteCost += cap.wasteCost;
+            overageCost += cap.overageCost;
+          }
+        }
+        return {
+          ctNonCt: b.ctNonCt,
+          cost: b.cost,
+          tokens: b.tokens,
+          billableCost: b.billableCost,
+          avgRecordCost: b.rowCount > 0 ? b.cost / b.rowCount : 0,
+          userCount: b.users.size,
+          projectCount: b.projects.size,
+          licenseCost,
+          roiPercent: licenseCost > 0 ? (b.cost / licenseCost) * 100 : 0,
+          wasteCost,
+          overageCost,
+        };
+      })
+      .sort((a, b) => b.cost - a.cost);
+  }, [targetRows, selectedSubEntity, userCapacityMap]);
+
+  const ctSeg = ctNonCtBreakdown.find((c) => c.ctNonCt === 'CT');
+  const nonCtSeg = ctNonCtBreakdown.find((c) => c.ctNonCt === 'Non-CT');
 
 
   // Associated project codes breakdown
@@ -503,7 +629,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
               <span className="text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded flex items-center gap-1">
                 <span>{selectedSubEntity.name}</span>
                 <span className="text-[10px] text-emerald-300/80 font-normal">
-                  ({selectedSubEntity.type})
+                  ({formatSubEntityType(selectedSubEntity.type)})
                 </span>
               </span>
             </>
@@ -523,7 +649,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
               </span>
               {selectedSubEntity && (
                 <span className="px-2 py-0.5 text-[11px] font-mono font-bold rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
-                  Filtered by {selectedSubEntity.type}: {selectedSubEntity.name}
+                  Filtered by {formatSubEntityType(selectedSubEntity.type)}: {selectedSubEntity.name}
                 </span>
               )}
             </div>
@@ -539,20 +665,65 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
 
           {/* Quick Metrics Header Pill */}
           <div className="flex items-center space-x-4 bg-ey-black/70 border border-ey-border rounded-xl p-3 text-xs font-mono shrink-0">
-            <div>
-              <span className="text-[10px] text-ey-muted block">AGGREGATE COST</span>
-              <span className="text-base font-bold text-ey-yellow">${totalSliceCost.toFixed(2)}</span>
-            </div>
-            <div className="w-px h-8 bg-ey-border" />
-            <div>
-              <span className="text-[10px] text-ey-muted block">TOTAL TOKENS</span>
-              <span className="text-base font-bold text-ey-light">{totalSliceTokens.toLocaleString()}</span>
-            </div>
-            <div className="w-px h-8 bg-ey-border" />
-            <div>
-              <span className="text-[10px] text-ey-muted block">RAW LOG ROWS</span>
-              <span className="text-base font-bold text-emerald-400">{targetRows.length} entries</span>
-            </div>
+            {id === 'efficiency' ? (
+              <>
+                <div>
+                  <span className="text-[10px] text-ey-muted block">TOTAL LICENSE COST</span>
+                  <span className="text-base font-bold text-ey-yellow">
+                    ${sliceLicenseCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="w-px h-8 bg-ey-border" />
+                <div>
+                  <span className="text-[10px] text-ey-muted block">LICENSE ROI</span>
+                  <span className="text-base font-bold text-emerald-400">{sliceLicenseRoiPercent.toFixed(1)}%</span>
+                </div>
+              </>
+            ) : id === 'waste' || id === 'zone1_under' ? (
+              <>
+                <div>
+                  <span className="text-[10px] text-ey-muted block">TOTAL WASTED CAPACITY</span>
+                  <span className="text-base font-bold text-amber-400">
+                    ${sliceWasteAndOverage.wasteCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="w-px h-8 bg-ey-border" />
+                <div>
+                  <span className="text-[10px] text-ey-muted block">AVG WASTE / USER</span>
+                  <span className="text-base font-bold text-ey-light">
+                    ${sliceWasteAndOverage.userCount > 0 ? (sliceWasteAndOverage.wasteCost / sliceWasteAndOverage.userCount).toFixed(2) : '0.00'}
+                  </span>
+                </div>
+              </>
+            ) : id === 'overage' || id === 'zone2_over' ? (
+              <>
+                <div>
+                  <span className="text-[10px] text-ey-muted block">TOTAL OVERAGE</span>
+                  <span className="text-base font-bold text-purple-400">
+                    ${sliceWasteAndOverage.overageCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="w-px h-8 bg-ey-border" />
+                <div>
+                  <span className="text-[10px] text-ey-muted block">AVG OVERAGE / USER</span>
+                  <span className="text-base font-bold text-ey-light">
+                    ${sliceWasteAndOverage.userCount > 0 ? (sliceWasteAndOverage.overageCost / sliceWasteAndOverage.userCount).toFixed(2) : '0.00'}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <span className="text-[10px] text-ey-muted block">AGGREGATE COST</span>
+                  <span className="text-base font-bold text-ey-yellow">${totalSliceCost.toFixed(2)}</span>
+                </div>
+                <div className="w-px h-8 bg-ey-border" />
+                <div>
+                  <span className="text-[10px] text-ey-muted block">TOTAL TOKENS</span>
+                  <span className="text-base font-bold text-ey-light">{totalSliceTokens.toLocaleString()}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -561,6 +732,12 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
           <div className="p-3 bg-ey-black/40 border border-ey-border rounded-xl space-y-0.5">
             <span className="text-[10px] text-ey-muted">UNIQUE ACTIVE USERS</span>
             <p className="text-base font-bold text-ey-light">{uniqueUsers} employees</p>
+            {!selectedSubEntity && (ctSeg || nonCtSeg) && (
+              <p className="text-[10px] text-ey-muted">
+                <span className="text-cyan-300 font-semibold">CT</span> {ctSeg?.userCount ?? 0} ·{' '}
+                <span className="text-cyan-400/70 font-semibold">Non-CT</span> {nonCtSeg?.userCount ?? 0}
+              </p>
+            )}
           </div>
 
           <div className="p-3 bg-ey-black/40 border border-ey-border rounded-xl space-y-0.5">
@@ -571,11 +748,23 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                 ({targetRows.length > 0 ? ((billableSliceRows / targetRows.length) * 100).toFixed(1) : 0}%)
               </span>
             </p>
+            {!selectedSubEntity && (ctSeg || nonCtSeg) && (
+              <p className="text-[10px] text-ey-muted">
+                <span className="text-cyan-300 font-semibold">CT</span> ${(ctSeg?.billableCost ?? 0).toFixed(2)} ·{' '}
+                <span className="text-cyan-400/70 font-semibold">Non-CT</span> ${(nonCtSeg?.billableCost ?? 0).toFixed(2)}
+              </p>
+            )}
           </div>
 
           <div className="p-3 bg-ey-black/40 border border-ey-border rounded-xl space-y-0.5">
             <span className="text-[10px] text-ey-muted">PROJECTS INVOLVED</span>
             <p className="text-base font-bold text-blue-400">{associatedProjects.length} projects</p>
+            {!selectedSubEntity && (ctSeg || nonCtSeg) && (
+              <p className="text-[10px] text-ey-muted">
+                <span className="text-cyan-300 font-semibold">CT</span> {ctSeg?.projectCount ?? 0} ·{' '}
+                <span className="text-cyan-400/70 font-semibold">Non-CT</span> {nonCtSeg?.projectCount ?? 0}
+              </p>
+            )}
           </div>
 
           <div className="p-3 bg-ey-black/40 border border-ey-border rounded-xl space-y-0.5">
@@ -583,8 +772,117 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
             <p className="text-base font-bold text-ey-yellow">
               ${targetRows.length > 0 ? (totalSliceCost / targetRows.length).toFixed(4) : '0.0000'}
             </p>
+            {!selectedSubEntity && (ctSeg || nonCtSeg) && (
+              <p className="text-[10px] text-ey-muted">
+                <span className="text-cyan-300 font-semibold">CT</span> ${(ctSeg?.avgRecordCost ?? 0).toFixed(4)} ·{' '}
+                <span className="text-cyan-400/70 font-semibold">Non-CT</span> ${(nonCtSeg?.avgRecordCost ?? 0).toFixed(4)}
+              </p>
+            )}
           </div>
         </div>
+
+        {/* CT / Non-CT Segregation of this slice — prominent, clickable drill-down tiles */}
+        {!selectedSubEntity && ctNonCtBreakdown.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {ctNonCtBreakdown.map((c) => {
+              // 100K Cap Risk telemetry is fundamentally a headcount story (how many
+              // users are near the ceiling), so lead with user count there instead of
+              // spend; License Investment ROI leads with each segment's own ROI %;
+              // Zone 1/2 lead with the actual waste/overage $ amount (not raw spend,
+              // which is a different number); every other drilldown is a plain
+              // cost story, so spend leads.
+              const isUserCentric = id === 'ceiling';
+              const isRoiCentric = id === 'efficiency';
+              const isWasteCentric = id === 'waste' || id === 'zone1_under';
+              const isOverageCentric = id === 'overage' || id === 'zone2_over';
+              const pct = totalSliceCost > 0 ? ((c.cost / totalSliceCost) * 100).toFixed(1) : '0.0';
+              const userPct = uniqueUsers > 0 ? ((c.userCount / uniqueUsers) * 100).toFixed(1) : '0.0';
+              const wastePct = sliceWasteAndOverage.wasteCost > 0 ? ((c.wasteCost / sliceWasteAndOverage.wasteCost) * 100).toFixed(1) : '0.0';
+              const overagePct = sliceWasteAndOverage.overageCost > 0 ? ((c.overageCost / sliceWasteAndOverage.overageCost) * 100).toFixed(1) : '0.0';
+              return (
+                <button
+                  key={c.ctNonCt}
+                  onClick={() => setSelectedSubEntity({ type: 'ct_non_ct', id: c.ctNonCt, name: c.ctNonCt })}
+                  title={`Click to drill down into ${c.ctNonCt} hierarchy`}
+                  className="w-full flex items-center justify-between gap-3 bg-cyan-500/10 hover:bg-cyan-500/20 border-2 border-cyan-500/40 hover:border-cyan-400 px-4 py-3.5 rounded-2xl transition-all cursor-pointer group text-left shadow-sm hover:shadow-lg hover:shadow-cyan-500/10"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-cyan-300 font-extrabold text-xs uppercase tracking-wider">{c.ctNonCt}</span>
+                      <span className="text-[9px] text-cyan-400 font-bold uppercase tracking-wider bg-cyan-500/15 px-1.5 py-0.5 rounded border border-cyan-500/30 opacity-0 group-hover:opacity-100 transition-opacity">
+                        Click to drill down
+                      </span>
+                    </div>
+                    {isUserCentric ? (
+                      <>
+                        <div className="flex items-baseline gap-2 mt-1">
+                          <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
+                            {c.userCount} users
+                          </span>
+                          <span className="text-xs text-cyan-300 font-bold">{userPct}% of slice</span>
+                        </div>
+                        <p className="text-[11px] text-ey-muted mt-0.5">
+                          ${c.cost.toFixed(2)} spend · {c.tokens.toLocaleString()} tokens
+                        </p>
+                      </>
+                    ) : isRoiCentric ? (
+                      <>
+                        <div className="flex items-baseline gap-2 mt-1">
+                          <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
+                            {c.roiPercent.toFixed(1)}%
+                          </span>
+                          <span className="text-xs text-cyan-300 font-bold">License ROI</span>
+                        </div>
+                        <p className="text-[11px] text-ey-muted mt-0.5">
+                          ${c.cost.toFixed(2)} actual ÷ ${c.licenseCost.toFixed(2)} license cost
+                        </p>
+                      </>
+                    ) : isWasteCentric ? (
+                      <>
+                        <div className="flex items-baseline gap-2 mt-1">
+                          <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
+                            ${c.wasteCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-xs text-cyan-300 font-bold">{wastePct}% of waste</span>
+                        </div>
+                        <p className="text-[11px] text-ey-muted mt-0.5">
+                          ${c.cost.toFixed(2)} actual spend · {c.userCount} users
+                        </p>
+                      </>
+                    ) : isOverageCentric ? (
+                      <>
+                        <div className="flex items-baseline gap-2 mt-1">
+                          <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
+                            ${c.overageCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-xs text-cyan-300 font-bold">{overagePct}% of overage</span>
+                        </div>
+                        <p className="text-[11px] text-ey-muted mt-0.5">
+                          ${c.cost.toFixed(2)} actual spend · {c.userCount} users
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-baseline gap-2 mt-1">
+                          <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
+                            ${c.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-xs text-cyan-300 font-bold">{pct}% of slice</span>
+                        </div>
+                        <p className="text-[11px] text-ey-muted mt-0.5">
+                          {c.tokens.toLocaleString()} tokens · {c.userCount} users
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <div className="p-2 bg-cyan-500/15 border border-cyan-500/40 rounded-xl text-cyan-300 group-hover:bg-cyan-500/25 group-hover:scale-110 transition-all shrink-0">
+                    <ArrowUpRight className="w-5 h-5" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -605,7 +903,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                   </h3>
                   <span className="text-[10px] text-ey-muted font-mono">{associatedSubServiceLines.length} practices</span>
                 </div>
-                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40">
+                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40 custom-scrollbar">
                   {associatedSubServiceLines.map((ssl) => (
                     <div
                       key={ssl.subServiceLine}
@@ -643,7 +941,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                   </h3>
                   <span className="text-[10px] text-ey-muted font-mono">{associatedProjects.length} projects</span>
                 </div>
-                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40">
+                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40 custom-scrollbar">
                   {associatedProjects.slice(0, 15).map((p) => (
                     <div
                       key={p.code}
@@ -687,7 +985,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                   </h3>
                   <span className="text-[10px] text-ey-muted font-mono">{associatedCountries.length} countries</span>
                 </div>
-                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40">
+                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40 custom-scrollbar">
                   {associatedCountries.map((c) => (
                     <div
                       key={c.country}
@@ -727,7 +1025,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                   </h3>
                   <span className="text-[10px] text-ey-muted font-mono">{associatedServiceLines.length} active</span>
                 </div>
-                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40">
+                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40 custom-scrollbar">
                   {associatedServiceLines.map((sl) => (
                     <div
                       key={sl.serviceLine}
@@ -766,7 +1064,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                     </h3>
                     <span className="text-[10px] text-ey-muted font-mono">{associatedCountries.length} countries</span>
                   </div>
-                  <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40">
+                  <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40 custom-scrollbar">
                     {associatedCountries.map((c) => (
                       <div
                         key={c.country}
@@ -803,7 +1101,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                     </h3>
                     <span className="text-[10px] text-ey-muted font-mono">{associatedSubServiceLines.length} practices</span>
                   </div>
-                  <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40">
+                  <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40 custom-scrollbar">
                     {associatedSubServiceLines.map((ssl) => (
                       <div
                         key={ssl.subServiceLine}
@@ -873,46 +1171,51 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Top Engagement Codes Selector */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-3">
-                <div className="flex items-center justify-between border-b border-ey-border pb-2.5">
+              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm flex flex-col">
+                <div className="flex items-center justify-between border-b border-ey-border pb-2.5 mb-3">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-ey-light flex items-center gap-1.5">
                     <Briefcase className="w-4 h-4 text-blue-400" />
                     <span>Filter by Engagement Code</span>
                   </h3>
-                  <span className="text-[10px] text-ey-muted font-mono">{associatedProjects.length} total</span>
+                  <span className="text-[10px] text-ey-muted font-mono">
+                    Top {Math.min(15, associatedProjects.length)} of {associatedProjects.length}
+                  </span>
                 </div>
-                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40">
-                  {associatedProjects.slice(0, 15).map((p) => (
-                    <div
-                      key={p.code}
-                      onClick={() =>
-                        setSelectedSubEntity({
-                          type: 'project',
-                          id: p.code,
-                          name: p.code,
-                        })
-                      }
-                      className="pt-2 first:pt-0 pb-1.5 flex items-center justify-between hover:bg-ey-black/40 px-2 rounded-lg cursor-pointer transition group"
-                    >
-                      <div className="truncate pr-2">
-                        <p className="font-bold text-ey-light group-hover:text-blue-300 flex items-center gap-1 truncate">
-                          <span>{p.code}</span>
-                          <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-blue-300 shrink-0" />
-                        </p>
-                        <span
-                          className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
-                            p.billable ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'
-                          }`}
-                        >
-                          {p.billable ? 'Billable' : 'Non-Billable'}
-                        </span>
+                <div className="relative flex-1 min-h-60">
+                  <div className="absolute inset-0 overflow-y-auto pr-1 text-xs font-mono divide-y divide-ey-border/40 custom-scrollbar space-y-1.5">
+                    {associatedProjects.slice(0, 15).map((p) => (
+                      <div
+                        key={p.code}
+                        onClick={() =>
+                          setSelectedSubEntity({
+                            type: 'project',
+                            id: p.code,
+                            name: p.code,
+                          })
+                        }
+                        className="pt-2 first:pt-0 pb-1.5 flex items-center justify-between hover:bg-ey-black/40 px-2 rounded-lg cursor-pointer transition group"
+                      >
+                        <div className="truncate pr-2">
+                          <p className="font-bold text-ey-light group-hover:text-blue-300 flex items-center gap-1 truncate">
+                            <span>{p.code}</span>
+                            <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-blue-300 shrink-0" />
+                          </p>
+                          <span
+                            className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
+                              p.billable ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'
+                            }`}
+                          >
+                            {p.billable ? 'Billable' : 'Non-Billable'}
+                          </span>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-bold text-ey-light">${p.cost.toFixed(2)}</p>
+                          <p className="text-[10px] text-ey-muted">{p.tokens.toLocaleString()} tok</p>
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-bold text-ey-light">${p.cost.toFixed(2)}</p>
-                        <p className="text-[10px] text-ey-muted">{p.tokens.toLocaleString()} tok</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-ey-card to-transparent rounded-b-xl" />
                 </div>
               </div>
 
@@ -958,9 +1261,19 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
       )}
 
           <HierarchyDrilldownPanel
+            // This panel stays mounted across selectedSubEntity changes (it's not
+            // conditionally rendered), so its internal path state won't pick up a
+            // new initialPath on its own — force a remount whenever the active
+            // sub-entity scope changes so the CT/Non-CT skip-level actually applies.
+            key={selectedSubEntity ? `${selectedSubEntity.type}:${selectedSubEntity.id}` : 'root'}
             rows={targetRows}
             title="Hierarchy Drilldown"
             subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
+            initialPath={
+              selectedSubEntity?.type === 'ct_non_ct'
+                ? [{ levelId: 'ctNonCt', field: 'ctNonCt', fieldLabel: 'CT / Non-CT', value: selectedSubEntity.id }]
+                : undefined
+            }
             onSelectUser={(email, name) => setSelectedSubEntity({ type: 'user', id: email, name })}
           />
         </>
@@ -1199,7 +1512,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
       {/* ========================================================================= */}
       {inspectingRecord && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-ey-card border border-ey-border rounded-2xl w-full max-w-2xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto font-mono text-xs">
+          <div className="bg-ey-card border border-ey-border rounded-2xl w-full max-w-2xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto font-mono text-xs custom-scrollbar">
             <div className="flex items-center justify-between border-b border-ey-border pb-3">
               <div className="flex items-center space-x-2">
                 <FileSpreadsheet className="w-5 h-5 text-ey-yellow" />

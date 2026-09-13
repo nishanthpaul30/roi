@@ -148,11 +148,9 @@ export function ExecutiveInferenceDrilldownView({
     }
   }, [initialEntity]);
 
-  // Pre-hierarchy facet selections: financial_volatility picks a month, habitual_retention
-  // picks a cohort, before handing off to the mandated hierarchy navigator.
-  const [selectedMonthFacet, setSelectedMonthFacet] = useState<string | null>(null);
+  // Pre-hierarchy facet selection: habitual_retention picks a cohort before
+  // handing off to the mandated hierarchy navigator.
   const [selectedCohortFacet, setSelectedCohortFacet] = useState<'embedded' | 'regular' | 'occasional' | null>(null);
-  const [selectedServiceLineFacet, setSelectedServiceLineFacet] = useState<string | null>(null);
 
   // Level 4 Search, Pagination & Modal Record Inspector State
   const [searchTerm, setSearchTerm] = useState('');
@@ -650,19 +648,6 @@ export function ExecutiveInferenceDrilldownView({
           ? `Automate a 30-day inactivity license reclamation workflow: reallocate dormant seats to waitlisted teams or convert low-activity seats to consumption-only API keys.`
           : `Maintain active monitoring and expand license seat capacity proactively.`,
     },
-    financial_volatility: {
-      id: 'financial_volatility',
-      title: 'Financial Run-Rate & Volatility Alert',
-      tag: 'Financial Governance',
-      tagColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-      icon: TrendingUp,
-      stat: '+37.8% MoM Surge',
-      statSub: 'August rebound to $277.60',
-      finding:
-        'Spend swung from $302.60 in March down to $182.70 in June, before surging +37.8% to $277.60 in August. High month-over-month volatility (-35.1% to +37.8%) reflects unmanaged on-demand prompt bursts.',
-      actionableInsight:
-        'Re-forecast mid-cycle budgets and establish monthly automated budget thresholds to smooth run-rate volatility.',
-    },
     pareto_risk: {
       id: 'pareto_risk',
       title: 'Pareto Cost Concentration (80/20 Risk)',
@@ -717,19 +702,6 @@ export function ExecutiveInferenceDrilldownView({
         actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens) to reduce token spend.`,
       };
     })(),
-    geo_asymmetry: {
-      id: 'geo_asymmetry',
-      title: 'Geographic & Service Line Asymmetry',
-      tag: 'Organizational Skew',
-      tagColor: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-      icon: Building2,
-      stat: '48.3% Spend in APAC',
-      statSub: 'Consulting leads at 32.7% ($450.00)',
-      finding:
-        'APAC accounts for $665.24 (48.3% of spend) — >3x Americas ($211.54). Australia alone drives $385.50 (28% of total company spend). Consulting leads all units at $450.00.',
-      actionableInsight:
-        'Rebalance regional AI budget allocations and validate if Consulting spend reflects genuine client delivery intensity or unmanaged growth.',
-    },
     project_billability: {
       id: 'project_billability',
       title: 'Client Billability & Project Telemetry Alignment',
@@ -762,19 +734,6 @@ export function ExecutiveInferenceDrilldownView({
             : 'AI tools show healthy habitual usage among active seats. Focus shift from basic onboarding to advanced competency training.',
       };
     })(),
-    service_line_comparison: {
-      id: 'service_line_comparison',
-      title: 'Service Line Usage & Cost Efficiency Comparison',
-      tag: 'Practice Cost Benchmarking',
-      tagColor: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-      icon: BarChart3,
-      stat: 'Consulting 32.7% Spend vs CBS $28.30/User Peak',
-      statSub: 'Assurance lowest unit cost ($13.27/M) vs CBS highest ($15.38/M)',
-      finding:
-        'Usage and expenditure diverge sharply across service lines: Consulting leads in overall volume at $450.00 (32.7% of spend across 32.9M tokens), but Core Business Services (CBS) exhibits the highest per-user intensity at $28.30/user (+32% above Consulting) and the highest unit cost at $15.38/M tokens due to heavy Claude/ChatGPT weighting and 64.3% internal R&D allocation ($218.46). In contrast, Assurance achieves benchmark efficiency at $13.27/M tokens with 94.5% client billability ($260.68).',
-      actionableInsight:
-        'Cross-pollinate Assurance\'s high-efficiency prompt patterns (94.5% client fee pass-through) to CBS and Consulting. Establish automated cost-routing policies in CBS to curb the $15.38/M unit rate by transitioning routine data queries from Claude/ChatGPT to lower-cost models.',
-    },
   };
 
   const currentMeta = inferencesMeta[inferenceId] || inferencesMeta.seat_utilization;
@@ -1122,90 +1081,6 @@ export function ExecutiveInferenceDrilldownView({
                 title={`Level 3: Active Seat Hierarchy (${activeUserList.length} Users)`}
                 onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
               />
-            </div>
-          )}
-
-          {/* 2. FINANCIAL VOLATILITY DECOMPOSITION */}
-          {inferenceId === 'financial_volatility' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">March Baseline Peak</span>
-                  <p className="text-2xl font-bold text-ey-light">$302.60</p>
-                  <p className="text-[10px] text-ey-muted">Initial Enterprise Pilot Launch</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">June Trough Low</span>
-                  <p className="text-2xl font-bold text-cyan-400">$182.70</p>
-                  <p className="text-[10px] text-cyan-300/80">-39.6% Reduction Mid-Year</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">August Rebound Surge</span>
-                  <p className="text-2xl font-bold text-amber-400">$277.60</p>
-                  <p className="text-[10px] text-amber-300/80">+37.8% MoM Surge</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Run-Rate Volatility Index</span>
-                  <p className="text-2xl font-bold text-rose-400">High Risk (±38%)</p>
-                  <p className="text-[10px] text-rose-300/80">Unmanaged Prompt Bursts</p>
-                </div>
-              </div>
-
-              {selectedMonthFacet === null ? (
-                <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="border-b border-ey-border/60 pb-3">
-                    <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-amber-400" />
-                      <span>Level 3: Month-by-Month Run-Rate Trajectory</span>
-                    </h3>
-                    <p className="text-xs text-ey-muted mt-0.5">
-                      Select any billing month to continue down the mandated hierarchy for that period's spend.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {monthlySpend.map((m, i) => (
-                      <div
-                        key={i}
-                        onClick={() => setSelectedMonthFacet(m.month)}
-                        className="bg-ey-black/70 border border-ey-border/80 hover:border-ey-yellow/80 p-4 rounded-xl cursor-pointer transition group flex flex-col justify-between space-y-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-ey-light group-hover:text-ey-yellow transition-colors font-mono">
-                            {m.month.replace('_', ' ')}
-                          </span>
-                          <span className="text-[10px] font-mono text-ey-muted bg-ey-card px-2 py-0.5 rounded border border-ey-border">
-                            {m.rowCount} Usage Records
-                          </span>
-                        </div>
-                        <div>
-                          <div className="text-xl font-bold text-ey-yellow font-mono">${m.cost.toFixed(2)}</div>
-                          <div className="text-[10px] text-ey-muted font-mono">{m.tokens.toLocaleString()} tokens</div>
-                        </div>
-                        <div className="pt-2 border-t border-ey-border/40 flex items-center justify-between text-[10px] text-ey-muted">
-                          <span>Continue to Hierarchy</span>
-                          <ChevronRight className="w-3.5 h-3.5 text-ey-yellow group-hover:translate-x-1 transition-transform" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setSelectedMonthFacet(null)}
-                    className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-muted hover:text-ey-yellow bg-ey-black border border-ey-border px-3 py-1.5 rounded-lg transition"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    Back to Months
-                  </button>
-                  <HierarchyDrilldownPanel
-                    rows={allRows.filter((r) => r.monthYear === selectedMonthFacet)}
-                    title={`Level 3: ${selectedMonthFacet?.replace('_', ' ')} Hierarchy`}
-                    onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
-                  />
-                </>
-              )}
             </div>
           )}
 
@@ -1599,18 +1474,6 @@ export function ExecutiveInferenceDrilldownView({
             </div>
           )}
 
-          {/* 5. GEOGRAPHIC & SERVICE LINE ASYMMETRY */}
-          {inferenceId === 'geo_asymmetry' && (
-            <div className="space-y-6">
-              {/* Level 3: Mandated Hierarchy Navigator (starts at Country, the hierarchy's own region-level facet) */}
-              <HierarchyDrilldownPanel
-                rows={allRows}
-                title="Level 3: Geographic & Organizational Hierarchy"
-                subtitle="APAC accounts for 48.3% of spend, over 3x Americas — drill via Country below to see exactly which teams drive it."
-                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
-              />
-            </div>
-          )}
 
           {/* 6. CLIENT BILLABILITY & PROJECT TELEMETRY ALIGNMENT */}
           {inferenceId === 'project_billability' && (
@@ -1735,151 +1598,6 @@ export function ExecutiveInferenceDrilldownView({
             </div>
           )}
 
-          {/* 9. SERVICE LINE USAGE & COST EFFICIENCY COMPARISON */}
-          {inferenceId === 'service_line_comparison' && (
-            <div className="space-y-6">
-              {/* Level 2 KPI Summary Tiles */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Volume Leader (Consulting)</span>
-                  <p className="text-2xl font-bold text-cyan-400">$450.00 (32.7%)</p>
-                  <p className="text-[10px] text-cyan-300/80">32.9M Tokens across 21 Users</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Highest Cost/User (CBS)</span>
-                  <p className="text-2xl font-bold text-rose-400">$28.30 / User</p>
-                  <p className="text-[10px] text-rose-300/80">$15.38/M Unit Rate (Heavy Claude/GPT)</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Benchmark Efficiency (Assurance)</span>
-                  <p className="text-2xl font-bold text-emerald-400">$13.27 / M</p>
-                  <p className="text-[10px] text-emerald-300/80">94.5% Client Billable ($260.68)</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Most Lean Practice (S&amp;T)</span>
-                  <p className="text-2xl font-bold text-ey-yellow">$12.32 / User</p>
-                  <p className="text-[10px] text-ey-yellow/80">10.0M Tokens across 11 Users</p>
-                </div>
-              </div>
-
-              {selectedServiceLineFacet === null ? (
-                <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="border-b border-ey-border/60 pb-3">
-                    <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                      <BarChart3 className="w-4 h-4 text-ey-yellow" />
-                      <span>Level 3: Cross-Service Line Usage, Spend &amp; Unit Cost Matrix (Click Row to Continue)</span>
-                    </h3>
-                    <p className="text-xs text-ey-muted mt-0.5">
-                      Comparative benchmarks showing token intensity, effective $/M unit cost, per-user economics, and client billability.
-                    </p>
-                  </div>
-
-                  <div className="overflow-x-auto border border-ey-border rounded-xl">
-                    <table className="w-full text-left text-xs font-mono">
-                      <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-                        <tr>
-                          <th className="px-4 py-3">Service Line</th>
-                          <th className="px-4 py-3 text-center">Active Users</th>
-                          <th className="px-4 py-3 text-right">Tokens Consumed</th>
-                          <th className="px-4 py-3 text-right">Total AI Spend</th>
-                          <th className="px-4 py-3 text-right">Effective Rate ($/M)</th>
-                          <th className="px-4 py-3 text-right">Avg Cost / User</th>
-                          <th className="px-4 py-3 text-center">Client Billable %</th>
-                          <th className="px-4 py-3">Top Sub-Practice</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-ey-border">
-                        {serviceLineComparisonData.map((s, i) => (
-                          <tr
-                            key={i}
-                            onClick={() => setSelectedServiceLineFacet(s.name)}
-                            className="hover:bg-ey-yellow/5 cursor-pointer transition group"
-                          >
-                            <td className="px-4 py-3 font-bold text-ey-light group-hover:text-ey-yellow transition-colors">
-                              <div className="flex items-center gap-2">
-                                <span>{s.name}</span>
-                                <ChevronRight className="w-3 h-3 text-ey-yellow opacity-0 group-hover:opacity-100 transition-opacity" />
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-center text-ey-muted">{s.users.size} Users</td>
-                            <td className="px-4 py-3 text-right text-ey-light">{s.tokens.toLocaleString()}</td>
-                            <td className="px-4 py-3 text-right font-bold text-ey-yellow">
-                              ${s.cost.toFixed(2)}{' '}
-                              <span className="text-[10px] text-ey-muted font-normal">
-                                ({totalOrgSpend > 0 ? ((s.cost / totalOrgSpend) * 100).toFixed(1) : 0}%)
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right font-bold">
-                              <span className={s.unitCostPerM > 15 ? 'text-rose-400' : s.unitCostPerM < 13.5 ? 'text-emerald-400' : 'text-ey-light'}>
-                                ${s.unitCostPerM.toFixed(2)}/M
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right font-bold">
-                              <span className={s.avgCostPerUser > 25 ? 'text-rose-400' : s.avgCostPerUser < 15 ? 'text-emerald-400' : 'text-ey-light'}>
-                                ${s.avgCostPerUser.toFixed(2)}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                                s.externalRatio >= 80 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
-                                s.externalRatio >= 50 ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
-                                'bg-purple-500/10 text-purple-400 border-purple-500/30'
-                              }`}>
-                                {s.externalRatio.toFixed(1)}% Billable
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-ey-muted">
-                              {s.topSubService[0]} (${Number(s.topSubService[1]).toFixed(0)})
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setSelectedServiceLineFacet(null)}
-                    className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-muted hover:text-ey-yellow bg-ey-black border border-ey-border px-3 py-1.5 rounded-lg transition"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    Back to Service Line Matrix
-                  </button>
-                  <HierarchyDrilldownPanel
-                    rows={allRows.filter((r) => r.orgServiceLine === selectedServiceLineFacet)}
-                    title={`Level 3: ${selectedServiceLineFacet} Hierarchy`}
-                    onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
-                  />
-                </>
-              )}
-
-              {/* Action Trigger Box */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-3">
-                <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-ey-yellow" />
-                  <span>Strategic Practice Action Plan</span>
-                </h3>
-                <p className="text-xs text-ey-muted leading-relaxed">
-                  CBS unit cost ($15.38/M) can be reduced by ~14% to match Consulting ($13.67/M) by encouraging GitHub Copilot for internal engineering and standardizing ChatGPT default models. Meanwhile, Assurance&apos;s 94.5% client fee pass-through should serve as the blueprint for Consulting&apos;s 29.7% internal spend review.
-                </p>
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <button
-                    onClick={() => handleTriggerAction('CBS model optimization plan dispatched to CBS Practice Lead.')}
-                    className="px-3.5 py-1.5 bg-ey-yellow text-ey-black font-bold text-xs rounded-xl shadow hover:bg-yellow-400 transition cursor-pointer"
-                  >
-                    Deploy CBS Cost Optimization Plan
-                  </button>
-                  <button
-                    onClick={() => handleTriggerAction('Cross-service line prompt library benchmark report exported.')}
-                    className="px-3.5 py-1.5 bg-ey-black border border-ey-border hover:border-ey-yellow text-ey-light text-xs font-semibold rounded-xl transition cursor-pointer"
-                  >
-                    Export Practice Benchmark Report
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       ) : null}
 

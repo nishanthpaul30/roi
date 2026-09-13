@@ -10,7 +10,6 @@ import {
   Building2,
   Globe2,
   Layers,
-  ShieldCheck,
   FolderKanban,
   CheckCircle2,
   AlertCircle,
@@ -26,7 +25,7 @@ import {
 import { MetricChart } from '@/components/ui/MetricChart';
 import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
 import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
-import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
+import { HierarchyDrilldownPanel, PathEntry } from './HierarchyDrilldownPanel';
 
 interface SubDrilldownState {
   type: 'tool' | 'service_line' | 'region' | 'project_code' | 'user';
@@ -38,6 +37,45 @@ interface SubDrilldownState {
 interface ExecutiveMetricDrilldownViewProps {
   data: DrilldownMetricData;
   onBack: () => void;
+}
+
+const fmtMoney = (v: number) => `$${(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtTokens = (v: number) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(v || 0);
+
+// The CT/Non-CT tiles sit on every KPI's Level 1 view — the headline figure on
+// each tile should match whatever that specific metric measures (a day-rate,
+// a per-user rate, a token count, or a raw spend total), not just always repeat
+// the segment's total spend regardless of which metric is being viewed.
+function ctNonCtSegmentDisplay(metricId: string, segment: { cost: number; tokens: number; userCount?: number; uniqueDays?: number }, totalCost?: number) {
+  const pct = totalCost ? ((segment.cost / totalCost) * 100).toFixed(1) : '0.0';
+
+  if (metricId === 'avg_daily_cost') {
+    const days = segment.uniqueDays || 0;
+    const perDay = days > 0 ? segment.cost / days : 0;
+    return {
+      primary: `$${perDay.toFixed(2)} / day`,
+      footnote: `${fmtMoney(segment.cost)} total across ${days} active day${days === 1 ? '' : 's'}`,
+    };
+  }
+  if (metricId === 'cost_per_user') {
+    const users = segment.userCount || 0;
+    const perUser = users > 0 ? segment.cost / users : 0;
+    return {
+      primary: `$${perUser.toFixed(2)} / user`,
+      footnote: `${fmtMoney(segment.cost)} across ${users} user${users === 1 ? '' : 's'}`,
+    };
+  }
+  if (metricId === 'token_consumption') {
+    return {
+      primary: `${fmtTokens(segment.tokens)} tokens`,
+      footnote: `${fmtMoney(segment.cost)} spend (${pct}% of total)`,
+    };
+  }
+  // total_investment (default)
+  return {
+    primary: fmtMoney(segment.cost),
+    footnote: `${pct}% of total · ${fmtTokens(segment.tokens)} tokens`,
+  };
 }
 
 export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDrilldownViewProps) {
@@ -55,6 +93,20 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
   // instead of jumping straight to a list of named users.
   const [pendingFacet, setPendingFacet] = useState<{ field: keyof CsvUsageRow; value: string; label: string } | null>(null);
 
+  // Tracks how far the mandated hierarchy panel below has been drilled (Country,
+  // Service Line, ...) so the trend chart above it can be re-scoped to match,
+  // instead of always showing the org-wide/unfiltered daily series.
+  const [hierarchyPath, setHierarchyPath] = useState<PathEntry[]>([]);
+
+  const chooseFacet = (facet: { field: keyof CsvUsageRow; value: string; label: string }) => {
+    setPendingFacet(facet);
+    setHierarchyPath([]);
+  };
+  const clearFacet = () => {
+    setPendingFacet(null);
+    setHierarchyPath([]);
+  };
+
   // Listen for Escape key to go back intuitively
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -66,7 +118,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
           setSearchTerm('');
           setCurrentPage(1);
         } else if (pendingFacet) {
-          setPendingFacet(null);
+          clearFacet();
         } else {
           onBack();
         }
@@ -131,10 +183,48 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
   );
 
   const byTool = summaryData?.byAiTool || [];
+  const byCtNonCt = summaryData?.byCtNonCt || [];
   const byRegion = summaryData?.byManagementRegion || [];
   const byServiceLine = summaryData?.byServiceLine || [];
   const topUsers = summaryData?.topUsers || [];
   const byProjectCode = summaryData?.byProjectCode || [];
+
+  // Rows currently in scope for the trend chart: the org-wide filtered set, narrowed
+  // by whatever facet (CT/Non-CT, tool, region, ...) and hierarchy levels have been
+  // drilled into below it — so the chart never silently shows a bigger population
+  // than the tiles/table the viewer is actually looking at.
+  const scopedRows = useMemo(() => {
+    if (!pendingFacet && hierarchyPath.length === 0) return null;
+    let rows = pendingFacet
+      ? allRows.filter((r) => String(r[pendingFacet.field] || '').toLowerCase() === pendingFacet.value.toLowerCase())
+      : allRows;
+    for (const p of hierarchyPath) {
+      rows = rows.filter((r) => String(r[p.field] || '').trim() === p.value);
+    }
+    return rows;
+  }, [allRows, pendingFacet, hierarchyPath]);
+
+  const chartTitleSuffix = (() => {
+    // When the facet IS the ctNonCt level, HierarchyDrilldownPanel's initialPath
+    // already reports that same value as hierarchyPath[0] — skip re-adding it
+    // here or the label would read "Non-CT › Non-CT".
+    const parts: string[] = [];
+    if (pendingFacet && pendingFacet.field !== 'ctNonCt') parts.push(pendingFacet.value);
+    parts.push(...hierarchyPath.map((p) => p.value));
+    return parts.length > 0 ? ` — ${parts.join(' › ')}` : '';
+  })();
+
+  const chartSeries = useMemo(() => {
+    if (!scopedRows) return series;
+    const dayMap = new Map<string, number>();
+    for (const r of scopedRows) {
+      const val = id === 'token_consumption' ? r.tokenConsumption : r.cost;
+      dayMap.set(r.activityDate, (dayMap.get(r.activityDate) || 0) + val);
+    }
+    return Array.from(dayMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, value]) => ({ date, value: Number(value.toFixed(4)) }));
+  }, [scopedRows, series, id]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -160,7 +250,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                 setCurrentPage(1);
               }
               if (pendingFacet) {
-                setPendingFacet(null);
+                clearFacet();
               }
             }}
             className={`${
@@ -211,6 +301,41 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
             </span>
           </div>
         </div>
+
+        {/* CT / Non-CT Spend Segregation — prominent, clickable drill-down tiles, shown for every metric */}
+        {!subDrilldown && !pendingFacet && byCtNonCt.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            {byCtNonCt.map((c: any) => {
+              const seg = ctNonCtSegmentDisplay(id, c, summaryData?.totalCost);
+              return (
+                <button
+                  key={c.ctNonCt}
+                  onClick={() => chooseFacet({ field: 'ctNonCt', value: c.ctNonCt, label: 'CT / Non-CT Spend Segregation' })}
+                  title={`Click to drill down into ${c.ctNonCt} hierarchy`}
+                  className="w-full flex items-center justify-between gap-3 bg-cyan-500/10 hover:bg-cyan-500/20 border-2 border-cyan-500/40 hover:border-cyan-400 px-4 py-3.5 rounded-2xl transition-all cursor-pointer group text-left shadow-sm hover:shadow-lg hover:shadow-cyan-500/10"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-cyan-300 font-extrabold text-xs uppercase tracking-wider">{c.ctNonCt}</span>
+                      <span className="text-[9px] text-cyan-400 font-bold uppercase tracking-wider bg-cyan-500/15 px-1.5 py-0.5 rounded border border-cyan-500/30 opacity-0 group-hover:opacity-100 transition-opacity">
+                        Click to drill down
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
+                        {seg.primary}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-ey-muted mt-0.5">{seg.footnote}</p>
+                  </div>
+                  <div className="p-2 bg-cyan-500/15 border border-cyan-500/40 rounded-xl text-cyan-300 group-hover:bg-cyan-500/25 group-hover:scale-110 transition-all shrink-0">
+                    <ArrowUpRight className="w-5 h-5" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -363,28 +488,10 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
         /* LEVEL 2: MIDDLE TELEMETRY BREAKDOWN VIEW (Click any card/row to Level 3)  */
         /* ========================================================================= */
         <div className="space-y-6">
-          {/* Main Time Series Trend Chart */}
-          <div className="bg-ey-card border border-ey-border rounded-2xl p-6 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-ey-border/60 pb-3">
-              <h3 className="text-base font-bold text-ey-light flex items-center gap-2">
-                <Zap className="w-5 h-5 text-ey-yellow" />
-                <span>Daily Telemetry Movement &amp; Run-Rate</span>
-              </h3>
-            </div>
-
-            <MetricChart
-              title={`${title} Trend Over Filtered Range`}
-              subtitle="Daily aggregated telemetry data points"
-              data={series}
-              chartType="area"
-              series={[{ key: 'value', name: title, color: '#FFE600' }]}
-            />
-          </div>
-
           {pendingFacet ? (
             <>
               <button
-                onClick={() => setPendingFacet(null)}
+                onClick={() => clearFacet()}
                 className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-muted hover:text-ey-yellow bg-ey-black border border-ey-border px-3 py-1.5 rounded-lg transition"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
@@ -393,6 +500,12 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
               <HierarchyDrilldownPanel
                 rows={allRows.filter((r) => String(r[pendingFacet.field] || '').toLowerCase() === pendingFacet.value.toLowerCase())}
                 title={`Level 3: ${pendingFacet.value} Hierarchy`}
+                initialPath={
+                  pendingFacet.field === 'ctNonCt'
+                    ? [{ levelId: 'ctNonCt', field: 'ctNonCt', fieldLabel: 'CT / Non-CT', value: pendingFacet.value }]
+                    : undefined
+                }
+                onPathChange={setHierarchyPath}
                 onSelectUser={(email, label) =>
                   setSubDrilldown({ type: 'user', id: email, name: email, subtitle: `Raw usage records for ${label}` })
                 }
@@ -418,7 +531,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                     return (
                       <div
                         key={t.tool}
-                        onClick={() => setPendingFacet({ field: 'aiTool', value: t.tool, label: 'Token Share by AI Tool' })}
+                        onClick={() => chooseFacet({ field: 'aiTool', value: t.tool, label: 'Token Share by AI Tool' })}
                         className="space-y-1.5 bg-ey-black/40 border border-ey-border/60 hover:border-ey-yellow/60 p-3 rounded-xl cursor-pointer transition group"
                       >
                         <div className="flex justify-between items-center text-ey-light group-hover:text-ey-yellow">
@@ -450,7 +563,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                   {byServiceLine.map((s: any) => (
                     <div
                       key={s.serviceLine}
-                      onClick={() => setPendingFacet({ field: 'orgServiceLine', value: s.serviceLine, label: 'Service Line Token Allocation' })}
+                      onClick={() => chooseFacet({ field: 'orgServiceLine', value: s.serviceLine, label: 'Service Line Token Allocation' })}
                       className="flex items-center justify-between p-3 bg-ey-black/40 border border-ey-border/60 hover:border-cyan-400/60 rounded-xl cursor-pointer transition group"
                     >
                       <span className="text-ey-light font-bold text-sm group-hover:text-cyan-300 flex items-center gap-1.5">
@@ -470,7 +583,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
               {/* Billability KPI Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
                 <div
-                  onClick={() => setPendingFacet({ field: 'billableFlag', value: 'True', label: 'Billable Client Spend' })}
+                  onClick={() => chooseFacet({ field: 'billableFlag', value: 'True', label: 'Billable Client Spend' })}
                   className="bg-ey-card border border-emerald-500/30 hover:border-emerald-400/80 p-4 rounded-2xl space-y-1 shadow-sm cursor-pointer transition group"
                 >
                   <div className="flex items-center justify-between text-ey-muted">
@@ -485,7 +598,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                 </div>
 
                 <div
-                  onClick={() => setPendingFacet({ field: 'billableFlag', value: 'False', label: 'Non-Billable Overhead' })}
+                  onClick={() => chooseFacet({ field: 'billableFlag', value: 'False', label: 'Non-Billable Overhead' })}
                   className="bg-ey-card border border-amber-500/30 hover:border-amber-400/80 p-4 rounded-2xl space-y-1 shadow-sm cursor-pointer transition group"
                 >
                   <div className="flex items-center justify-between text-ey-muted">
@@ -513,7 +626,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                   {byRegion.map((r: any) => (
                     <div
                       key={r.region}
-                      onClick={() => setPendingFacet({ field: 'managementRegion', value: r.region, label: 'Regional Spend Breakdown' })}
+                      onClick={() => chooseFacet({ field: 'managementRegion', value: r.region, label: 'Regional Spend Breakdown' })}
                       className="bg-ey-black/60 border border-ey-border hover:border-ey-yellow/60 p-4 rounded-xl space-y-1 cursor-pointer transition group"
                     >
                       <span className="text-ey-muted text-[10px] uppercase font-bold group-hover:text-ey-yellow flex items-center justify-between">
@@ -533,6 +646,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
             <HierarchyDrilldownPanel
               rows={allRows}
               title="Level 3: Developer Seat & Active User Hierarchy"
+              onPathChange={setHierarchyPath}
               onSelectUser={(email, label) =>
                 setSubDrilldown({ type: 'user', id: email, name: email, subtitle: `Raw usage records for ${label}` })
               }
@@ -554,7 +668,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                   <div
                     key={p.projectCode}
                     onClick={() =>
-                      setPendingFacet({ field: 'projectCode', value: p.projectCode, label: 'Top Associated Engagement Codes' })
+                      chooseFacet({ field: 'projectCode', value: p.projectCode, label: 'Top Associated Engagement Codes' })
                     }
                     className="p-3 bg-ey-black/60 border border-ey-border hover:border-blue-400/60 rounded-xl flex items-center justify-between cursor-pointer transition group"
                   >
@@ -578,6 +692,28 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
           )}
           </>
           )}
+
+          {/* Main Time Series Trend Chart */}
+          <div className="bg-ey-card border border-ey-border rounded-2xl p-6 shadow-sm space-y-3">
+            <div className="flex items-center justify-between border-b border-ey-border/60 pb-3">
+              <h3 className="text-base font-bold text-ey-light flex items-center gap-2">
+                <Zap className="w-5 h-5 text-ey-yellow" />
+                <span>Daily Telemetry Movement &amp; Run-Rate</span>
+              </h3>
+            </div>
+
+            <MetricChart
+              title={`${title} Trend Over Filtered Range${chartTitleSuffix}`}
+              subtitle={
+                scopedRows
+                  ? `Daily aggregated telemetry data points, scoped to the current drill-down`
+                  : 'Daily aggregated telemetry data points'
+              }
+              data={chartSeries}
+              chartType="area"
+              series={[{ key: 'value', name: title, color: '#FFE600' }]}
+            />
+          </div>
         </div>
       )}
 
@@ -592,7 +728,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
               setSearchTerm('');
               setCurrentPage(1);
             } else if (pendingFacet) {
-              setPendingFacet(null);
+              clearFacet();
             } else {
               onBack();
             }
