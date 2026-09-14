@@ -1,11 +1,18 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AppShell } from '@/components/layout/AppShell';
 
-const inter = Inter({ subsets: ['latin'] });
+// Self-hosted from src/app/fonts/ instead of next/font/google, so the build
+// never has to reach out to Google's font servers — same Inter variable font,
+// zero external requests at any point.
+const inter = localFont({
+  src: './fonts/Inter-Variable.woff2',
+  variable: '--font-inter',
+  weight: '100 900',
+});
 
 export const metadata: Metadata = {
   title: 'GitHub Copilot Usage & ROI Enterprise Dashboard',
