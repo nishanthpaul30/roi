@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import * as XLSX from 'xlsx';
 import {
   BookOpen,
   Search,
@@ -18,6 +19,7 @@ import {
   Globe2,
   Bot,
   Wallet,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 // Derivation Data Item Interface
@@ -297,6 +299,20 @@ export default function MetricsDerivationPage() {
     setTimeout(() => setCopiedFormula(null), 2000);
   };
 
+  const handleExportSchemaToExcel = () => {
+    const worksheetData = CSV_SCHEMA.map((row) => ({
+      'CSV Column Name': row.column,
+      'Internal Field': row.fieldName,
+      'Data Type': row.dataType,
+      'Description & Usage': row.description,
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+    worksheet['!cols'] = [{ wch: 26 }, { wch: 22 }, { wch: 12 }, { wch: 90 }];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'CSV Schema');
+    XLSX.writeFile(workbook, 'ai_usage_data_schema.xlsx');
+  };
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto text-ey-light">
       {/* Header Banner */}
@@ -341,7 +357,16 @@ export default function MetricsDerivationPage() {
               CSV Input Data Schema Mapping (`ai_usage_data.csv`)
             </h2>
           </div>
-          <span className="text-[11px] text-ey-muted font-mono">{CSV_SCHEMA.length} Columns Mapped • Single Source of Truth</span>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-ey-muted font-mono">{CSV_SCHEMA.length} Columns Mapped • Single Source of Truth</span>
+            <button
+              onClick={handleExportSchemaToExcel}
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-black bg-ey-yellow hover:bg-ey-yellow-hover px-2.5 py-1.5 rounded-lg transition shrink-0"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              Export to Excel
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
