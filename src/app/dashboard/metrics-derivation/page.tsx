@@ -65,8 +65,6 @@ const CSV_SCHEMA = [
   { column: 'Cost Center', fieldName: 'costCenter', description: 'Internal accounting cost center code (e.g. CC-TAX-647) — independent of the hierarchy chain', dataType: 'String' },
   { column: 'Month_Year', fieldName: 'monthYear', description: 'Human-readable calendar month label (e.g. March_2026) — basis for Monthly Trend charts', dataType: 'String' },
   { column: 'Month Id', fieldName: 'monthId', description: 'Sortable numeric month key (e.g. 202603) used to order Monthly Trend series', dataType: 'Numeric' },
-  { column: 'Period Start Date', fieldName: 'periodStartDate', description: 'Billing period start, DD/MM/YYYY (e.g. 01/03/2026) — parsed but not currently surfaced in any view', dataType: 'Date' },
-  { column: 'Period End Date', fieldName: 'periodEndDate', description: 'Billing period end, DD/MM/YYYY (e.g. 31/03/2026) — parsed but not currently surfaced in any view', dataType: 'Date' },
 ];
 
 const FORMULA_CATEGORIES = [

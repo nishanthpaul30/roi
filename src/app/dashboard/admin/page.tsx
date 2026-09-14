@@ -23,8 +23,6 @@ const REQUIRED_HEADERS = [
   'Activity Date',
   'Month_Year',
   'Month Id',
-  'Period Start Date',
-  'Period End Date',
   'Token Consumption',
   'Daily Billable Tokens',
   'Cost in USD',
@@ -91,13 +89,13 @@ export default function AdminPage() {
   }, []);
 
   const handleDownloadTemplate = () => {
-    const templateCsv = `AI Tool Flag,User Mail,Display Name,Activity Date,Month_Year,Month Id,Period Start Date,Period End Date,Token Consumption,Daily Billable Tokens,Cost in USD,CT/Non-CT,Country,Service Line,Org Sub Service Line,Sub-Service Line 1,Sub-Service Line 2,Engagement Code,Engagement Super Region,Engagement Service Line,Engagement Sub Service Line,Engagement Competency,Region,Management Region,License Cost in USD,Usage Free Token Limit,Billable/Non-Billable,ProjectType,GDS Location,Cost Center
-copilot,john.doe@enterprise-corp.com,John Doe,2026-03-01,March_2026,202603,01/03/2026,31/03/2026,25000,25000,0.35,CT,United States,Consulting,Strategy,Delivery,Hybrid Delivery,E-481920,Americas,Tax,Client Advisory,People Advisory,North America,Americas,35.00,20.00,True,External,Onshore,CC-CNS-101
-chatgpt,jane.smith@enterprise-corp.com,Jane Smith,2026-03-02,March_2026,202603,01/03/2026,31/03/2026,42000,42000,0.65,CT,United Kingdom,CBS,Data & AI,Innovation,Offshore Delivery,E-719302,EMEIA,Assurance,Risk & Compliance,Risk Management,Europe,EMEA,25.00,20.00,True,External,Wroclaw,CC-CBS-205
-claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,01/03/2026,31/03/2026,18000,18000,0.28,Non-CT,Singapore,Assurance,Reporting,Delivery,Onshore Delivery,I-304918,Asia-Pacific,Consulting,Digital Enablement,Technology,Southeast Asia,APAC,40.00,0.00,False,Internal,Bangalore,CC-ASU-318
-replit,maria.garcia@enterprise-corp.com,Maria Garcia,2026-03-04,March_2026,202603,01/03/2026,31/03/2026,15000,15000,0.18,CT,Spain,Consulting,Strategy,Delivery,Onshore Delivery,E-552104,EMEIA,Consulting,Client Advisory,Operations,Europe,EMEA,50.00,0.00,True,External,Madrid,CC-CNS-410
-factoryai,liam.oconnor@enterprise-corp.com,Liam O'Connor,2026-03-05,March_2026,202603,01/03/2026,31/03/2026,20000,20000,0.18,Non-CT,Ireland,CBS,Data & AI,Innovation,Onshore Delivery,I-118273,EMEIA,CBS,Risk & Compliance,Technology,Europe,EMEA,10.00,0.00,False,Internal,Dublin,CC-CBS-512
-cursor,priya.nair@enterprise-corp.com,Priya Nair,2026-03-06,March_2026,202603,01/03/2026,31/03/2026,22000,22000,0.24,CT,India,Tax,Tax Tech Transformation,Advisory,Onshore Delivery,E-663210,Asia-Pacific,Tax,Indirect Tax,Operations,South Asia,APAC,60.00,40.00,True,External,Bangalore,CC-TAX-720`;
+    const templateCsv = `AI Tool Flag,User Mail,Display Name,Activity Date,Month_Year,Month Id,Token Consumption,Daily Billable Tokens,Cost in USD,CT/Non-CT,Country,Service Line,Org Sub Service Line,Sub-Service Line 1,Sub-Service Line 2,Engagement Code,Engagement Super Region,Engagement Service Line,Engagement Sub Service Line,Engagement Competency,Region,Management Region,License Cost in USD,Usage Free Token Limit,Billable/Non-Billable,ProjectType,GDS Location,Cost Center
+copilot,john.doe@enterprise-corp.com,John Doe,2026-03-01,March_2026,202603,25000,25000,0.35,CT,United States,Consulting,Strategy,Delivery,Hybrid Delivery,E-481920,Americas,Tax,Client Advisory,People Advisory,North America,Americas,35.00,20.00,True,External,Onshore,CC-CNS-101
+chatgpt,jane.smith@enterprise-corp.com,Jane Smith,2026-03-02,March_2026,202603,42000,42000,0.65,CT,United Kingdom,CBS,Data & AI,Innovation,Offshore Delivery,E-719302,EMEIA,Assurance,Risk & Compliance,Risk Management,Europe,EMEA,25.00,20.00,True,External,Wroclaw,CC-CBS-205
+claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,18000,18000,0.28,Non-CT,Singapore,Assurance,Reporting,Delivery,Onshore Delivery,I-304918,Asia-Pacific,Consulting,Digital Enablement,Technology,Southeast Asia,APAC,40.00,0.00,False,Internal,Bangalore,CC-ASU-318
+replit,maria.garcia@enterprise-corp.com,Maria Garcia,2026-03-04,March_2026,202603,15000,15000,0.18,CT,Spain,Consulting,Strategy,Delivery,Onshore Delivery,E-552104,EMEIA,Consulting,Client Advisory,Operations,Europe,EMEA,50.00,0.00,True,External,Madrid,CC-CNS-410
+factoryai,liam.oconnor@enterprise-corp.com,Liam O'Connor,2026-03-05,March_2026,202603,20000,20000,0.18,Non-CT,Ireland,CBS,Data & AI,Innovation,Onshore Delivery,I-118273,EMEIA,CBS,Risk & Compliance,Technology,Europe,EMEA,10.00,0.00,False,Internal,Dublin,CC-CBS-512
+cursor,priya.nair@enterprise-corp.com,Priya Nair,2026-03-06,March_2026,202603,22000,22000,0.24,CT,India,Tax,Tax Tech Transformation,Advisory,Onshore Delivery,E-663210,Asia-Pacific,Tax,Indirect Tax,Operations,South Asia,APAC,60.00,40.00,True,External,Bangalore,CC-TAX-720`;
 
     const blob = new Blob([templateCsv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -177,11 +175,11 @@ cursor,priya.nair@enterprise-corp.com,Priya Nair,2026-03-06,March_2026,202603,01
           userMail: cols[1] || '',
           displayName: cols[2] || '',
           activityDate: cols[3] || '',
-          tokenConsumption: cols[8] || '0',
-          cost: cols[10] || '0',
-          serviceLine: cols[13] || '',
-          country: cols[12] || '',
-          region: cols[22] || '',
+          tokenConsumption: cols[6] || '0',
+          cost: cols[8] || '0',
+          serviceLine: cols[11] || '',
+          country: cols[10] || '',
+          region: cols[20] || '',
         });
       }
     }
@@ -315,7 +313,7 @@ cursor,priya.nair@enterprise-corp.com,Priya Nair,2026-03-06,March_2026,202603,01
           <div className="flex items-center justify-between border-b border-ey-border/60 pb-3">
             <div className="flex items-center space-x-2">
               <FileSpreadsheet className="w-5 h-5 text-ey-yellow" />
-              <h3 className="text-sm font-bold text-ey-light tracking-wide">Required CSV Schema Fields (20 Columns)</h3>
+              <h3 className="text-sm font-bold text-ey-light tracking-wide">Required CSV Schema Fields ({REQUIRED_HEADERS.length} Columns)</h3>
             </div>
             <button
               onClick={handleDownloadTemplate}
@@ -465,7 +463,7 @@ cursor,priya.nair@enterprise-corp.com,Priya Nair,2026-03-06,March_2026,202603,01
               value={rawText}
               onChange={(e) => validateAndPreviewCsv(e.target.value, 'pasted_data.csv')}
               rows={8}
-              placeholder="AI Tool Flag,User Mail,Display Name,Activity Date,Month_Year,Month Id,Period Start Date,Period End Date,Token Consumption,Daily Billable Tokens,Cost in USD,CT/Non-CT,Country,Service Line,Org Sub Service Line,Sub-Service Line 1,Sub-Service Line 2,Engagement Code,Engagement Super Region,Engagement Service Line,Engagement Sub Service Line,Engagement Competency,Region,Management Region,License Cost in USD,Usage Free Token Limit,Billable/Non-Billable,ProjectType,GDS Location,Cost Center&#10;chatgpt,user@corp.com,User Name,2026-03-01,March_2026,202603,01/03/2026,31/03/2026,25000,25000,0.35,CT,USA,Consulting,Strategy,Delivery,Hybrid Delivery,E-1234,Americas,Tax,Client Advisory,People Advisory,North America,Americas,100.00,80.00,True,External,Onshore,CC-CNS-101"
+              placeholder="AI Tool Flag,User Mail,Display Name,Activity Date,Month_Year,Month Id,Token Consumption,Daily Billable Tokens,Cost in USD,CT/Non-CT,Country,Service Line,Org Sub Service Line,Sub-Service Line 1,Sub-Service Line 2,Engagement Code,Engagement Super Region,Engagement Service Line,Engagement Sub Service Line,Engagement Competency,Region,Management Region,License Cost in USD,Usage Free Token Limit,Billable/Non-Billable,ProjectType,GDS Location,Cost Center&#10;chatgpt,user@corp.com,User Name,2026-03-01,March_2026,202603,25000,25000,0.35,CT,USA,Consulting,Strategy,Delivery,Hybrid Delivery,E-1234,Americas,Tax,Client Advisory,People Advisory,North America,Americas,100.00,80.00,True,External,Onshore,CC-CNS-101"
               className="w-full bg-ey-black/60 border border-ey-border rounded-xl p-3 text-xs text-ey-light font-mono focus:outline-none focus:border-ey-yellow"
             />
           </div>

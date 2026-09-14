@@ -24,8 +24,6 @@ export interface CsvUsageRow {
   activityDate: string;         // Activity Date: YYYY-MM-DD
   monthYear: string;            // Month_Year: March_2026
   monthId: number;              // Month Id: 202603
-  periodStartDate: string;      // Period Start Date: DD/MM/YYYY
-  periodEndDate: string;        // Period End Date: DD/MM/YYYY
   tokenConsumption: number;     // Token Consumption
   dailyBillableTokens: number;  // Daily Billable Tokens
   cost: number;                 // Cost in USD
@@ -90,12 +88,12 @@ function getCsvFilePath(): string {
 // Line, Engagement Sub Service Line) -> Engagement Competency.
 const COL = {
   aiTool: 0, userMail: 1, displayName: 2, activityDate: 3, monthYear: 4, monthId: 5,
-  periodStartDate: 6, periodEndDate: 7, tokenConsumption: 8, dailyBillableTokens: 9, cost: 10,
-  ctNonCt: 11, country: 12, orgServiceLine: 13, orgSubServiceLine: 14,
-  subServiceLine1: 15, subServiceLine2: 16, projectCode: 17,
-  engagementSuperRegion: 18, engagementServiceLine: 19, engagementSubServiceLine: 20, engagementCompetency: 21,
-  region: 22, managementRegion: 23, licenseCost: 24, usageFreeTokenLimit: 25,
-  billableFlag: 26, projectType: 27, gdsLocation: 28, costCenter: 29,
+  tokenConsumption: 6, dailyBillableTokens: 7, cost: 8,
+  ctNonCt: 9, country: 10, orgServiceLine: 11, orgSubServiceLine: 12,
+  subServiceLine1: 13, subServiceLine2: 14, projectCode: 15,
+  engagementSuperRegion: 16, engagementServiceLine: 17, engagementSubServiceLine: 18, engagementCompetency: 19,
+  region: 20, managementRegion: 21, licenseCost: 22, usageFreeTokenLimit: 23,
+  billableFlag: 24, projectType: 25, gdsLocation: 26, costCenter: 27,
 };
 
 // parseFloat(x) || fallback silently replaces a legitimate 0 (falsy in JS)
@@ -126,8 +124,6 @@ export function parseRawCsvText(raw: string): CsvUsageRow[] {
       activityDate: get(COL.activityDate),  // YYYY-MM-DD
       monthYear: get(COL.monthYear),
       monthId: parseInt(get(COL.monthId), 10) || 0,
-      periodStartDate: get(COL.periodStartDate),
-      periodEndDate: get(COL.periodEndDate),
       tokenConsumption: parseFloat(get(COL.tokenConsumption)) || 0,
       dailyBillableTokens: parseFloat(get(COL.dailyBillableTokens)) || 0,
       cost: parseFloat(get(COL.cost)) || 0,
