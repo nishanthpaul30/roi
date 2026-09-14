@@ -647,10 +647,10 @@ export function ExecutiveInferenceDrilldownView({
     const priciestTool = byCostAsc[byCostAsc.length - 1]?.tool;
     const topSpendTool = bySpendDesc[0]?.tool;
     for (const t of toolList) {
-      if (t.tool === topSpendTool) t.badge = `Primary Spend Driver (${t.spendShare.toFixed(1)}%)`;
+      if (t.tool === topSpendTool) t.badge = `Highest Spend (${t.spendShare.toFixed(1)}%)`;
       else if (t.tool === cheapestTool) t.badge = 'Lowest Unit Cost';
       else if (t.tool === priciestTool) t.badge = 'Highest Unit Cost';
-      else t.badge = 'Mid-Tier Rate';
+      else t.badge = '';
     }
 
     // GitHub Copilot always displays first; the rest keep their existing relative order.
@@ -1016,7 +1016,7 @@ export function ExecutiveInferenceDrilldownView({
         <div className="bg-ey-yellow/5 border border-ey-yellow/20 rounded-xl p-3.5 flex items-start space-x-3">
           <Sparkles className="w-5 h-5 text-ey-yellow shrink-0 mt-0.5" />
           <div className="flex-1 text-xs">
-            <span className="font-bold text-ey-yellow uppercase tracking-wider mr-2">Executive Action:</span>
+            <span className="font-bold text-ey-yellow uppercase tracking-wider mr-2">Suggestive Action:</span>
             <span className="text-ey-light leading-relaxed">{currentMeta.actionableInsight}</span>
           </div>
         </div>
@@ -1183,7 +1183,9 @@ export function ExecutiveInferenceDrilldownView({
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-ey-muted text-[10px] uppercase font-bold">{t.shortLabel}</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${t.badgeBg}`}>{t.badge}</span>
+                      {t.badge && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${t.badgeBg}`}>{t.badge}</span>
+                      )}
                     </div>
                     <p className={`text-2xl font-bold ${t.color}`}>${t.costPerM.toFixed(2)} / M</p>
                     <p className="text-[10px] text-ey-muted">{t.label} • {(t.tokens / 1000000).toFixed(1)}M Tokens</p>
@@ -1218,11 +1220,13 @@ export function ExecutiveInferenceDrilldownView({
                     title={`Click to inspect all ${t.label} log records`}
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md border ${t.badgeBg}`}>
-                          {t.badge}
-                        </span>
-                        <span className="text-xs font-mono text-ey-muted">{t.rowCount} Logs</span>
+                      <div className="flex items-center mb-2">
+                        {t.badge && (
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md border ${t.badgeBg}`}>
+                            {t.badge}
+                          </span>
+                        )}
+                        <span className="text-xs font-mono text-ey-muted ml-auto">{t.rowCount} Logs</span>
                       </div>
                       <h4 className="text-base font-bold text-ey-light tracking-tight group-hover:text-ey-yellow transition-colors">
                         {t.label}

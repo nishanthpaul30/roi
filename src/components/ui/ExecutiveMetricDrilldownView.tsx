@@ -42,6 +42,16 @@ interface ExecutiveMetricDrilldownViewProps {
 const fmtMoney = (v: number) => `$${(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtTokens = (v: number) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(v || 0);
 
+const TOOL_LABELS: Record<string, string> = {
+  chatgpt: 'ChatGPT',
+  github: 'GitHub Copilot',
+  claude: 'Claude',
+  replit: 'Replit',
+  factory: 'Factory AI',
+  cursor: 'Cursor AI',
+};
+const toolLabel = (tool: string) => TOOL_LABELS[tool.toLowerCase()] || tool;
+
 // The CT/Non-CT tiles sit on every KPI's Level 1 view — the headline figure on
 // each tile should match whatever that specific metric measures (a day-rate,
 // a per-user rate, a token count, or a raw spend total), not just always repeat
@@ -550,11 +560,11 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                         className="space-y-1.5 bg-ey-black/40 border border-ey-border/60 hover:border-ey-yellow/60 p-3 rounded-xl cursor-pointer transition group"
                       >
                         <div className="flex justify-between items-center text-ey-light group-hover:text-ey-yellow">
-                          <span className="capitalize font-bold text-sm flex items-center gap-1.5">
-                            <span>{t.tool}</span>
+                          <span className="font-bold text-sm flex items-center gap-1.5">
+                            <span>{toolLabel(t.tool)}</span>
                             <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </span>
-                          <span>{t.tokens.toLocaleString()} tokens ({pct}%)</span>
+                          <span>{fmtTokens(t.tokens)} tokens ({pct}%)</span>
                         </div>
                         <div className="w-full bg-ey-black rounded-full h-2 overflow-hidden border border-ey-border">
                           <div className="bg-ey-yellow h-full transition-all duration-300" style={{ width: `${pct}%` }} />
@@ -585,7 +595,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                         <span>{s.serviceLine}</span>
                         <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </span>
-                      <span className="text-cyan-300 font-bold">{s.tokens.toLocaleString()} tokens</span>
+                      <span className="text-cyan-300 font-bold">{fmtTokens(s.tokens)} tokens</span>
                     </div>
                   ))}
                 </div>
@@ -649,23 +659,12 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                         <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow" />
                       </span>
                       <p className="text-xl font-bold text-ey-yellow">${r.cost.toFixed(2)}</p>
-                      <p className="text-ey-muted text-[11px]">{r.tokens.toLocaleString()} tokens</p>
+                      <p className="text-ey-muted text-[11px]">{fmtTokens(r.tokens)} tokens</p>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-          )}
-
-          {id === 'cost_per_user' && (
-            <HierarchyDrilldownPanel
-              rows={allRows}
-              title="Level 3: Developer Seat & Active User Hierarchy"
-              onPathChange={setHierarchyPath}
-              onSelectUser={(email, label) =>
-                setSubDrilldown({ type: 'user', id: email, name: email, subtitle: `Raw usage records for ${label}` })
-              }
-            />
           )}
 
           {/* Top Engagement Codes Telemetry Grid -> Level 3 Trigger */}
@@ -698,7 +697,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-ey-yellow">${p.cost.toFixed(2)}</p>
-                      <p className="text-[10px] text-ey-muted">{p.tokens.toLocaleString()} tok</p>
+                      <p className="text-[10px] text-ey-muted">{fmtTokens(p.tokens)} tok</p>
                     </div>
                   </div>
                 ))}
@@ -713,7 +712,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
             <div className="flex items-center justify-between border-b border-ey-border/60 pb-3">
               <h3 className="text-base font-bold text-ey-light flex items-center gap-2">
                 <Zap className="w-5 h-5 text-ey-yellow" />
-                <span>Daily Telemetry Movement &amp; Run-Rate</span>
+                <span>Monthly Telemetry Movement &amp; Run-Rate</span>
               </h3>
             </div>
 
@@ -721,8 +720,8 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
               title={`${title} Trend Over Filtered Range${chartTitleSuffix}`}
               subtitle={
                 scopedRows
-                  ? `Daily aggregated telemetry data points, scoped to the current drill-down`
-                  : 'Daily aggregated telemetry data points'
+                  ? `Monthly aggregated telemetry data points, scoped to the current drill-down`
+                  : 'Monthly aggregated telemetry data points'
               }
               data={chartSeries}
               chartType="area"

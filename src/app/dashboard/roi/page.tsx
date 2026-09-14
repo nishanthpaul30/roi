@@ -257,15 +257,15 @@ export default function RoiPage() {
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <MetricChart
-                title="Daily API Cost Over Time"
-                subtitle="Cost in USD per day"
+                title="Monthly API Cost Over Time"
+                subtitle="Cost in USD per month"
                 data={data.metrics.cost.series}
                 chartType="area"
-                series={[{ key: 'value', name: 'Daily Cost ($)', color: '#FFE600' }]}
+                series={[{ key: 'value', name: 'Monthly Cost ($)', color: '#FFE600' }]}
               />
               <MetricChart
-                title="Daily Token Consumption"
-                subtitle="Token Consumption per day"
+                title="Monthly Token Consumption"
+                subtitle="Token Consumption per month"
                 data={data.metrics.tokenConsumption.series}
                 chartType="area"
                 series={[{ key: 'value', name: 'Token Consumption', color: '#6366f1' }]}

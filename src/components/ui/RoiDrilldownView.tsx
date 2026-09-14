@@ -413,7 +413,6 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
           cost: b.cost,
           tokens: b.tokens,
           billableCost: b.billableCost,
-          avgRecordCost: b.rowCount > 0 ? b.cost / b.rowCount : 0,
           userCount: b.users.size,
           projectCount: b.projects.size,
           licenseCost,
@@ -706,8 +705,8 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
           </div>
         </div>
 
-        {/* 4 Slice Summary KPI Metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+        {/* 3 Slice Summary KPI Metrics */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
           <div className="p-3 bg-ey-black/40 border border-ey-border rounded-xl space-y-0.5">
             <span className="text-[10px] text-ey-muted">UNIQUE ACTIVE USERS</span>
             <p className="text-base font-bold text-ey-light">{uniqueUsers} employees</p>
@@ -746,18 +745,6 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
             )}
           </div>
 
-          <div className="p-3 bg-ey-black/40 border border-ey-border rounded-xl space-y-0.5">
-            <span className="text-[10px] text-ey-muted">AVG RECORD COST</span>
-            <p className="text-base font-bold text-ey-yellow">
-              ${targetRows.length > 0 ? (totalSliceCost / targetRows.length).toFixed(4) : '0.0000'}
-            </p>
-            {!selectedSubEntity && (ctSeg || nonCtSeg) && (
-              <p className="text-[10px] text-ey-muted">
-                <span className="text-cyan-300 font-semibold">CT</span> ${(ctSeg?.avgRecordCost ?? 0).toFixed(4)} ·{' '}
-                <span className="text-cyan-400/70 font-semibold">Non-CT</span> ${(nonCtSeg?.avgRecordCost ?? 0).toFixed(4)}
-              </p>
-            )}
-          </div>
         </div>
 
         {/* CT / Non-CT Segregation of this slice — prominent, clickable drill-down tiles */}

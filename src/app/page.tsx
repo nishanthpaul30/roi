@@ -182,7 +182,7 @@ export default function ExecutiveOverviewPage() {
                         'token_consumption',
                         'Total Token Consumption',
                         'Comprehensive volume breakdown across tools, regions, and service lines',
-                        `${(data.metrics.tokenConsumption.summary.current || 0).toLocaleString()} tokens`,
+                        `${new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(data.metrics.tokenConsumption.summary.current || 0)} tokens`,
                         data.metrics.tokenConsumption.summary,
                         data.metrics.tokenConsumption.series
                       )
