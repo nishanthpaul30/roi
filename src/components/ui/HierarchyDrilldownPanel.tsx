@@ -220,15 +220,62 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
         <div className="space-y-4">
           {currentLevel.fields.map((f) => {
             const groups = summarize(pathRows, f.key);
+            const combinedCost = groups.reduce((s, g) => s + g.cost, 0);
+            const combinedTokens = groups.reduce((s, g) => s + g.tokens, 0);
+            const combinedUsers = new Set(pathRows.map((r) => r.userMail.toLowerCase())).size;
             return (
               <div key={f.key}>
-                <p className="text-[11px] font-bold text-ey-light mb-2">
-                  Level {path.length + 1}: {f.label}{' '}
-                  <span className="text-ey-muted font-normal">({groups.length} value{groups.length === 1 ? '' : 's'})</span>
-                </p>
+                <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+                  <p className="text-[11px] font-bold text-ey-light">
+                    Level {path.length + 1}: {f.label}{' '}
+                    <span className="text-ey-muted font-normal">({groups.length} value{groups.length === 1 ? '' : 's'})</span>
+                  </p>
+                  {groups.length > 1 && (
+                    <p className="text-xs font-semibold text-ey-light font-mono text-right">
+                      Total: <span className="font-extrabold text-sm">{fmtCost(combinedCost)}</span>
+                      {' · '}{combinedUsers} users · {combinedTokens.toLocaleString()} tokens
+                    </p>
+                  )}
+                </div>
                 {groups.length === 0 ? (
                   <p className="text-[11px] text-ey-muted py-3 text-center">No data at this step.</p>
+                ) : groups.length <= 8 ? (
+                  // Small value sets (CT/Non-CT, Region, Service Line, ...) get the same
+                  // prominent clickable tile used for CT/Non-CT everywhere else in the app
+                  // (RoiDrilldownView, ExecutiveMetricDrilldownView), instead of a plain table.
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {groups.map((g) => (
+                      <button
+                        key={g.value}
+                        onClick={() => selectValue(currentLevel.id, f.key, f.label, g.value)}
+                        title={`Click to drill down into ${g.value}`}
+                        className="w-full flex items-center justify-between gap-3 bg-cyan-500/10 hover:bg-cyan-500/20 border-2 border-cyan-500/40 hover:border-cyan-400 px-4 py-3.5 rounded-2xl transition-all cursor-pointer group text-left shadow-sm hover:shadow-lg hover:shadow-cyan-500/10"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-cyan-300 font-extrabold text-xs uppercase tracking-wider truncate">{g.value}</span>
+                            <span className="text-[9px] text-cyan-400 font-bold uppercase tracking-wider bg-cyan-500/15 px-1.5 py-0.5 rounded border border-cyan-500/30 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                              Click to drill down
+                            </span>
+                          </div>
+                          <div className="flex items-baseline gap-2 mt-1">
+                            <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
+                              {fmtCost(g.cost)}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-ey-muted mt-0.5">
+                            {g.userCount} users · {g.tokens.toLocaleString()} tokens
+                          </p>
+                        </div>
+                        <div className="p-2 bg-cyan-500/15 border border-cyan-500/40 rounded-xl text-cyan-300 group-hover:bg-cyan-500/25 group-hover:scale-110 transition-all shrink-0">
+                          <ArrowUpRight className="w-5 h-5" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 ) : (
+                  // Large value sets (Engagement Code, etc. can run into the hundreds) stay
+                  // a compact scannable table — a card per row wouldn't be readable at that volume.
                   <div className="overflow-x-auto border border-ey-border rounded-xl">
                     <table className="w-full text-left text-xs">
                       <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border text-[10px]">

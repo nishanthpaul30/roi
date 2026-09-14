@@ -988,6 +988,13 @@ export function ExecutiveInferenceDrilldownView({
           {/* 1. SEAT UTILIZATION DECOMPOSITION */}
           {inferenceId === 'seat_utilization' && (
             <div className="space-y-6">
+              {/* Mandated Hierarchy Navigator — always shown first, at the top */}
+              <HierarchyDrilldownPanel
+                rows={activePeriodRows}
+                title={`Level 3: Active Seat Hierarchy (${activeUserList.length} Users)`}
+                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+              />
+
               {/* Level 2 KPI Tiles */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
@@ -1075,18 +1082,19 @@ export function ExecutiveInferenceDrilldownView({
                 </div>
               </div>
 
-              {/* Level 3: Mandated Hierarchy Navigator — user identity only appears at the final level */}
-              <HierarchyDrilldownPanel
-                rows={activePeriodRows}
-                title={`Level 3: Active Seat Hierarchy (${activeUserList.length} Users)`}
-                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
-              />
             </div>
           )}
 
           {/* 3. PARETO 80/20 COST CONCENTRATION DECOMPOSITION */}
           {inferenceId === 'pareto_risk' && (
             <div className="space-y-6">
+              {/* Mandated Hierarchy Navigator — always shown first, at the top, scoped to the top-20% power users' rows */}
+              <HierarchyDrilldownPanel
+                rows={allRows.filter((r) => top20Users.some((u) => u.email === (r.userMail || '').toLowerCase().trim()))}
+                title={`Level 3: Top 20% Power User Hierarchy (${top20Users.length} Key Accounts)`}
+                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+              />
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Total Organization Spend</span>
@@ -1109,13 +1117,6 @@ export function ExecutiveInferenceDrilldownView({
                   <p className="text-[10px] text-emerald-300/80">{activeUserList.length - top20PercentCount} Users ({(100 - parseFloat(top20SpendPercent)).toFixed(1)}%)</p>
                 </div>
               </div>
-
-              {/* Level 3: Mandated Hierarchy Navigator, scoped to the top-20% power users' rows */}
-              <HierarchyDrilldownPanel
-                rows={allRows.filter((r) => top20Users.some((u) => u.email === (r.userMail || '').toLowerCase().trim()))}
-                title={`Level 3: Top 20% Power User Hierarchy (${top20Users.length} Key Accounts)`}
-                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
-              />
             </div>
           )}
 
@@ -1478,6 +1479,14 @@ export function ExecutiveInferenceDrilldownView({
           {/* 6. CLIENT BILLABILITY & PROJECT TELEMETRY ALIGNMENT */}
           {inferenceId === 'project_billability' && (
             <div className="space-y-6">
+              {/* Mandated Hierarchy Navigator — always shown first, at the top (Engagement Code sits inside it at level 4) */}
+              <HierarchyDrilldownPanel
+                rows={allRows}
+                title="Level 3: Billability & Engagement Hierarchy"
+                subtitle="Billable and non-billable engagement codes appear at the Engagement Code step below."
+                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+              />
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Client Billable Spend</span>
@@ -1500,14 +1509,6 @@ export function ExecutiveInferenceDrilldownView({
                   <p className="text-[10px] text-emerald-300/80">100% Code Compliance</p>
                 </div>
               </div>
-
-              {/* Level 3: Mandated Hierarchy Navigator (Engagement Code sits inside it at level 4) */}
-              <HierarchyDrilldownPanel
-                rows={allRows}
-                title="Level 3: Billability & Engagement Hierarchy"
-                subtitle="Billable and non-billable engagement codes appear at the Engagement Code step below."
-                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
-              />
             </div>
           )}
 
