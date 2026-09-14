@@ -1,5 +1,15 @@
 import { NextResponse } from 'next/server';
-import { calculatePivot, DimensionKey, MetricKey, DIMENSIONS, METRICS } from '@/lib/metrics/pivot';
+import {
+  calculatePivot,
+  DimensionKey,
+  MetricKey,
+  DIMENSIONS,
+  METRICS,
+  EXTRA_FILTER_DIMENSIONS,
+  ExtraFilterKey,
+  ExtraFilters,
+  getExtraFilterOptions,
+} from '@/lib/metrics/pivot';
 import { GlobalFilterState } from '@/lib/metrics/types';
 
 export const dynamic = 'force-dynamic';
@@ -35,9 +45,21 @@ export async function GET(request: Request) {
     agent: 'all',
   };
 
+  const extraFilters: ExtraFilters = {};
+  for (const { key } of EXTRA_FILTER_DIMENSIONS) {
+    const value = searchParams.get(key as ExtraFilterKey);
+    if (value) extraFilters[key] = value;
+  }
+
   try {
-    const result = calculatePivot(filters, rowDim, colDim, metric);
-    return NextResponse.json({ result, dimensions: DIMENSIONS, metrics: METRICS });
+    const result = calculatePivot(filters, rowDim, colDim, metric, extraFilters);
+    return NextResponse.json({
+      result,
+      dimensions: DIMENSIONS,
+      metrics: METRICS,
+      extraFilterDimensions: EXTRA_FILTER_DIMENSIONS,
+      extraFilterOptions: getExtraFilterOptions(),
+    });
   } catch (error: any) {
     console.error('Error computing pivot:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });

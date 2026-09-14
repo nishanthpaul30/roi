@@ -1,25 +1,88 @@
-import { loadCsvData, CsvUsageRow } from '../data/csvLoader';
+import { loadCsvData, dateStringToMonthId, getDistinctValues, CsvUsageRow } from '../data/csvLoader';
 import { GlobalFilterState } from './types';
 
-function filterRows(rows: CsvUsageRow[], filters: GlobalFilterState, sDate: string, eDate: string): CsvUsageRow[] {
+// Extra dimensions the Data Playground exposes as standalone filters, beyond
+// what the shared GlobalFilterBar already covers (aiTool, superRegion,
+// serviceLine, country, date range). Field names match CsvUsageRow directly.
+export const EXTRA_FILTER_DIMENSIONS: { key: ExtraFilterKey; label: string }[] = [
+  { key: 'ctNonCt', label: 'CT / Non-CT' },
+  { key: 'subServiceLine1', label: 'Sub-Service Line 1' },
+  { key: 'subServiceLine2', label: 'Sub-Service Line 2' },
+  { key: 'projectCode', label: 'Engagement Code' },
+  { key: 'engagementSuperRegion', label: 'Engagement Super Region' },
+  { key: 'engagementServiceLine', label: 'Engagement Service Line' },
+  { key: 'engagementSubServiceLine', label: 'Engagement Sub Service Line' },
+  { key: 'engagementCompetency', label: 'Engagement Competency' },
+  { key: 'projectType', label: 'Project Type' },
+  { key: 'billableFlag', label: 'Billable / Non-Billable' },
+  { key: 'calculationMethod', label: 'Calculation Method' },
+  { key: 'gdsLocation', label: 'GDS Location' },
+  { key: 'costCenter', label: 'Cost Center' },
+];
+
+export type ExtraFilterKey =
+  | 'ctNonCt'
+  | 'subServiceLine1'
+  | 'subServiceLine2'
+  | 'projectCode'
+  | 'engagementSuperRegion'
+  | 'engagementServiceLine'
+  | 'engagementSubServiceLine'
+  | 'engagementCompetency'
+  | 'projectType'
+  | 'billableFlag'
+  | 'calculationMethod'
+  | 'gdsLocation'
+  | 'costCenter';
+
+export type ExtraFilters = Partial<Record<ExtraFilterKey, string>>;
+
+/** Distinct values for every extra-filter dimension, for populating dropdowns. */
+export function getExtraFilterOptions(): Record<ExtraFilterKey, string[]> {
+  const options = {} as Record<ExtraFilterKey, string[]>;
+  for (const { key } of EXTRA_FILTER_DIMENSIONS) {
+    options[key] = getDistinctValues(key as keyof CsvUsageRow);
+  }
+  return options;
+}
+
+function filterRows(
+  rows: CsvUsageRow[],
+  filters: GlobalFilterState,
+  sDate: string,
+  eDate: string,
+  extraFilters?: ExtraFilters
+): CsvUsageRow[] {
+  const startMonthId = dateStringToMonthId(sDate);
+  const endMonthId = dateStringToMonthId(eDate);
   return rows.filter((r) => {
-    if (r.activityDate < sDate || r.activityDate > eDate) return false;
+    if (r.monthId < startMonthId || r.monthId > endMonthId) return false;
     if (filters.aiTool && filters.aiTool !== 'all' && r.aiTool !== filters.aiTool) return false;
-    if (filters.managementRegion && filters.managementRegion !== 'all' && r.managementRegion !== filters.managementRegion) return false;
+    if (filters.managementRegion && filters.managementRegion !== 'all' && r.superRegion !== filters.managementRegion) return false;
     if (filters.serviceLine && filters.serviceLine !== 'all' && r.orgServiceLine !== filters.serviceLine) return false;
     if (filters.userMail && filters.userMail !== 'all' && r.userMail !== filters.userMail) return false;
     if (filters.country && filters.country !== 'all' && r.country !== filters.country) return false;
+    if (extraFilters) {
+      for (const { key } of EXTRA_FILTER_DIMENSIONS) {
+        const wanted = extraFilters[key];
+        if (wanted && wanted !== 'all' && String(r[key as keyof CsvUsageRow] ?? '') !== wanted) return false;
+      }
+    }
     return true;
   });
 }
 
+/** Raw rows matching every current filter (global + Data Playground extras) — shared by the pivot and the "Export Excel" download so both reflect the exact same slice. */
+export function getFilteredPlaygroundRows(filters: GlobalFilterState, extraFilters?: ExtraFilters): CsvUsageRow[] {
+  const allRows = loadCsvData();
+  return filterRows(allRows, filters, filters.startDate, filters.endDate, extraFilters);
+}
+
 export type DimensionKey =
   | 'aiTool'
-  | 'managementRegion'
-  | 'region'
+  | 'superRegion'
   | 'country'
   | 'orgServiceLine'
-  | 'orgSubServiceLine'
   | 'projectType'
   | 'billableFlag'
   | 'projectCode'
@@ -32,7 +95,8 @@ export type DimensionKey =
   | 'engagementSubServiceLine'
   | 'engagementCompetency'
   | 'gdsLocation'
-  | 'costCenter';
+  | 'costCenter'
+  | 'calculationMethod';
 
 // Ordered per the required application-wide hierarchy:
 // CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1 -> Sub-Service Line 2 ->
@@ -50,22 +114,20 @@ export const DIMENSIONS: { key: DimensionKey; label: string }[] = [
   { key: 'engagementSubServiceLine', label: 'Engagement Sub Service Line' },
   { key: 'engagementCompetency', label: 'Engagement Competency' },
   { key: 'aiTool', label: 'AI Tool' },
-  { key: 'managementRegion', label: 'Management Region' },
-  { key: 'region', label: 'Region' },
-  { key: 'orgSubServiceLine', label: 'Org Sub-Service Line' },
+  { key: 'superRegion', label: 'Super Region' },
   { key: 'projectType', label: 'Project Type' },
   { key: 'billableFlag', label: 'Billable / Non-Billable' },
+  { key: 'calculationMethod', label: 'Calculation Method' },
   { key: 'gdsLocation', label: 'GDS Location' },
   { key: 'costCenter', label: 'Cost Center' },
   { key: 'monthLabel', label: 'Month' },
 ];
 
-export type MetricKey = 'cost' | 'tokenConsumption' | 'dailyBillableTokens';
+export type MetricKey = 'cost' | 'tokenConsumption';
 
 export const METRICS: { key: MetricKey; label: string }[] = [
   { key: 'cost', label: 'Cost (USD)' },
-  { key: 'tokenConsumption', label: 'Token Consumption' },
-  { key: 'dailyBillableTokens', label: 'Daily Billable Tokens' },
+  { key: 'tokenConsumption', label: 'GenAI Tool Consumption' },
 ];
 
 function extractDim(row: CsvUsageRow, dim: DimensionKey): string {
@@ -76,8 +138,7 @@ function extractDim(row: CsvUsageRow, dim: DimensionKey): string {
 
 function extractMetric(row: CsvUsageRow, metric: MetricKey): number {
   if (metric === 'cost') return row.cost;
-  if (metric === 'tokenConsumption') return row.tokenConsumption;
-  return row.dailyBillableTokens;
+  return row.tokenConsumption;
 }
 
 export interface PivotResult {
@@ -99,10 +160,10 @@ export function calculatePivot(
   filters: GlobalFilterState,
   rowDim: DimensionKey,
   colDim: DimensionKey | 'none',
-  metric: MetricKey
+  metric: MetricKey,
+  extraFilters?: ExtraFilters
 ): PivotResult {
-  const allRows = loadCsvData();
-  const rows = filterRows(allRows, filters, filters.startDate, filters.endDate);
+  const rows = getFilteredPlaygroundRows(filters, extraFilters);
 
   const columns = colDim === 'none'
     ? []

@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { useMetricsData } from '@/hooks/useMetricsData';
 import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { ExplorerChart } from '@/components/ui/ExplorerChart';
 import { DataTable, Column } from '@/components/ui/DataTable';
-import { LayoutGrid, Sparkles } from 'lucide-react';
+import { LayoutGrid, Sparkles, Download, SlidersHorizontal, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface DimensionOption {
   key: string;
@@ -28,11 +29,43 @@ export default function DataExplorerPage() {
 
   const [dimensions, setDimensions] = useState<DimensionOption[]>([]);
   const [metrics, setMetrics] = useState<DimensionOption[]>([]);
-  const [rowDim, setRowDim] = useState('aiTool');
+  const [rowDim, setRowDim] = useState('ctNonCt');
   const [colDim, setColDim] = useState('none');
   const [metric, setMetric] = useState('cost');
   const [result, setResult] = useState<PivotResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+
+  // Extra filters this page exposes beyond the shared GlobalFilterBar — every
+  // dimension with no dedicated panel elsewhere (Engagement chain, GDS
+  // Location, Cost Center, Calculation Method, Billable flag, etc.).
+  const [extraFilterDimensions, setExtraFilterDimensions] = useState<DimensionOption[]>([]);
+  const [extraFilterOptions, setExtraFilterOptions] = useState<Record<string, string[]>>({});
+  const [extraFilters, setExtraFilters] = useState<Record<string, string>>({});
+  const [showExtraFilters, setShowExtraFilters] = useState(false);
+
+  // A dimension already chosen as Rows or Columns has its own filter hidden —
+  // filtering to one value of the exact field you're breaking down by just
+  // duplicates the breakdown and adds clutter.
+  const visibleExtraFilterDimensions = useMemo(
+    () => extraFilterDimensions.filter((d) => d.key !== rowDim && d.key !== colDim),
+    [extraFilterDimensions, rowDim, colDim]
+  );
+  const activeExtraFilterCount = visibleExtraFilterDimensions.filter(
+    (d) => extraFilters[d.key] && extraFilters[d.key] !== 'all'
+  ).length;
+
+  const handleRowDimChange = (value: string) => {
+    setRowDim(value);
+    // Same field can't stay both a breakdown axis and a hidden active filter.
+    setExtraFilters((prev) => (prev[value] && prev[value] !== 'all' ? { ...prev, [value]: 'all' } : prev));
+    if (value === colDim) setColDim('none');
+  };
+
+  const handleColDimChange = (value: string) => {
+    setColDim(value);
+    setExtraFilters((prev) => (prev[value] && prev[value] !== 'all' ? { ...prev, [value]: 'all' } : prev));
+  };
 
   const loadPivot = useCallback(async () => {
     setLoading(true);
@@ -49,17 +82,22 @@ export default function DataExplorerPage() {
         colDim,
         metric,
       });
+      for (const [key, value] of Object.entries(extraFilters)) {
+        if (value && value !== 'all') params.set(key, value);
+      }
       const res = await fetch(`/api/metrics/pivot?${params.toString()}`);
       const json = await res.json();
       setResult(json.result);
       setDimensions(json.dimensions || []);
       setMetrics(json.metrics || []);
+      setExtraFilterDimensions(json.extraFilterDimensions || []);
+      setExtraFilterOptions(json.extraFilterOptions || {});
     } catch (err) {
       console.error('Failed to load pivot data:', err);
     } finally {
       setLoading(false);
     }
-  }, [filters, rowDim, colDim, metric]);
+  }, [filters, rowDim, colDim, metric, extraFilters]);
 
   useEffect(() => {
     loadPivot();
@@ -98,6 +136,60 @@ export default function DataExplorerPage() {
 
   const chartData = useMemo(() => (result ? result.rows.slice(0, 15) : []), [result]);
 
+  const handleExtraFilterChange = (key: string, value: string) => {
+    setExtraFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleResetExtraFilters = () => setExtraFilters({});
+
+  const handleExportExcel = async () => {
+    if (!result) return;
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        aiTool: filters.aiTool,
+        managementRegion: filters.managementRegion,
+        serviceLine: filters.serviceLine,
+        userMail: filters.userMail,
+        country: filters.country,
+      });
+      for (const [key, value] of Object.entries(extraFilters)) {
+        if (value && value !== 'all') params.set(key, value);
+      }
+      const res = await fetch(`/api/metrics/playground-export?${params.toString()}`);
+      const json = await res.json();
+      const rawRows: Record<string, any>[] = json.rows || [];
+
+      // Sheet 1: the pivot cross-tab exactly as shown on screen.
+      const pivotSheetData = result.rows.map((r) => {
+        const row: Record<string, any> = {
+          [result.rowDimLabel]: r.label,
+          'Active Users': r.userCount,
+        };
+        if (result.colDim === 'none') {
+          row[result.metricLabel] = r.value;
+        } else {
+          for (const c of result.columns) row[c] = r[c] || 0;
+          row.Total = r.total;
+        }
+        return row;
+      });
+
+      const workbook = XLSX.utils.book_new();
+      const pivotSheet = XLSX.utils.json_to_sheet(pivotSheetData);
+      XLSX.utils.book_append_sheet(workbook, pivotSheet, 'Pivot Summary');
+      const rawSheet = XLSX.utils.json_to_sheet(rawRows);
+      XLSX.utils.book_append_sheet(workbook, rawSheet, 'Raw Data');
+      XLSX.writeFile(workbook, `data_playground_export_${filters.startDate}_to_${filters.endDate}.xlsx`);
+    } catch (err) {
+      console.error('Failed to export Data Playground data:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col">
       <GlobalFilterBar filters={filters} onFilterChange={setFilters} filterOptions={data?.filterOptions} />
@@ -122,6 +214,15 @@ export default function DataExplorerPage() {
               </p>
             </div>
           </div>
+
+          <button
+            onClick={handleExportExcel}
+            disabled={exporting || loading || !result}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 bg-ey-yellow text-ey-black rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>{exporting ? 'Exporting…' : 'Export Excel'}</span>
+          </button>
         </div>
 
         {/* Pivot Controls */}
@@ -131,7 +232,7 @@ export default function DataExplorerPage() {
               <label className="block text-[11px] font-semibold text-ey-muted uppercase mb-1.5">Rows (break down by)</label>
               <select
                 value={rowDim}
-                onChange={(e) => setRowDim(e.target.value)}
+                onChange={(e) => handleRowDimChange(e.target.value)}
                 className="w-full bg-ey-black border border-ey-border text-ey-light text-xs rounded-md px-3 py-2 focus:outline-none focus:border-ey-yellow"
               >
                 {dimensions.map((d) => (
@@ -144,7 +245,7 @@ export default function DataExplorerPage() {
               <label className="block text-[11px] font-semibold text-ey-muted uppercase mb-1.5">Columns (split by, optional)</label>
               <select
                 value={colDim}
-                onChange={(e) => setColDim(e.target.value)}
+                onChange={(e) => handleColDimChange(e.target.value)}
                 className="w-full bg-ey-black border border-ey-border text-ey-light text-xs rounded-md px-3 py-2 focus:outline-none focus:border-ey-yellow"
               >
                 <option value="none">None (single total column)</option>
@@ -167,6 +268,66 @@ export default function DataExplorerPage() {
               </select>
             </div>
           </div>
+        </div>
+
+        {/* Additional Filters — every dimension without a dedicated panel elsewhere; collapsed by default */}
+        <div className="bg-ey-card border border-ey-border rounded-xl p-5 shadow-sm">
+          <button
+            onClick={() => setShowExtraFilters((prev) => !prev)}
+            className="w-full flex items-center justify-between gap-3"
+          >
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="w-4 h-4 text-indigo-400" />
+              <h2 className="text-xs font-bold text-ey-light uppercase tracking-wider">
+                Additional Filters
+              </h2>
+              {activeExtraFilterCount > 0 && (
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300">
+                  {activeExtraFilterCount} active
+                </span>
+              )}
+            </div>
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-muted">
+              {showExtraFilters ? 'Collapse' : 'Expand'}
+              {showExtraFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </span>
+          </button>
+
+          {showExtraFilters && (
+            <>
+              <div className="flex items-center justify-between gap-3 mt-3 mb-4">
+                <p className="text-[10.5px] text-ey-muted">
+                  Whatever's picked for Rows or Columns above is hidden here — filtering a field to one value while breaking down by that same field just duplicates it.
+                </p>
+                {activeExtraFilterCount > 0 && (
+                  <button
+                    onClick={handleResetExtraFilters}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-muted hover:text-ey-yellow bg-ey-black border border-ey-border px-2.5 py-1.5 rounded-lg transition shrink-0"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Reset
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {visibleExtraFilterDimensions.map((d) => (
+                  <div key={d.key}>
+                    <label className="block text-[10px] font-semibold text-ey-muted uppercase mb-1">{d.label}</label>
+                    <select
+                      value={extraFilters[d.key] || 'all'}
+                      onChange={(e) => handleExtraFilterChange(d.key, e.target.value)}
+                      className="w-full bg-ey-black border border-ey-border text-ey-light text-xs rounded-md px-2.5 py-1.5 focus:outline-none focus:border-ey-yellow"
+                    >
+                      <option value="all">All</option>
+                      {(extraFilterOptions[d.key] || []).map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {loading || !result ? (
