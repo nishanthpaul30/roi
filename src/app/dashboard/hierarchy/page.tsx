@@ -80,9 +80,19 @@ export default function HierarchyDrilldownPage() {
 
   const baseRows = useMemo(() => filterRowsByGlobalFilters(allRows, filters), [allRows, filters]);
 
+  // Every held tool gets a 'License' row every month regardless of activity
+  // (flat seat fee, tokenConsumption always 0). Cost/token totals throughout
+  // this hierarchy must sum only genuine Usage rows, or seat fees silently
+  // blend into what's presented as usage spend (e.g. total cost far exceeding
+  // summary.totalCost elsewhere in the app).
+  const usageRows = useMemo(
+    () => baseRows.filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0),
+    [baseRows]
+  );
+
   const pathRows = useMemo(
-    () => baseRows.filter((r) => path.every((p) => String(r[p.field] || '').trim() === p.value)),
-    [baseRows, path]
+    () => usageRows.filter((r) => path.every((p) => String(r[p.field] || '').trim() === p.value)),
+    [usageRows, path]
   );
 
   const currentLevel = LEVELS[path.length];
@@ -101,11 +111,11 @@ export default function HierarchyDrilldownPage() {
 
   // Combined Level 1+2 landing screen: a CT/Non-CT lens over the same country map,
   // so the very first thing shown is the map rather than a plain CT/Non-CT table.
-  const ctNonCtGroups = useMemo(() => summarize(baseRows, 'ctNonCt'), [baseRows]);
+  const ctNonCtGroups = useMemo(() => summarize(usageRows, 'ctNonCt'), [usageRows]);
   const effectiveSegment = combinedSegment ?? ctNonCtGroups[0]?.value ?? null;
   const combinedCountryGroups = useMemo(
-    () => (effectiveSegment ? summarize(baseRows.filter((r) => r.ctNonCt === effectiveSegment), 'country') : []),
-    [baseRows, effectiveSegment]
+    () => (effectiveSegment ? summarize(usageRows.filter((r) => r.ctNonCt === effectiveSegment), 'country') : []),
+    [usageRows, effectiveSegment]
   );
   const selectCombined = (country: string) => {
     if (!effectiveSegment) return;
@@ -119,7 +129,7 @@ export default function HierarchyDrilldownPage() {
   };
 
   const rawColumns: Column<CsvUsageRow>[] = [
-    { header: 'Date', accessorKey: 'activityDate' },
+    { header: 'Month', accessorKey: 'monthYear', cell: (r) => r.monthYear.replace(/_/g, ' ') },
     { header: 'User', accessorKey: 'displayName' },
     { header: 'AI Tool', accessorKey: 'aiTool' },
     { header: 'Tokens', accessorKey: 'tokenConsumption', cell: (r) => r.tokenConsumption.toLocaleString() },

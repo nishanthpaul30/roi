@@ -82,6 +82,15 @@ interface HierarchyDrilldownPanelProps {
  * inference drilldown so user-level detail only ever appears at the last level.
  */
 export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, initialPath, onPathChange }: HierarchyDrilldownPanelProps) {
+  // Every held tool gets a 'License' row every month regardless of activity
+  // (flat seat fee, tokenConsumption always 0). Cost/token figures throughout
+  // this hierarchy navigator represent actual usage, so License rows are
+  // excluded here rather than double-counting seat fees on top of consumption
+  // — callers that already pass usage-only rows are unaffected.
+  const usageRows = useMemo(
+    () => rows.filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0),
+    [rows]
+  );
   const basePath = useMemo(() => initialPath || [], [initialPath]);
   const [path, setPath] = useState<PathEntry[]>(basePath);
 
@@ -91,8 +100,8 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
   }, [path]);
 
   const pathRows = useMemo(
-    () => rows.filter((r) => path.every((p) => String(r[p.field] || '').trim() === p.value)),
-    [rows, path]
+    () => usageRows.filter((r) => path.every((p) => String(r[p.field] || '').trim() === p.value)),
+    [usageRows, path]
   );
 
   const currentLevel = LEVELS[path.length];

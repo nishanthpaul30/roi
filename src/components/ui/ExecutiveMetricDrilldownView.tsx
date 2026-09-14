@@ -154,7 +154,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
     return allRows.filter((r) => {
       if (type === 'tool') return r.aiTool.toLowerCase() === lowerName;
       if (type === 'service_line') return r.orgServiceLine.toLowerCase() === lowerName;
-      if (type === 'region') return r.managementRegion.toLowerCase() === lowerName;
+      if (type === 'region') return r.superRegion.toLowerCase() === lowerName;
       if (type === 'project_code') return (r.projectCode || '').toLowerCase() === lowerName;
       if (type === 'user') return r.userMail.toLowerCase() === lowerName || r.displayName.toLowerCase() === lowerName;
       return true;
@@ -172,7 +172,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
         r.aiTool.toLowerCase().includes(s) ||
         (r.projectCode || '').toLowerCase().includes(s) ||
         r.orgServiceLine.toLowerCase().includes(s) ||
-        r.activityDate.includes(s)
+        r.monthYear.toLowerCase().includes(s)
     );
   }, [granularRows, searchTerm]);
 
@@ -182,8 +182,14 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
     currentPage * itemsPerPage
   );
 
-  // Level 3 Granular Aggregates
-  const level3TotalCost = useMemo(() => granularRows.reduce((acc, r) => acc + r.cost, 0), [granularRows]);
+  // Level 3 Granular Aggregates — Usage rows only. License rows (flat seat fee,
+  // tokenConsumption always 0, present every month regardless of activity) stay
+  // visible in the raw granularRows log below, but must not blend into these
+  // summary totals or every Total Cost figure balloons far past summary.totalCost.
+  const level3TotalCost = useMemo(
+    () => granularRows.filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0).reduce((acc, r) => acc + r.cost, 0),
+    [granularRows]
+  );
   const level3TotalTokens = useMemo(() => granularRows.reduce((acc, r) => acc + r.tokenConsumption, 0), [granularRows]);
   const level3BillableRows = useMemo(
     () => granularRows.filter((r) => r.billableFlag === 'True' || r.billableFlag === 'true').length,
@@ -224,14 +230,15 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
 
   const chartSeries = useMemo(() => {
     if (!scopedRows) return series;
-    const dayMap = new Map<string, number>();
+    const monthMap = new Map<number, { label: string; value: number }>();
     for (const r of scopedRows) {
       const val = id === 'token_consumption' ? r.tokenConsumption : r.cost;
-      dayMap.set(r.activityDate, (dayMap.get(r.activityDate) || 0) + val);
+      const existing = monthMap.get(r.monthId);
+      monthMap.set(r.monthId, { label: r.monthYear, value: (existing?.value || 0) + val });
     }
-    return Array.from(dayMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, value]) => ({ date, value: Number(value.toFixed(4)) }));
+    return Array.from(monthMap.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([, { label, value }]) => ({ date: label, value: Number(value.toFixed(4)) }));
   }, [scopedRows, series, id]);
 
   return (
@@ -414,7 +421,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
               <table className="w-full text-left text-xs font-mono">
                 <thead className="bg-ey-black/60 text-ey-muted uppercase tracking-wider border-b border-ey-border">
                   <tr>
-                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Month</th>
                     <th className="px-4 py-3">User &amp; Email</th>
                     <th className="px-4 py-3">AI Tool</th>
                     <th className="px-4 py-3">Engagement Code</th>
@@ -428,7 +435,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                   {paginatedGranularRows.length > 0 ? (
                     paginatedGranularRows.map((r, idx) => (
                       <tr key={idx} className="hover:bg-ey-card-hover/80 transition">
-                        <td className="px-4 py-3 text-ey-muted whitespace-nowrap">{r.activityDate}</td>
+                        <td className="px-4 py-3 text-ey-muted whitespace-nowrap">{r.monthYear.replace(/_/g, ' ')}</td>
                         <td className="px-4 py-3 font-medium text-ey-light">
                           <div>{r.displayName}</div>
                           <div className="text-[10px] text-ey-muted">{r.userMail}</div>
@@ -634,7 +641,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                   {byRegion.map((r: any) => (
                     <div
                       key={r.region}
-                      onClick={() => chooseFacet({ field: 'managementRegion', value: r.region, label: 'Regional Spend Breakdown' })}
+                      onClick={() => chooseFacet({ field: 'superRegion', value: r.region, label: 'Regional Spend Breakdown' })}
                       className="bg-ey-black/60 border border-ey-border hover:border-ey-yellow/60 p-4 rounded-xl space-y-1 cursor-pointer transition group"
                     >
                       <span className="text-ey-muted text-[10px] uppercase font-bold group-hover:text-ey-yellow flex items-center justify-between">

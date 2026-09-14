@@ -15,10 +15,10 @@ import { TokenCostSummary } from '@/lib/metrics/types';
 
 const TOOL_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT',
-  copilot: 'GitHub Copilot',
+  github: 'GitHub Copilot',
   claude: 'Claude',
   replit: 'Replit',
-  factoryai: 'Factory AI',
+  factory: 'Factory AI',
   cursor: 'Cursor AI',
 };
 
@@ -72,7 +72,7 @@ export default function RoiPage() {
                     <span>Financial Governance &amp; Capacity Waste ROI</span>
                   </h1>
                   <p className="text-xs text-ey-muted mt-0.5">
-                    Bifurcated capacity waste, overage risk, and 100K token cap governance across your organization.
+                    Bifurcated capacity waste, overage risk, and hard dollar-ceiling governance across your organization.
                   </p>
                 </div>
               </div>
@@ -80,7 +80,7 @@ export default function RoiPage() {
               <div className="flex items-center space-x-3">
                 <div className="hidden md:flex items-center space-x-2 text-xs bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 text-amber-300 shrink-0">
                   <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="font-mono text-[11px]">Free Limit: <strong>Per-Tool</strong> (Copilot $20 · ChatGPT $20 · Cursor AI $40 · Claude/Replit/Factory AI $0) · Ceiling: <strong>100,000 tokens</strong></span>
+                  <span className="font-mono text-[11px]">Free Limit: <strong>Per-Tool Credits ($)</strong> · Ceiling: <strong>${summary ? Math.round(summary.hardCeiling).toLocaleString() : '—'}</strong></span>
                 </div>
               </div>
             </div>
@@ -129,13 +129,13 @@ export default function RoiPage() {
                   previousDataAvailable,
                 }}
                 formatType="currency"
-                description="Zone 1: Unconsumed dollar limit across under-utilized seats (limit - actualCost). Click to drill down to raw usage logs."
+                description="Zone 1: Unused free-dollar limit across under-utilized seats (limit - gross cost, per month). Click to drill down to raw usage logs."
                 onClick={() =>
                   openDrilldown({
                     type: 'zone',
                     id: 'waste',
                     title: 'Zone 1: Unconsumed Capacity Waste',
-                    subtitle: 'Under-utilized employee seats with unconsumed dollar allocations (per-tool free limit - actual cost).',
+                    subtitle: 'Under-utilized employee seats with unconsumed free-dollar limit (per-tool free limit - gross usage cost).',
                     badge: 'Zone 1 Waste',
                   })
                 }
@@ -152,7 +152,7 @@ export default function RoiPage() {
                   previousDataAvailable,
                 }}
                 formatType="currency"
-                description="Zone 2: Additional billed usage exceeding each tool's free limit (Copilot $20, ChatGPT $20, Cursor AI $40, Claude/Replit/Factory AI $0). Click to drill down to raw usage logs."
+                description="Zone 2: Billed usage exceeding each tool's free-dollar limit. Click to drill down to raw usage logs."
                 onClick={() =>
                   openDrilldown({
                     type: 'zone',
@@ -165,7 +165,7 @@ export default function RoiPage() {
               />
 
               <KpiCard
-                title="100K Cap Risk Count"
+                title="Dollar Cap Risk Count"
                 delta={{
                   current: summary.ceilingRiskCount,
                   previous: summary.prevCeilingRiskCount,
@@ -175,13 +175,13 @@ export default function RoiPage() {
                   previousDataAvailable,
                 }}
                 unit="users"
-                description="Users who have reached or exceeded 90% of the 100,000 token ceiling. Click to inspect power users."
+                description={`Users who have reached or exceeded 90% of the $${Math.round(summary.hardCeiling).toLocaleString()} spend ceiling. Click to inspect power users.`}
                 onClick={() =>
                   openDrilldown({
                     type: 'zone',
                     id: 'ceiling',
-                    title: '100,000 Token Ceiling Risk Telemetry',
-                    subtitle: 'High-volume power users who have reached or exceeded 90% (90,000+ tokens) of the 100K token cap.',
+                    title: 'Dollar Ceiling Risk Telemetry',
+                    subtitle: `High-volume power users who have reached or exceeded 90% ($${Math.round(summary.hardCeiling * 0.9).toLocaleString()}+) of the spend cap.`,
                     badge: 'Cap Risk Telemetry',
                   })
                 }
@@ -195,6 +195,7 @@ export default function RoiPage() {
               totalOverageCost={summary.totalOverageCost}
               licenseEfficiencyRate={summary.licenseEfficiencyRate}
               ceilingRiskCount={summary.ceilingRiskCount}
+              hardCeiling={summary.hardCeiling}
               totalLicenseCost={summary.totalLicenseCost}
               licenseRoiPercent={summary.licenseRoiPercent}
               licenseUnderutilizedCost={summary.licenseUnderutilizedCost}
@@ -219,7 +220,7 @@ export default function RoiPage() {
                       ? 'Zone 1: Under-Utilized Capacity'
                       : zone === 'zone2_over'
                       ? 'Zone 2: Over-Utilized Seats'
-                      : '100K Ceiling Risk',
+                      : 'Dollar Ceiling Risk',
                   subtitle: 'Detailed employee breakdown and live CSV log telemetry.',
                   badge: zone.toUpperCase(),
                 })
@@ -311,12 +312,12 @@ export default function RoiPage() {
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
                 {[
-                  { label: 'Wasted Capacity (total)', value: `$${summary.totalWasteCost.toLocaleString()}`, sub: 'unconsumed dollar limit', color: 'text-amber-400' },
-                  { label: 'Overage Spend (total)', value: `$${summary.totalOverageCost.toLocaleString()}`, sub: 'billed beyond per-tool free limit', color: 'text-purple-400' },
+                  { label: 'Wasted Capacity (total)', value: `$${summary.totalWasteCost.toLocaleString()}`, sub: 'unconsumed free-dollar limit', color: 'text-amber-400' },
+                  { label: 'Overage Spend (total)', value: `$${summary.totalOverageCost.toLocaleString()}`, sub: 'billed beyond per-tool free-dollar limit', color: 'text-purple-400' },
                   { label: 'Quota Efficiency Rate', value: `${summary.licenseEfficiencyRate}%`, sub: 'actual ÷ limit', color: 'text-emerald-400' },
                   { label: 'Total API Cost', value: `$${summary.totalCost.toLocaleString()}`, sub: 'actual billed USD', color: 'text-ey-light' },
                   { label: 'Cost per 1K tokens', value: `$${summary.costPer1kTokens.toFixed(6)}`, sub: '/ 1K tokens', color: 'text-ey-yellow' },
-                  { label: 'Near 100K Cap Users', value: `${summary.ceilingRiskCount} users`, sub: '≥90K token usage', color: 'text-red-400' },
+                  { label: 'Near Dollar Cap Users', value: `${summary.ceilingRiskCount} users`, sub: `≥90% of $${Math.round(summary.hardCeiling).toLocaleString()}`, color: 'text-red-400' },
                   { label: 'Total License Cost', value: `$${summary.totalLicenseCost.toLocaleString()}`, sub: 'sum of per-seat License Cost in USD', color: 'text-sky-400' },
                   { label: 'License Investment ROI', value: `${summary.licenseRoiPercent}%`, sub: 'actual cost ÷ license cost', color: 'text-sky-400' },
                 ].map((item) => (

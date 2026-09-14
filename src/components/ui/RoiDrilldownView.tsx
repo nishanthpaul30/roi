@@ -36,10 +36,10 @@ import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 
 const TOOL_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT',
-  copilot: 'Copilot',
+  github: 'Copilot',
   claude: 'Claude',
   replit: 'Replit',
-  factoryai: 'Factory AI',
+  factory: 'Factory AI',
   cursor: 'Cursor AI',
 };
 
@@ -181,16 +181,13 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
           return (r.orgServiceLine || '').toLowerCase() === selectedSubEntity.id.toLowerCase();
         }
         if (selectedSubEntity.type === 'sub_service_line') {
-          return (r.orgSubServiceLine || '').toLowerCase() === selectedSubEntity.id.toLowerCase();
+          return (r.subServiceLine1 || '').toLowerCase() === selectedSubEntity.id.toLowerCase();
         }
         if (selectedSubEntity.type === 'country') {
           return (r.country || '').toLowerCase() === selectedSubEntity.id.toLowerCase();
         }
         if (selectedSubEntity.type === 'region') {
-          return (
-            (r.managementRegion || '').toLowerCase() === selectedSubEntity.id.toLowerCase() ||
-            (r.region || '').toLowerCase() === selectedSubEntity.id.toLowerCase()
-          );
+          return (r.superRegion || '').toLowerCase() === selectedSubEntity.id.toLowerCase();
         }
         if (selectedSubEntity.type === 'ct_non_ct') {
           return (r.ctNonCt || '').toLowerCase() === selectedSubEntity.id.toLowerCase();
@@ -203,14 +200,11 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
       }
 
       if (type === 'sub_service_line') {
-        return (r.orgSubServiceLine || '').toLowerCase() === id.toLowerCase();
+        return (r.subServiceLine1 || '').toLowerCase() === id.toLowerCase();
       }
 
       if (type === 'region') {
-        return (
-          (r.managementRegion || '').toLowerCase() === id.toLowerCase() ||
-          (r.region || '').toLowerCase() === id.toLowerCase()
-        );
+        return (r.superRegion || '').toLowerCase() === id.toLowerCase();
       }
 
       if (type === 'country') {
@@ -268,13 +262,10 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
         if ((r.orgServiceLine || '').toLowerCase() !== filterCriteria.serviceLine.toLowerCase()) return false;
       }
       if (filterCriteria?.subServiceLine) {
-        if ((r.orgSubServiceLine || '').toLowerCase() !== filterCriteria.subServiceLine.toLowerCase()) return false;
+        if ((r.subServiceLine1 || '').toLowerCase() !== filterCriteria.subServiceLine.toLowerCase()) return false;
       }
       if (filterCriteria?.region) {
-        if (
-          (r.managementRegion || '').toLowerCase() !== filterCriteria.region.toLowerCase() &&
-          (r.region || '').toLowerCase() !== filterCriteria.region.toLowerCase()
-        ) return false;
+        if ((r.superRegion || '').toLowerCase() !== filterCriteria.region.toLowerCase()) return false;
       }
       if (filterCriteria?.country) {
         if ((r.country || '').toLowerCase() !== filterCriteria.country.toLowerCase()) return false;
@@ -306,8 +297,8 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
         (r.aiTool || '').toLowerCase().includes(s) ||
         (r.projectCode || '').toLowerCase().includes(s) ||
         (r.orgServiceLine || '').toLowerCase().includes(s) ||
-        (r.orgSubServiceLine || '').toLowerCase().includes(s) ||
-        (r.activityDate || '').includes(s) ||
+        (r.subServiceLine1 || '').toLowerCase().includes(s) ||
+        (r.monthYear || '').toLowerCase().includes(s) ||
         (r.country || '').toLowerCase().includes(s)
       );
     });
@@ -335,23 +326,22 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
     [targetRows]
   );
 
-  // Total License Cost for this slice — summed once per distinct (user, tool) pair,
-  // same rule as everywhere else License Cost is aggregated. Used by the header pill
-  // when viewing the License Investment ROI drilldown specifically.
+  // Total License Cost for this slice — License Cost lives on userCapacityMap
+  // per user (it comes from separate 'License'-tagged rows, not the Usage rows
+  // targetRows is built from), so sum each distinct user in the slice once.
+  // Used by the header pill when viewing the License Investment ROI drilldown.
   const sliceLicenseCost = useMemo(() => {
-    const userTools = new Map<string, Map<string, number>>();
+    const seen = new Set<string>();
+    let total = 0;
     for (const r of targetRows) {
       const email = (r.userMail || '').toLowerCase();
-      if (!email || !r.aiTool) continue;
-      if (!userTools.has(email)) userTools.set(email, new Map());
-      userTools.get(email)!.set(r.aiTool, r.licenseCost || 0);
-    }
-    let total = 0;
-    for (const toolMap of userTools.values()) {
-      for (const cost of toolMap.values()) total += cost;
+      if (!email || seen.has(email)) continue;
+      seen.add(email);
+      const cap = userCapacityMap.get(email);
+      if (cap) total += cap.licenseCost;
     }
     return total;
-  }, [targetRows]);
+  }, [targetRows, userCapacityMap]);
   const sliceLicenseRoiPercent = sliceLicenseCost > 0 ? (totalSliceCost / sliceLicenseCost) * 100 : 0;
 
   // Total Zone 1 waste / Zone 2 overage for this slice — summed once per distinct
@@ -386,14 +376,11 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
       rowCount: number;
       users: Set<string>;
       projects: Set<string>;
-      // email -> tool -> that tool's flat License Cost in USD, so it's summed once
-      // per distinct tool a user has (not once per row) when computing License ROI.
-      userTools: Map<string, Map<string, number>>;
     }>();
     for (const r of targetRows) {
       const key = r.ctNonCt || 'Unclassified';
       if (!map.has(key)) {
-        map.set(key, { ctNonCt: key, cost: 0, tokens: 0, billableCost: 0, rowCount: 0, users: new Set(), projects: new Set(), userTools: new Map() });
+        map.set(key, { ctNonCt: key, cost: 0, tokens: 0, billableCost: 0, rowCount: 0, users: new Set(), projects: new Set() });
       }
       const bucket = map.get(key)!;
       bucket.cost += r.cost;
@@ -403,24 +390,20 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
       const email = (r.userMail || '').toLowerCase();
       if (email) bucket.users.add(email);
       if (r.projectCode) bucket.projects.add(r.projectCode);
-      if (email && r.aiTool) {
-        if (!bucket.userTools.has(email)) bucket.userTools.set(email, new Map());
-        bucket.userTools.get(email)!.set(r.aiTool, r.licenseCost || 0);
-      }
     }
     return Array.from(map.values())
       .map((b) => {
+        // licenseCost/wasteCost/overageCost all live on userCapacityMap per user
+        // (not per row — License Cost comes from separate 'License'-tagged rows
+        // than the Usage rows this breakdown is built from), so sum each
+        // distinct user in this segment once.
         let licenseCost = 0;
-        for (const toolMap of b.userTools.values()) {
-          for (const cost of toolMap.values()) licenseCost += cost;
-        }
-        // wasteCost/overageCost live on userCapacityMap per user (not per row), so
-        // sum each distinct user in this segment once.
         let wasteCost = 0;
         let overageCost = 0;
         for (const email of b.users) {
           const cap = userCapacityMap.get(email);
           if (cap) {
+            licenseCost += cap.licenseCost;
             wasteCost += cap.wasteCost;
             overageCost += cap.overageCost;
           }
@@ -489,7 +472,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
   const associatedSubServiceLines = useMemo(() => {
     const map = new Map<string, { subServiceLine: string; cost: number; tokens: number; count: number }>();
     for (const r of targetRows) {
-      const ssl = (r.orgSubServiceLine || 'General').trim();
+      const ssl = (r.subServiceLine1 || 'General').trim();
       if (!map.has(ssl)) {
         map.set(ssl, { subServiceLine: ssl, cost: 0, tokens: 0, count: 0 });
       }
@@ -543,38 +526,34 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
   const handleExportFilteredCsv = () => {
     if (filteredRows.length === 0) return;
     const headers = [
-      'Activity Date',
+      'Month',
       'Display Name',
       'User Email',
       'AI Tool Flag',
       'Engagement Code',
       'Service Line',
-      'Org Sub Service Line',
+      'Sub-Service Line 1',
       'Country',
-      'Region',
-      'Management Region',
+      'Super Region',
       'Billable/Non-Billable',
-      'Token Consumption',
+      'GenAI Tool Consumption',
       'Cost in USD',
-      'License Cost in USD',
-      'Usage Free Token Limit',
+      'Credits',
     ];
     const rows = filteredRows.map((r) => [
-      r.activityDate,
+      r.monthYear,
       `"${r.displayName}"`,
       r.userMail,
       r.aiTool,
       r.projectCode,
       r.orgServiceLine,
-      r.orgSubServiceLine,
+      r.subServiceLine1,
       r.country,
-      r.region,
-      r.managementRegion,
+      r.superRegion,
       r.billableFlag,
       r.tokenConsumption,
       r.cost.toFixed(4),
-      r.licenseCost || 100.0,
-      r.usageFreeTokenLimit || 80.0,
+      r.creditsLimit,
     ]);
     const csvContent = [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1363,7 +1342,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
           <table className="w-full text-left text-xs font-mono">
             <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
               <tr>
-                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Month</th>
                 <th className="px-4 py-3">Employee</th>
                 <th className="px-4 py-3">AI Tool</th>
                 <th className="px-4 py-3">Engagement Code</th>
@@ -1383,7 +1362,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                     onClick={() => setInspectingRecord(r)}
                     className="hover:bg-ey-card-hover/80 transition cursor-pointer group"
                   >
-                    <td className="px-4 py-3 text-ey-muted whitespace-nowrap">{r.activityDate}</td>
+                    <td className="px-4 py-3 text-ey-muted whitespace-nowrap">{r.monthYear.replace(/_/g, ' ')}</td>
                     <td className="px-4 py-3">
                       <p className="font-bold text-ey-light group-hover:text-ey-yellow flex items-center gap-1">
                         <span>{r.displayName}</span>
@@ -1405,7 +1384,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                       </span>
                     </td>
                     <td className="px-4 py-3 text-ey-light">{r.orgServiceLine}</td>
-                    <td className="px-4 py-3 text-cyan-300 font-semibold">{r.orgSubServiceLine || 'N/A'}</td>
+                    <td className="px-4 py-3 text-cyan-300 font-semibold">{r.subServiceLine1 || 'N/A'}</td>
                     <td className="px-4 py-3 text-center">
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
@@ -1530,10 +1509,6 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
 
             <div className="grid grid-cols-2 gap-3 bg-ey-black/60 p-4 rounded-xl border border-ey-border">
               <div>
-                <span className="text-ey-muted text-[10px] block">ACTIVITY DATE</span>
-                <span className="text-ey-light font-bold">{inspectingRecord.activityDate}</span>
-              </div>
-              <div>
                 <span className="text-ey-muted text-[10px] block">MONTH / YEAR</span>
                 <span className="text-ey-light font-bold">{inspectingRecord.monthYear} ({inspectingRecord.monthId})</span>
               </div>
@@ -1558,12 +1533,12 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                 <span className="text-ey-light">{inspectingRecord.orgServiceLine}</span>
               </div>
               <div>
-                <span className="text-ey-muted text-[10px] block">ORG SUB SERVICE LINE</span>
-                <span className="text-ey-light">{inspectingRecord.orgSubServiceLine || 'N/A'}</span>
+                <span className="text-ey-muted text-[10px] block">SUB-SERVICE LINE 1</span>
+                <span className="text-ey-light">{inspectingRecord.subServiceLine1 || 'N/A'}</span>
               </div>
               <div>
-                <span className="text-ey-muted text-[10px] block">COUNTRY / REGION</span>
-                <span className="text-ey-light">{inspectingRecord.country} ({inspectingRecord.managementRegion})</span>
+                <span className="text-ey-muted text-[10px] block">COUNTRY / SUPER REGION</span>
+                <span className="text-ey-light">{inspectingRecord.country} ({inspectingRecord.superRegion})</span>
               </div>
               <div>
                 <span className="text-ey-muted text-[10px] block">BILLABLE FLAG</span>
@@ -1580,12 +1555,12 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                 <span className="text-ey-yellow font-bold text-sm">${inspectingRecord.cost.toFixed(4)}</span>
               </div>
               <div>
-                <span className="text-ey-muted text-[10px] block">LICENSE COST IN USD</span>
-                <span className="text-ey-light">${inspectingRecord.licenseCost?.toFixed(2) || '100.00'}</span>
+                <span className="text-ey-muted text-[10px] block">CALCULATION METHOD</span>
+                <span className="text-ey-light">{inspectingRecord.calculationMethod}</span>
               </div>
               <div>
-                <span className="text-ey-muted text-[10px] block">USAGE FREE TOKEN LIMIT</span>
-                <span className="text-ey-light">{inspectingRecord.usageFreeTokenLimit || 80.0}</span>
+                <span className="text-ey-muted text-[10px] block">CREDITS</span>
+                <span className="text-ey-light">{inspectingRecord.creditsLimit}</span>
               </div>
             </div>
 

@@ -61,7 +61,7 @@ export async function GET(request: Request) {
     // Expose dimension options for dynamic filter dropdowns
     const filterOptions = {
       aiTools: getDistinctValues('aiTool'),
-      managementRegions: getDistinctValues('managementRegion'),
+      managementRegions: getDistinctValues('superRegion'),
       serviceLines: getDistinctValues('orgServiceLine'),
       countries: getDistinctValues('country'),
     };

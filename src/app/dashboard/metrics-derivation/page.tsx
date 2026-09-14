@@ -34,50 +34,54 @@ interface MetricDerivationItem {
   category: string;
 }
 
-// Ordered per the required application-wide hierarchy:
-// CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1 -> Sub-Service Line 2 ->
-// Engagement Code -> Engagement Super Region -> Engagement Service Line ->
-// Engagement Sub Service Line -> Engagement Competency. Remaining columns follow.
+// Ordered to match the raw ai_usage_data.csv column order exactly (see COL in
+// src/lib/data/csvLoader.ts). Data is monthly-grained — there is no day-level
+// Activity Date. Each (user, tool, month) can have a Calculation Method =
+// 'License' row (flat seat fee, present every month regardless of usage)
+// and/or a 'Usage' row (metered consumption/cost, present only when active).
 const CSV_SCHEMA = [
-  { column: 'AI Tool Flag', fieldName: 'aiTool', description: 'AI Tool classification flag (e.g. copilot, chatgpt, claude, replit, factoryai, cursor)', dataType: 'String' },
-  { column: 'User Mail', fieldName: 'userMail', description: 'Developer email identifier (e.g. aditya.malik@enterprise-corp.com)', dataType: 'String' },
-  { column: 'Display Name', fieldName: 'displayName', description: 'Developer display name (e.g. Aditya Malik)', dataType: 'String' },
-  { column: 'Activity Date', fieldName: 'activityDate', description: 'Date of usage formatted as YYYY-MM-DD (e.g. 2026-03-09)', dataType: 'Date' },
-  { column: 'Token Consumption', fieldName: 'tokenConsumption', description: 'Total raw tokens generated and processed (Prompt + Completion)', dataType: 'Numeric' },
-  { column: 'Daily Billable Tokens', fieldName: 'dailyBillableTokens', description: 'Tokens charged toward billable quota', dataType: 'Numeric' },
-  { column: 'Cost in USD', fieldName: 'cost', description: 'Direct monetary expenditure incurred in USD ($)', dataType: 'Numeric ($)' },
+  { column: 'User Email', fieldName: 'userMail', description: 'Developer email identifier (e.g. aditya.malik@enterprise-corp.com)', dataType: 'String' },
+  { column: 'User Name', fieldName: 'displayName', description: 'Developer display name (e.g. Aditya Malik)', dataType: 'String' },
+  { column: 'Year', fieldName: 'year', description: 'Calendar year of the row (e.g. 2026)', dataType: 'Numeric' },
+  { column: 'Month', fieldName: 'month', description: 'Calendar month 1-12, or a month name (e.g. "March") — combined with Year to derive monthYear/monthId', dataType: 'Numeric' },
+  { column: 'Product', fieldName: 'aiTool', description: 'AI Tool identity (e.g. github, chatgpt, claude, replit, factory, cursor)', dataType: 'String' },
+  { column: 'Calculation Method', fieldName: 'calculationMethod', description: '"License" (flat seat fee, one row per held tool per month, tokenConsumption always 0) or "Usage" (metered consumption/cost, present only for active months)', dataType: 'String' },
+  { column: 'GenAI Tool Consumption', fieldName: 'tokenConsumption', description: 'Metered consumption units for the month (0 on License rows) — the new unit of AI usage, replacing raw token counts', dataType: 'Numeric' },
+  { column: 'Credits', fieldName: 'creditsLimit', description: 'Dollar-denominated free-tier credit actually applied this row — null, 0, or negative. Fully covers Cost USD while under the tool\'s free-dollar limit (Credits = -Cost USD), then pins at that limit once Cost USD exceeds it. The limit itself is derived per tool as max(|Credits|) across a tool\'s Usage rows — see Capacity Waste/Overage below', dataType: 'Numeric ($)' },
+  { column: 'Cost USD', fieldName: 'costUsd', description: 'Gross metered cost before the Credits adjustment — Cost (in $) = Cost USD + Credits always holds exactly', dataType: 'Numeric ($)' },
+  { column: 'Cost (in $)', fieldName: 'cost', description: 'Direct monetary amount in USD ($) for the row — a License row\'s flat seat fee, or a Usage row\'s net metered cost (Cost USD + Credits), depending on Calculation Method', dataType: 'Numeric ($)' },
   { column: 'CT/Non-CT', fieldName: 'ctNonCt', description: 'Chargeable Time flag distinguishing CT (client-chargeable) from Non-CT work — hierarchy level 1', dataType: 'String' },
   { column: 'Country', fieldName: 'country', description: 'Country location of user — hierarchy level 2', dataType: 'String' },
+  { column: 'Super Region', fieldName: 'superRegion', description: 'Single regional grouping (e.g. Americas, EMEIA, Asia-Pacific) — replaces the old Region + Management Region pair', dataType: 'String' },
   { column: 'Service Line', fieldName: 'orgServiceLine', description: 'Internal delivery Service Line (e.g. Tax, Assurance, S&T, CBS, Consulting) — hierarchy level 3', dataType: 'String' },
-  { column: 'Org Sub Service Line', fieldName: 'orgSubServiceLine', description: 'Internal delivery sub-practice under Service Line (e.g. Reporting, Strategy)', dataType: 'String' },
-  { column: 'Sub-Service Line 1', fieldName: 'subServiceLine1', description: 'First-level delivery sub-practice classification, derived from Service Line — hierarchy level 4', dataType: 'String' },
+  { column: 'Sub-Service Line 1', fieldName: 'subServiceLine1', description: 'First-level delivery sub-practice classification, derived from Service Line — hierarchy level 4; replaces the old Org Sub Service Line', dataType: 'String' },
   { column: 'Sub-Service Line 2', fieldName: 'subServiceLine2', description: 'Second-level delivery sub-practice classification, derived from Sub-Service Line 1 — hierarchy level 5', dataType: 'String' },
-  { column: 'Engagement Code', fieldName: 'projectCode', description: 'Billing engagement code (E-XXXXXX for external, I-XXXXXX for internal) — formerly labeled ProjectCode; hierarchy level 6', dataType: 'String' },
-  { column: 'Engagement Super Region', fieldName: 'engagementSuperRegion', description: 'Client engagement-side region grouping (e.g. EMEIA, Asia-Pacific, Americas) — hierarchy level 7', dataType: 'String' },
+  { column: 'Engagement Code', fieldName: 'projectCode', description: 'Billing engagement code — E-XXXXXX for external/billable, I-XXXXXX for internal/non-billable. This prefix convention is the sole source of Billable/Non-Billable and ProjectType, both now derived rather than separate columns — hierarchy level 6', dataType: 'String' },
+  { column: 'Engagement - Super Region', fieldName: 'engagementSuperRegion', description: 'Client engagement-side region grouping (e.g. EMEIA, Asia-Pacific, Americas) — hierarchy level 7', dataType: 'String' },
   { column: 'Engagement Service Line', fieldName: 'engagementServiceLine', description: 'Client engagement-side Global Service Line, derived from Engagement Super Region — hierarchy level 8', dataType: 'String' },
-  { column: 'Engagement Sub Service Line', fieldName: 'engagementSubServiceLine', description: 'Client engagement-side sub-practice, derived from Engagement Service Line — hierarchy level 9', dataType: 'String' },
-  { column: 'Engagement Competency', fieldName: 'engagementCompetency', description: 'Skill/competency classification, derived from Engagement Sub Service Line — hierarchy level 10 (leaf)', dataType: 'String' },
-  { column: 'Region', fieldName: 'region', description: 'Finer-grained region than Management Region (e.g. ANZ, Middle East, North America)', dataType: 'String' },
-  { column: 'Management Region', fieldName: 'managementRegion', description: 'Regional management division (e.g. EMEA, APAC, Americas)', dataType: 'String' },
-  { column: 'License Cost in USD', fieldName: 'licenseCost', description: 'Set per AI Tool — Copilot: $35, ChatGPT: $25, Claude: $40, Replit: $50, Factory AI: $10, Cursor AI: $60 flat seat license. Summed per distinct tool a user has — basis for License Investment ROI', dataType: 'Numeric ($)' },
-  { column: 'Usage Free Token Limit', fieldName: 'usageFreeTokenLimit', description: 'Set per AI Tool — Copilot: $20 free allowance; ChatGPT: $20 free allowance; Cursor AI: $40 free allowance; Claude/Replit/Factory AI: $0 (fully usage-based). Summed per distinct tool a user has, used for Zone 1/2 Capacity Waste & Overage (distinct from License Cost)', dataType: 'Numeric' },
-  { column: 'Billable/Non-Billable', fieldName: 'billableFlag', description: 'Client billability flag, derived from Project Type: True for External (E-XXXXXX) engagements, False for Internal (I-XXXXXX) projects', dataType: 'Boolean' },
-  { column: 'ProjectType', fieldName: 'projectType', description: 'Project classification (External for client, Internal for R&D)', dataType: 'String' },
+  { column: 'Engagement Sub-Service Line', fieldName: 'engagementSubServiceLine', description: 'Client engagement-side sub-practice, derived from Engagement Service Line — hierarchy level 9', dataType: 'String' },
+  { column: 'Engagement Competency', fieldName: 'engagementCompetency', description: 'Skill/competency classification, derived from Engagement Sub-Service Line — hierarchy level 10 (leaf)', dataType: 'String' },
+  { column: 'Engagement Invest Type', fieldName: 'engagementInvestType', description: 'Investment type classification — parsed and retained but not used in any insight', dataType: 'String (passthrough)' },
   { column: 'GDS Location', fieldName: 'gdsLocation', description: 'Global Delivery Services location fulfilling the work, or "Onshore" if not GDS-delivered — independent of the hierarchy chain', dataType: 'String' },
   { column: 'Cost Center', fieldName: 'costCenter', description: 'Internal accounting cost center code (e.g. CC-TAX-647) — independent of the hierarchy chain', dataType: 'String' },
-  { column: 'Month_Year', fieldName: 'monthYear', description: 'Human-readable calendar month label (e.g. March_2026) — basis for Monthly Trend charts', dataType: 'String' },
-  { column: 'Month Id', fieldName: 'monthId', description: 'Sortable numeric month key (e.g. 202603) used to order Monthly Trend series', dataType: 'Numeric' },
+  { column: 'Portfolio - CT Product Family', fieldName: 'portfolioCtProductFamily', description: 'Parsed and retained but not used in any insight', dataType: 'String (passthrough)' },
+  { column: 'Portfolio - CT Product', fieldName: 'portfolioCtProduct', description: 'Parsed and retained but not used in any insight', dataType: 'String (passthrough)' },
+  { column: 'Entity', fieldName: 'entity', description: 'Parsed and retained but not used in any insight', dataType: 'String (passthrough)' },
+  { column: 'SL/SF', fieldName: 'slSf', description: 'Parsed and retained but not used in any insight', dataType: 'String (passthrough)' },
+  { column: 'RS', fieldName: 'rs', description: 'Parsed and retained but not used in any insight', dataType: 'String (passthrough)' },
+  { column: 'GDS', fieldName: 'gds', description: 'Parsed and retained but not used in any insight', dataType: 'String (passthrough)' },
+  { column: '— (derived from Year + Month)', fieldName: 'monthYear / monthId', description: 'monthYear is a human-readable label (e.g. "March_2026") for chart axes; monthId is a sortable numeric key (e.g. 202603) used for date-range filtering and ordering — there is no day-level Activity Date in this schema', dataType: 'Derived' },
+  { column: '— (derived from Engagement Code)', fieldName: 'billableFlag / projectType', description: 'billableFlag ("True"/"False") and projectType ("External"/"Internal") are derived from the Engagement Code prefix: E-XXXXXX → billable/External, I-XXXXXX → non-billable/Internal', dataType: 'Derived' },
 ];
 
 const FORMULA_CATEGORIES = [
   {
-    title: 'Core AI Token & Utilization Formulas',
+    title: 'Core AI Consumption & Utilization Formulas',
     icon: Zap,
     color: 'text-ey-yellow',
     formulas: [
-      { name: 'Total Token Consumption', formula: 'Total Tokens = ∑ (token_consumption)', example: '32,378 + 31,509 + 39,002 = 102,889 Tokens' },
-      { name: 'Total Billable Tokens', formula: 'Billable Tokens = ∑ (daily_billable_tokens)', example: '32,378 + 31,509 + 39,002 = 102,889 Tokens' },
-      { name: 'Billable Utilization Rate (%)', formula: 'Utilization % = (Total Billable Tokens / Total Token Consumption) × 100', example: '(102,889 / 102,889) × 100 = 100.0%' },
+      { name: 'Total GenAI Tool Consumption', formula: 'Total Consumption = ∑ (tokenConsumption) over Usage rows only', example: '18,500 + 32,000 + 15,200 = 65,700 units' },
+      { name: 'Billable Utilization Rate (%)', formula: 'Utilization % = (Consumption on billable/E- rows / Total Consumption) × 100', example: '(51,200 / 65,700) × 100 = 77.9%' },
     ],
   },
   {
@@ -85,10 +89,12 @@ const FORMULA_CATEGORIES = [
     icon: DollarSign,
     color: 'text-emerald-400',
     formulas: [
-      { name: 'Total AI Investment ($)', formula: 'Total Spend = ∑ (cost)', example: '$0.4627 + $0.5055 + $0.6155 = $1.5837' },
+      { name: 'Total AI Investment ($)', formula: 'Total Spend = ∑ (cost) over Usage rows only', example: '$18.68 + $48.96 + $16.72 = $84.36' },
       { name: 'Cost per Active User ($ / user)', formula: 'Cost per User = Total Spend / Unique Active Users', example: '$1,750.00 / 70 Users = $25.00 / user' },
-      { name: 'Capacity Waste ($)', formula: 'Waste = ∑ max(0, usageFreeTokenLimit - actualCost)', example: 'Copilot user: $20.00 limit - $13.44 cost = $6.56 wasted capacity' },
-      { name: 'Overage Cost ($)', formula: 'Overage = ∑ max(0, actualCost - usageFreeTokenLimit)', example: 'ChatGPT user: $35.20 cost - $20.00 limit = $15.20 overage' },
+      { name: 'Per-Tool Free-Dollar Limit', formula: 'Limit(tool) = max(|Credits|) across that tool\'s Usage rows', example: 'GitHub Copilot: largest Credits ever applied is -70.00 → $70.00 free limit' },
+      { name: 'Capacity Waste ($)', formula: 'Waste = ∑ max(0, Limit(tool) - costUsd), per Usage row, summed', example: '$70.00 limit - $42.31 gross cost = $27.69 wasted that month' },
+      { name: 'Overage Cost ($)', formula: 'Overage = ∑ max(0, costUsd - Limit(tool)), per Usage row, summed', example: '$70.08 gross cost - $70.00 limit = $0.08 overage that month' },
+      { name: 'Hard Ceiling (dynamic)', formula: 'Ceiling = 3 × average per-user free-dollar limit (summed across held tools) in the current period', example: 'avg $2.67/user × 3 = $8.00 ceiling (placeholder pending real-data guidance)' },
     ],
   },
   {
@@ -97,7 +103,7 @@ const FORMULA_CATEGORIES = [
     color: 'text-cyan-400',
     formulas: [
       { name: 'Billable AI Spend Share (%)', formula: 'Billable Spend % = (Billable Spend / Total Spend) × 100', example: '($1,372.40 / $1,750.00) × 100 = 78.4%' },
-      { name: 'Engagement Code Token Ranking', formula: 'Engagement Cost = ∑ (cost) grouped by Engagement Code', example: 'E-301461: 325,000 tokens | $48.20' },
+      { name: 'Engagement Code Consumption Ranking', formula: 'Engagement Cost = ∑ (cost) grouped by Engagement Code', example: 'E-301461: 325,000 units | $48.20' },
     ],
   },
   {
@@ -105,73 +111,74 @@ const FORMULA_CATEGORIES = [
     icon: Wallet,
     color: 'text-sky-400',
     formulas: [
-      { name: 'License Investment ROI (%)', formula: 'License ROI % = (Total Cost / Total License Cost) × 100', example: '($1,376.51 / $2,177.61) × 100 = 63.2%' },
-      { name: 'License Underutilized Spend ($)', formula: 'Underutilized = ∑ max(0, licenseCost - actualCost) per seat', example: '$235.31 license − $103.44 actual = $131.87 unconsumed' },
-      { name: 'Monthly Spend Trend ($)', formula: 'Monthly Cost = ∑ (cost) grouped by Month Id, sorted ascending', example: 'June_2026: $182.75 | August_2026: $277.58' },
-      { name: 'Habitual Retention Cohort', formula: 'Avg Active Days/Month = distinct(activityDate) / distinct(monthId), per user', example: '3 active days ÷ 2 active months = 1.5/mo → Trial-only (<4)' },
+      { name: 'License Investment ROI (%)', formula: 'License ROI % = (Total Usage Cost / Total License Cost) × 100', example: '($1,376.51 / $2,177.61) × 100 = 63.2%' },
+      { name: 'License Cost (per user, per tool)', formula: 'License Cost = ∑ (cost) where calculationMethod = "License", grouped by user + tool', example: '3 License rows @ $35.00/mo = $105.00' },
+      { name: 'License Underutilized Spend ($)', formula: 'Underutilized = ∑ max(0, licenseCost - actualUsageCost) per seat', example: '$105.00 license − $56.04 actual = $48.96 unconsumed' },
+      { name: 'Monthly Spend Trend ($)', formula: 'Monthly Cost = ∑ (cost) grouped by monthId, sorted ascending', example: 'June_2026: $182.75 | August_2026: $277.58' },
+      { name: 'Habitual Retention Cohort', formula: 'Active Month Ratio = distinct(monthId with activity) / distinct(monthId in window), per user', example: '4 active months ÷ 6-month window = 0.67 → Regular (≥0.6)' },
     ],
   },
 ];
 
 const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
   {
-    name: 'Total Token Consumption',
-    csvField: 'token_consumption',
-    formula: 'Sum of all token_consumption rows matching filters',
-    sampleInput: 'token_consumption array: [32378, 31509, 39002]',
-    workedCalculation: '32,378 + 31,509 + 39,002',
-    derivedOutput: '102,889 Tokens',
-    notes: 'Total tokens generated across prompt and completion turns',
+    name: 'Total GenAI Tool Consumption',
+    csvField: 'tokenConsumption (Calculation Method = "Usage" rows only)',
+    formula: 'Sum of tokenConsumption across Usage rows matching filters',
+    sampleInput: 'tokenConsumption array: [18500, 32000, 15200]',
+    workedCalculation: '18,500 + 32,000 + 15,200',
+    derivedOutput: '65,700 units',
+    notes: 'License rows always carry tokenConsumption = 0 by design and are excluded — only metered Usage rows count toward consumption',
     category: 'Tokens',
   },
   {
-    name: 'Total Billable Tokens',
-    csvField: 'daily_billable_tokens',
-    formula: 'Sum of all daily_billable_tokens rows matching filters',
-    sampleInput: 'daily_billable_tokens array: [32378, 31509, 39002]',
-    workedCalculation: '32,378 + 31,509 + 39,002',
-    derivedOutput: '102,889 Tokens',
-    notes: 'Tokens counted towards billing allocation',
+    name: 'Billable Consumption (units)',
+    csvField: 'tokenConsumption filtered by billableFlag',
+    formula: 'Sum of tokenConsumption where billableFlag == "True"',
+    sampleInput: 'billable rows: [18500, 32000], non-billable rows: [15200]',
+    workedCalculation: '18,500 + 32,000',
+    derivedOutput: '50,500 units',
+    notes: 'billableFlag is derived from the Engagement Code prefix (E-XXXXXX = billable, I-XXXXXX = non-billable) — there is no separate billability column in the source data',
     category: 'Tokens',
   },
   {
     name: 'Total AI Investment ($)',
-    csvField: 'cost',
-    formula: 'Sum of all cost rows matching filters',
-    sampleInput: 'cost array: [$0.4627, $0.5055, $0.6155]',
-    workedCalculation: '$0.4627 + $0.5055 + $0.6155',
-    derivedOutput: '$1.5837',
-    notes: 'Direct dollar cost in USD recorded in the input CSV',
+    csvField: 'cost (Calculation Method = "Usage" rows only)',
+    formula: 'Sum of cost across Usage rows matching filters',
+    sampleInput: 'cost array: [$18.68, $48.96, $16.72]',
+    workedCalculation: '$18.68 + $48.96 + $16.72',
+    derivedOutput: '$84.36',
+    notes: 'License row costs are tracked separately as License Cost, not blended into this figure',
     category: 'Cost',
   },
   {
     name: 'Billable Utilization Rate (%)',
-    csvField: 'daily_billable_tokens ÷ token_consumption',
-    formula: '(Total Billable Tokens / Total Token Consumption) × 100',
-    sampleInput: 'Billable = 102,889, Total = 102,889',
-    workedCalculation: '(102,889 ÷ 102,889) × 100',
-    derivedOutput: '100.0%',
-    notes: 'Percentage of total tokens that incurred billable usage',
+    csvField: 'tokenConsumption filtered by billableFlag (derived from Engagement Code)',
+    formula: '(Consumption on billable/E- rows / Total Consumption) × 100',
+    sampleInput: 'Billable = 50,500, Total = 65,700',
+    workedCalculation: '(50,500 ÷ 65,700) × 100',
+    derivedOutput: '76.9%',
+    notes: 'Redefined for the new schema: since there is no separate "billable tokens" column, this splits total consumption by the Engagement Code E-/I- prefix instead',
     category: 'Tokens',
   },
   {
-    name: 'Cost per 1K Tokens',
-    csvField: 'cost ÷ (daily_billable_tokens / 1000)',
-    formula: 'Total Cost / (Total Billable Tokens / 1000)',
-    sampleInput: 'Total Cost = $1.5837, Billable = 102,889',
-    workedCalculation: '$1.5837 ÷ 102.889',
-    derivedOutput: '$0.015392 / 1k tokens',
-    notes: 'Effective rate per thousand billable tokens',
+    name: 'Cost per 1K Consumption Units',
+    csvField: 'cost ÷ (tokenConsumption / 1000)',
+    formula: 'Total Cost / (Total Consumption / 1000)',
+    sampleInput: 'Total Cost = $84.36, Total Consumption = 65,700',
+    workedCalculation: '$84.36 ÷ 65.7',
+    derivedOutput: '$1.2840 / 1k units',
+    notes: 'Effective blended rate per thousand consumption units across all tools in the filtered set',
     category: 'Cost',
   },
   {
-    name: 'Average Daily Cost ($ / day)',
-    csvField: 'cost ÷ count(distinct activityDate)',
-    formula: 'Total Cost / Count of Unique Activity Dates',
-    sampleInput: 'Total Cost = $1.5837, Unique Dates = 3',
-    workedCalculation: '$1.5837 ÷ 3',
-    derivedOutput: '$0.5279 / day',
-    notes: 'Average spend per active calendar day',
+    name: 'Average Monthly Cost ($ / month)',
+    csvField: 'cost ÷ count(distinct monthId)',
+    formula: 'Total Cost / Count of Unique Months',
+    sampleInput: 'Total Cost = $507.00, Unique Months = 6',
+    workedCalculation: '$507.00 ÷ 6',
+    derivedOutput: '$84.50 / month',
+    notes: 'This schema is monthly-grained only — there is no day-level Activity Date, so spend is averaged per distinct month rather than per calendar day',
     category: 'Cost',
   },
   {
@@ -226,29 +233,29 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
   },
   {
     name: 'License Investment ROI (%)',
-    csvField: 'License Cost in USD',
-    formula: '(Total Cost / Total License Cost) × 100',
-    sampleInput: 'Total Cost = $1,376.51, Total License Cost = $2,177.61',
+    csvField: 'cost where calculationMethod = "License"',
+    formula: '(Total Usage Cost / Total License Cost) × 100',
+    sampleInput: 'Total Usage Cost = $1,376.51, Total License Cost = $2,177.61',
     workedCalculation: '$1,376.51 ÷ $2,177.61 × 100',
     derivedOutput: '63.2% License ROI',
-    notes: 'Measures actual usage cost against the real per-seat License Cost in USD — independent of the Usage Free Token Limit used for Capacity Waste/Overage above',
+    notes: 'Total License Cost is now summed directly from each user\'s actual Calculation Method = "License" row costs per distinct tool, rather than a fixed per-tool constant',
     category: 'License & Adoption',
   },
   {
     name: 'License Underutilized / Overutilized Spend ($)',
-    csvField: 'licenseCost vs actualCost, per user seat',
-    formula: 'Underutilized = ∑ max(0, licenseCost − actualCost); Overutilized = ∑ max(0, actualCost − licenseCost)',
-    sampleInput: 'Seat A: licenseCost $235.31, actualCost $103.44',
-    workedCalculation: '$235.31 − $103.44 = $131.87 unconsumed',
+    csvField: 'licenseCost (summed from License rows) vs actualUsageCost, per user seat',
+    formula: 'Underutilized = ∑ max(0, licenseCost − actualUsageCost); Overutilized = ∑ max(0, actualUsageCost − licenseCost)',
+    sampleInput: 'Seat A: licenseCost $105.00 (3 License rows), actualUsageCost $56.04',
+    workedCalculation: '$105.00 − $56.04 = $48.96 unconsumed',
     derivedOutput: '$904.65 total unconsumed across all seats',
-    notes: 'A seat can be simultaneously "under license ROI" and "over its token free-limit" — the two waste metrics measure different baselines',
+    notes: 'A seat can be simultaneously "under license ROI" and "over its Credits limit" — the two waste metrics measure different baselines (License Cost vs Credits)',
     category: 'License & Adoption',
   },
   {
-    name: 'Monthly Spend & Token Trend',
-    csvField: 'group_by(monthId) -> sum(cost), sum(token_consumption)',
-    formula: 'Aggregate cost and tokens per Month Id, sorted ascending, split further by AI Tool',
-    sampleInput: 'Month_Year: March_2026 through August_2026',
+    name: 'Monthly Spend & Consumption Trend',
+    csvField: 'group_by(monthId) -> sum(cost), sum(tokenConsumption), Usage rows only',
+    formula: 'Aggregate cost and consumption per monthId, sorted ascending, split further by AI Tool',
+    sampleInput: 'monthYear: March_2026 through August_2026',
     workedCalculation: 'March: $302.62 | June: $182.75 | August: $277.58',
     derivedOutput: 'Monthly Cost Trend chart, Monthly Spend by AI Tool chart',
     notes: 'Powers the ROI page monthly trend charts',
@@ -266,12 +273,12 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
   },
   {
     name: 'Habitual User Retention Cohorts',
-    csvField: 'activityDate, monthId grouped by userMail',
-    formula: 'Avg Active Days/Month = count(distinct activityDate) / count(distinct monthId), per user; bucketed Embedded (16+), Regular (9-15), Occasional (4-8), Trial-only (<4)',
-    sampleInput: 'User with 3 activityDate rows across 2 distinct monthId values',
-    workedCalculation: '3 ÷ 2 = 1.5 avg active days/month',
-    derivedOutput: 'Trial-only cohort (below 4 days/month threshold)',
-    notes: 'Replaces a previously hardcoded "100% retention" claim — now computed per user from the raw filtered rows',
+    csvField: 'monthId grouped by userMail (Usage rows)',
+    formula: 'Active Month Ratio = count(distinct monthId with usage) / count(distinct monthId in the filtered window), per user; bucketed Embedded (≥0.9), Regular (≥0.6), Occasional (≥0.25), Dropout (<0.25)',
+    sampleInput: 'User active in 4 of 6 distinct monthId values in the current window',
+    workedCalculation: '4 ÷ 6 = 0.67 active month ratio',
+    derivedOutput: 'Regular cohort (≥0.6 threshold)',
+    notes: 'Redesigned for the new schema: since there is no day-level Activity Date, "habitual" is now measured as the share of months in the filtered window a user was active in, rather than active days per month',
     category: 'License & Adoption',
   },
 ];
@@ -337,13 +344,13 @@ export default function MetricsDerivationPage() {
         {/* Quick Data Badges */}
         <div className="flex flex-wrap gap-2 pt-2">
           <span className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-ey-black/60 border border-ey-border text-ey-yellow flex items-center gap-1.5">
-            <Database className="w-3 h-3" /> Input Dataset: ai_usage_data.csv
+            <Database className="w-3 h-3" /> Input Dataset: ai_usage_data.csv (monthly-grained)
           </span>
           <span className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-ey-black/60 border border-ey-border text-cyan-400">
-            Token Fields: token_consumption, daily_billable_tokens
+            Consumption Field: GenAI Tool Consumption (Usage rows only)
           </span>
           <span className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-ey-black/60 border border-ey-border text-emerald-400">
-            Cost Field: Cost in USD ($)
+            Cost Field: Cost (in $)
           </span>
         </div>
       </div>

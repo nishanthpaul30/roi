@@ -9,10 +9,10 @@ interface ExecutivePrintTemplateProps {
 
 const TOOL_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT Enterprise',
-  copilot: 'GitHub Copilot Enterprise',
+  github: 'GitHub Copilot Enterprise',
   claude: 'Claude Enterprise',
   replit: 'Replit Enterprise',
-  factoryai: 'Factory AI Enterprise',
+  factory: 'Factory AI Enterprise',
   cursor: 'Cursor AI Enterprise',
 };
 

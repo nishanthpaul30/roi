@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { loadCsvData } from '@/lib/data/csvLoader';
+import { loadCsvData, dateStringToMonthId } from '@/lib/data/csvLoader';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,31 +12,28 @@ export async function GET(request: Request) {
   try {
     let rows = loadCsvData();
 
-    if (startDate) {
-      rows = rows.filter((r) => r.activityDate >= startDate);
-    }
-    if (endDate) {
-      rows = rows.filter((r) => r.activityDate <= endDate);
-    }
+    const startMonthId = dateStringToMonthId(startDate);
+    const endMonthId = dateStringToMonthId(endDate);
+    rows = rows.filter((r) => r.monthId >= startMonthId && r.monthId <= endMonthId);
     if (aiTool !== 'all') {
       rows = rows.filter((r) => r.aiTool.toLowerCase() === aiTool.toLowerCase());
     }
 
-    const csvHeader = 'Activity Date,AI Tool,User Mail,Display Name,Service Line,Management Region,Country,Token Consumption,Daily Billable Tokens,Cost ($),License Cost ($),Usage Free Token Limit,Billable/Non-Billable,ProjectType,Engagement Code';
+    const csvHeader = 'Month,AI Tool,User Mail,Display Name,Service Line,Super Region,Country,Calculation Method,GenAI Tool Consumption,Cost USD,Credits,Cost ($),Billable/Non-Billable,ProjectType,Engagement Code';
     const csvRows = rows.map((r) =>
       [
-        r.activityDate,
+        r.monthYear,
         `"${r.aiTool}"`,
         `"${r.userMail}"`,
         `"${r.displayName}"`,
         `"${r.orgServiceLine}"`,
-        `"${r.managementRegion}"`,
+        `"${r.superRegion}"`,
         `"${r.country}"`,
+        `"${r.calculationMethod}"`,
         r.tokenConsumption,
-        r.dailyBillableTokens,
+        r.costUsd.toFixed(4),
+        r.creditsLimit.toFixed(2),
         r.cost.toFixed(4),
-        (r.licenseCost || 100.0).toFixed(2),
-        (r.usageFreeTokenLimit || r.usageLimit || 80.0).toFixed(2),
         r.billableFlag || 'True',
         r.projectType || 'External',
         r.projectCode || 'E-100000',

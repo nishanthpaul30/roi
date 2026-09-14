@@ -1,12 +1,14 @@
-import { loadCsvData, CsvUsageRow } from '../data/csvLoader';
+import { loadCsvData, dateStringToMonthId, CsvUsageRow } from '../data/csvLoader';
 import { GlobalFilterState, TokenCostSummary, MonthlyTrendPoint } from './types';
 import { getPreviousDateRange, hasPreviousPeriodData } from './engine';
 
 function filterRows(rows: CsvUsageRow[], filters: GlobalFilterState, sDate: string, eDate: string): CsvUsageRow[] {
+  const startMonthId = dateStringToMonthId(sDate);
+  const endMonthId = dateStringToMonthId(eDate);
   return rows.filter((r) => {
-    if (r.activityDate < sDate || r.activityDate > eDate) return false;
+    if (r.monthId < startMonthId || r.monthId > endMonthId) return false;
     if (filters.aiTool && filters.aiTool !== 'all' && r.aiTool !== filters.aiTool) return false;
-    if (filters.managementRegion && filters.managementRegion !== 'all' && r.managementRegion !== filters.managementRegion) return false;
+    if (filters.managementRegion && filters.managementRegion !== 'all' && r.superRegion !== filters.managementRegion) return false;
     if (filters.serviceLine && filters.serviceLine !== 'all' && r.orgServiceLine !== filters.serviceLine) return false;
     if (filters.userMail && filters.userMail !== 'all' && r.userMail !== filters.userMail) return false;
     if (filters.country && filters.country !== 'all' && r.country !== filters.country) return false;
@@ -25,14 +27,43 @@ function groupBy<T>(rows: T[], key: (r: T) => string): Map<string, T[]> {
 }
 
 /**
- * Per-user capacity waste / overage / 100K-ceiling / License ROI aggregates.
- * Shared by the current-period and previous-period computations in
- * calculateTokenCostSummary so both periods use identical logic — `rows`
- * must already be usage-only (tokenConsumption > 0).
+ * Per-tool free-dollar-limit, derived from real data rather than hardcoded.
+ * Confirmed against a real example set: Credits is the free-tier dollar
+ * amount actually applied that row, capped at a fixed per-tool ceiling —
+ * below the cap, Credits = -CostUSD exactly (Cost (in $) nets to 0); at or
+ * above the cap, Credits pins at that ceiling (e.g. -70 for GitHub Copilot in
+ * one real sample) and Cost (in $) = CostUSD - ceiling is the overage billed.
+ * So the ceiling itself is recoverable as max(|Credits|) across a tool's
+ * Usage rows — the largest credit ever applied is the cap being hit.
  */
-function computeCapacityAggregates(rows: CsvUsageRow[]) {
-  const HARD_TOKEN_CEILING = 100000; // Hard cap per user
+function computeToolFreeLimits(usageRows: CsvUsageRow[]): Map<string, number> {
+  const limits = new Map<string, number>();
+  for (const r of usageRows) {
+    const credit = Math.abs(r.creditsLimit || 0);
+    if (credit > (limits.get(r.aiTool) || 0)) {
+      limits.set(r.aiTool, credit);
+    }
+  }
+  return limits;
+}
 
+/**
+ * Per-user capacity waste / overage / ceiling-risk / License ROI aggregates.
+ * Shared by the current-period and previous-period computations in
+ * calculateTokenCostSummary so both periods use identical logic.
+ *
+ * `rows` must be every row (License + Usage) for the period being aggregated,
+ * already scoped to the users/filters in question — each user's Usage-type
+ * rows drive actual cost/consumption, their License-type rows drive license
+ * cost. `toolFreeLimits` is shared across current/previous-period calls (see
+ * computeToolFreeLimits) so both periods measure against the same ceiling.
+ *
+ * Each tool's free limit resets every month (License rows recur monthly too),
+ * so waste/overage is computed per Usage row against Cost USD (gross, before
+ * the credit), then summed across the user's rows — a user can land in waste
+ * some months and overage in others within the same reporting window.
+ */
+function computeCapacityAggregates(rows: CsvUsageRow[], hardCeiling: number, toolFreeLimits: Map<string, number>) {
   let totalWasteCost = 0;
   let totalOverageCost = 0;
   let totalUsageLimitsSum = 0;
@@ -47,50 +78,54 @@ function computeCapacityAggregates(rows: CsvUsageRow[]) {
     const displayName = userRows[0].displayName || userMail;
     const toolsSet = new Set(userRows.map(r => r.aiTool).filter(Boolean));
     const aiTools = Array.from(toolsSet);
-    const actualCost = Number(userRows.reduce((s, r) => s + r.cost, 0).toFixed(4));
-    const tokenConsumption = Math.round(userRows.reduce((s, r) => s + r.tokenConsumption, 0));
 
-    // Per-tool licensing: License Cost in USD / Usage Free Token Limit are set per
-    // AI Tool in the CSV (Copilot: $35 license / $20 free limit; ChatGPT: usage-based
-    // with a $20 free limit; Claude: fully usage-based, no license or free limit).
-    // A user's overall allowance is the sum of each DISTINCT tool they actually use,
-    // taken once per tool (not once per row) so repeated days on the same tool don't
-    // double-count that tool's flat license/limit.
-    let usageFreeTokenLimit = 0;
-    for (const tool of toolsSet) {
-      const toolRow = userRows.find((r) => r.aiTool === tool);
-      usageFreeTokenLimit += toolRow?.usageFreeTokenLimit || 0;
+    const usageRows = userRows.filter(r => r.calculationMethod === 'Usage');
+    const licenseRows = userRows.filter(r => r.calculationMethod === 'License');
+
+    const actualCost = Number(usageRows.reduce((s, r) => s + r.cost, 0).toFixed(4));
+    const tokenConsumption = Math.round(usageRows.reduce((s, r) => s + r.tokenConsumption, 0));
+
+    // The free limit resets monthly, so waste/overage is computed row by row
+    // (against gross Cost USD, before the credit adjustment) and summed —
+    // not derived from period totals, which would hide a user who was under
+    // the cap some months and over it in others.
+    let wasteCost = 0;
+    let overageCost = 0;
+    for (const r of usageRows) {
+      const limit = toolFreeLimits.get(r.aiTool) || 0;
+      if (r.costUsd < limit) wasteCost += limit - r.costUsd;
+      else if (r.costUsd > limit) overageCost += r.costUsd - limit;
     }
+    wasteCost = Number(wasteCost.toFixed(4));
+    overageCost = Number(overageCost.toFixed(4));
+    totalWasteCost += wasteCost;
+    totalOverageCost += overageCost;
+    const zone: 'zone1_under' | 'zone2_over' | 'zone_balanced' =
+      wasteCost > overageCost ? 'zone1_under' : overageCost > wasteCost ? 'zone2_over' : 'zone_balanced';
+
+    // usageLimit/usageFreeTokenLimit: this user's held tools' free limits,
+    // summed once per distinct tool (a stable per-tool constant, unlike
+    // Credits itself which varies row to row) — the monthly free-dollar
+    // capacity this user's toolset provides.
+    const usageFreeTokenLimit = Number(
+      Array.from(toolsSet).reduce((s, t) => s + (toolFreeLimits.get(t) || 0), 0).toFixed(4)
+    );
     const usageLimit = usageFreeTokenLimit;
     totalUsageLimitsSum += usageLimit;
 
-    let wasteCost = 0;
-    let overageCost = 0;
-    let zone: 'zone1_under' | 'zone2_over' | 'zone_balanced' = 'zone_balanced';
-
-    if (actualCost < usageLimit) {
-      wasteCost = Number((usageLimit - actualCost).toFixed(4));
-      zone = 'zone1_under';
-      totalWasteCost += wasteCost;
-    } else if (actualCost > usageLimit) {
-      overageCost = Number((actualCost - usageLimit).toFixed(4));
-      zone = 'zone2_over';
-      totalOverageCost += overageCost;
-    }
-
-    const ceilingPercent = Number(((tokenConsumption / HARD_TOKEN_CEILING) * 100).toFixed(1));
-    if (tokenConsumption >= 90000) {
+    const ceilingPercent = hardCeiling > 0 ? Number(((actualCost / hardCeiling) * 100).toFixed(1)) : 0;
+    if (hardCeiling > 0 && actualCost >= hardCeiling * 0.9) {
       ceilingRiskCount++;
     }
 
-    // License Cost ROI: sum each distinct tool's own flat License Cost in USD
-    // (independent of the $ free-token limit above) — e.g. Copilot's $35 seat fee.
-    // Usage-based tools (ChatGPT, Claude) contribute $0 here.
+    // License Cost ROI: sum this user's actual License-type row costs per
+    // distinct tool (replaces the old fixed-per-tool-constant lookup — the
+    // new source carries real License line items instead).
     let licenseCost = 0;
     for (const tool of toolsSet) {
-      const toolRow = userRows.find((r) => r.aiTool === tool);
-      licenseCost += toolRow?.licenseCost || 0;
+      licenseCost += licenseRows.filter(r => r.aiTool === tool).reduce((s, r) => s + r.cost, 0);
     }
+    licenseCost = Number(licenseCost.toFixed(4));
     totalLicenseCost += licenseCost;
     const licenseRoiPercent = licenseCost > 0 ? Number(((actualCost / licenseCost) * 100).toFixed(1)) : 0;
 
@@ -135,8 +170,11 @@ function computeCapacityAggregates(rows: CsvUsageRow[]) {
 
 /**
  * Calculate token/cost summary from ai_usage_data.csv.
- * All three fields (Token Consumption, Daily Billable Tokens, Cost in USD) are read directly.
- * Includes breakdown dimensions from CSV columns.
+ * The source is monthly-grained with a Calculation Method flag splitting
+ * each (user, tool, month) into a 'License' row (flat seat fee, present
+ * whether or not the seat was used) and/or a 'Usage' row (metered
+ * consumption/cost, present only for active months). All usage-based
+ * aggregates below read Usage rows only; License rows feed License ROI.
  */
 export async function calculateTokenCostSummary(
   filters: GlobalFilterState
@@ -149,31 +187,31 @@ export async function calculateTokenCostSummary(
   const currentRows = filterRows(allRows, filters, startDate, endDate);
   const previousRows = filterRows(allRows, filters, prevStartDate, prevEndDate);
 
-  // Seat Utilization: a user can hold an AI tool license (an "AI Tool Flag" row
-  // with its License Cost / Usage Free Token Limit) without ever using it — 0
-  // tokens, $0 cost. Those rows represent the roster of provisioned-but-inactive
-  // seats. Every usage-based aggregate below (spend, tokens, rankings, cohorts,
-  // capacity waste, etc.) should reflect only real usage, so it's computed from
-  // usageRows; the seat_utilization split further down needs the full roster too.
+  // Seat Utilization: every user with a held license has a 'License' row every
+  // month regardless of whether they used the tool, so the full roster is
+  // every distinct user across ALL currentRows (License + Usage); "active"
+  // means they have at least one Usage row with real consumption this period.
   const totalRosterUserCount = new Set(currentRows.map(r => r.userMail.toLowerCase())).size;
-  const usageRows = currentRows.filter(r => r.tokenConsumption > 0);
+  const usageRows = currentRows.filter(r => r.calculationMethod === 'Usage' && r.tokenConsumption > 0);
   const activeUserCount = new Set(usageRows.map(r => r.userMail.toLowerCase())).size;
   const inactiveUserCount = totalRosterUserCount - activeUserCount;
 
   // Core aggregates
   const totalTokenConsumption = usageRows.reduce((s, r) => s + r.tokenConsumption, 0);
-  const totalBillableTokens = usageRows.reduce((s, r) => s + r.dailyBillableTokens, 0);
   const totalCost = usageRows.reduce((s, r) => s + r.cost, 0);
 
-  const prevTotalTokenConsumption = previousRows.reduce((s, r) => s + r.tokenConsumption, 0);
-  const prevTotalBillableTokens = previousRows.reduce((s, r) => s + r.dailyBillableTokens, 0);
-  const prevTotalCost = previousRows.reduce((s, r) => s + r.cost, 0);
+  const previousUsageRows = previousRows.filter(r => r.calculationMethod === 'Usage' && r.tokenConsumption > 0);
+  const prevTotalTokenConsumption = previousUsageRows.reduce((s, r) => s + r.tokenConsumption, 0);
+  const prevTotalCost = previousUsageRows.reduce((s, r) => s + r.cost, 0);
 
-  // Unique activity days for avg daily cost
-  const uniqueDays = new Set(usageRows.map(r => r.activityDate)).size || 1;
-  const avgDailyCost = totalCost / uniqueDays;
-  const costPer1kTokens = totalBillableTokens > 0 ? (totalCost / (totalBillableTokens / 1000)) : 0;
-  const billableUtilizationRate = totalTokenConsumption > 0 ? (totalBillableTokens / totalTokenConsumption) * 100 : 0;
+  const costPer1kTokens = totalTokenConsumption > 0 ? (totalCost / (totalTokenConsumption / 1000)) : 0;
+
+  // Billability is a convention on the Engagement Code (E-XXXXXX billable,
+  // I-XXXXXX not) rather than a separate source column — there's no distinct
+  // "billable tokens" field in the new schema, so this is the share of
+  // consumption on billable engagement codes instead.
+  const billableConsumption = usageRows.filter(r => r.billableFlag === 'True').reduce((s, r) => s + r.tokenConsumption, 0);
+  const billableUtilizationRate = totalTokenConsumption > 0 ? (billableConsumption / totalTokenConsumption) * 100 : 0;
 
   // By AI Tool breakdown with Unit Economics
   const byToolMap = groupBy(usageRows, r => r.aiTool);
@@ -258,13 +296,12 @@ export async function calculateTokenCostSummary(
       tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
       cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
       userCount: new Set(rows.map(r => r.userMail.toLowerCase())).size,
-      uniqueDays: new Set(rows.map(r => r.activityDate)).size,
       uniqueMonths: new Set(rows.map(r => r.monthId)).size,
     }))
     .sort((a, b) => b.cost - a.cost);
 
-  // By Management Region breakdown
-  const byRegionMap = groupBy(usageRows, r => r.managementRegion);
+  // By Super Region breakdown (replaces the old Region / Management Region pair)
+  const byRegionMap = groupBy(usageRows, r => r.superRegion);
   const byManagementRegion = Array.from(byRegionMap.entries())
     .map(([region, rows]) => ({
       region,
@@ -280,8 +317,7 @@ export async function calculateTokenCostSummary(
   const byCountry = Array.from(byCountryMap.entries())
     .map(([country, rows]) => ({
       country,
-      region: rows[0]?.region || 'N/A',
-      managementRegion: rows[0]?.managementRegion || 'N/A',
+      superRegion: rows[0]?.superRegion || 'N/A',
       tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
       cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
       userCount: new Set(rows.map(r => r.userMail.toLowerCase())).size,
@@ -296,12 +332,12 @@ export async function calculateTokenCostSummary(
       tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
       cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
       userCount: new Set(rows.map(r => r.userMail.toLowerCase())).size,
-      subServiceLines: Array.from(new Set(rows.map(r => r.orgSubServiceLine).filter(Boolean))),
+      subServiceLines: Array.from(new Set(rows.map(r => r.subServiceLine1).filter(Boolean))),
     }))
     .sort((a, b) => b.tokens - a.tokens);
 
   // By Sub-Service Line breakdown
-  const bySubSlMap = groupBy(usageRows, r => `${r.orgServiceLine}:::${r.orgSubServiceLine || 'General'}`);
+  const bySubSlMap = groupBy(usageRows, r => `${r.orgServiceLine}:::${r.subServiceLine1 || 'General'}`);
   const bySubServiceLine = Array.from(bySubSlMap.entries())
     .map(([key, rows]) => {
       const [serviceLine, subServiceLine] = key.split(':::');
@@ -334,7 +370,28 @@ export async function calculateTokenCostSummary(
   // Users capacity & waste breakdown — current period, plus the same
   // computation over the previous period so waste/overage/cap-risk/license
   // ROI KPI cards can show a real "vs last period" comparison instead of a
-  // fixed reference baseline.
+  // fixed reference baseline. Per-tool free limits are derived once from the
+  // current period's Usage rows and shared across both period computations
+  // (see computeToolFreeLimits) so current and previous periods are measured
+  // against the same ceiling.
+  const toolFreeLimits = computeToolFreeLimits(usageRows);
+
+  // Hard ceiling: the old schema had a fixed, dataset-calibrated 100,000
+  // Token hard cap. This derives a scale-appropriate replacement instead of
+  // reusing that stale absolute number — 3x the average per-user free-dollar
+  // limit (sum of each user's held tools' free limits) in the current period.
+  // Flagged here since it's a placeholder assumption pending real data
+  // guidance on an actual dollar cap.
+  const allCurrentUsers = groupBy(currentRows, r => r.userMail);
+  const avgFreeLimitPerUser = allCurrentUsers.size > 0
+    ? Array.from(allCurrentUsers.values()).reduce((sum, userRows) => {
+        const toolsSet = new Set(userRows.map(r => r.aiTool).filter(Boolean));
+        const userLimit = Array.from(toolsSet).reduce((s, t) => s + (toolFreeLimits.get(t) || 0), 0);
+        return sum + userLimit;
+      }, 0) / allCurrentUsers.size
+    : 0;
+  const hardCeiling = avgFreeLimitPerUser * 3;
+
   const {
     totalWasteCost,
     totalOverageCost,
@@ -344,10 +401,9 @@ export async function calculateTokenCostSummary(
     licenseUnderutilizedCost,
     licenseOverutilizedValue,
     userCapacityBreakdown,
-  } = computeCapacityAggregates(usageRows);
+  } = computeCapacityAggregates(currentRows, hardCeiling, toolFreeLimits);
 
-  const previousUsageRows = previousRows.filter(r => r.tokenConsumption > 0);
-  const prevCapacity = computeCapacityAggregates(previousUsageRows);
+  const prevCapacity = computeCapacityAggregates(previousRows, hardCeiling, toolFreeLimits);
   const prevTotalCostForCapacity = previousUsageRows.reduce((s, r) => s + r.cost, 0);
 
   const licenseEfficiencyRate = totalUsageLimitsSum > 0
@@ -362,23 +418,23 @@ export async function calculateTokenCostSummary(
     ? Number(((prevTotalCostForCapacity / prevCapacity.totalLicenseCost) * 100).toFixed(1))
     : 0;
 
-  // Previous-period cost by Service Line / Management Region / Sub-Service
-  // Line, and previous distinct-sub-practice count — so the Service Line
-  // Analytics KPI cards can compare against this same entity's own real
-  // prior-period value instead of a fixed $0 baseline.
+  // Previous-period cost by Service Line / Super Region / Sub-Service Line,
+  // and previous distinct sub-practice count — so the Service Line Analytics
+  // KPI cards can compare against this same entity's own real prior-period
+  // value instead of a fixed $0 baseline.
   const prevByServiceLineMap = groupBy(previousUsageRows, r => r.orgServiceLine);
   const prevByServiceLine = Array.from(prevByServiceLineMap.entries()).map(([serviceLine, rows]) => ({
     serviceLine,
     cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
   }));
 
-  const prevByRegionMap = groupBy(previousUsageRows, r => r.managementRegion);
+  const prevByRegionMap = groupBy(previousUsageRows, r => r.superRegion);
   const prevByManagementRegion = Array.from(prevByRegionMap.entries()).map(([region, rows]) => ({
     region,
     cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
   }));
 
-  const prevBySubSlMap = groupBy(previousUsageRows, r => `${r.orgServiceLine}:::${r.orgSubServiceLine || 'General'}`);
+  const prevBySubSlMap = groupBy(previousUsageRows, r => `${r.orgServiceLine}:::${r.subServiceLine1 || 'General'}`);
   const prevBySubServiceLine = Array.from(prevBySubSlMap.entries()).map(([key, rows]) => {
     const [serviceLine, subServiceLine] = key.split(':::');
     return {
@@ -389,12 +445,12 @@ export async function calculateTokenCostSummary(
   });
 
   const prevSubServiceLineCount = new Set(
-    previousUsageRows.map(r => `${r.orgServiceLine}:::${r.orgSubServiceLine || 'General'}`)
+    previousUsageRows.map(r => `${r.orgServiceLine}:::${r.subServiceLine1 || 'General'}`)
   ).size;
 
   // Billable vs Non-Billable Insights
-  const billableRows = usageRows.filter(r => r.billableFlag === 'True' || r.billableFlag === 'true' || r.billableFlag === '1');
-  const nonBillableRows = usageRows.filter(r => r.billableFlag === 'False' || r.billableFlag === 'false' || r.billableFlag === '0');
+  const billableRows = usageRows.filter(r => r.billableFlag === 'True');
+  const nonBillableRows = usageRows.filter(r => r.billableFlag === 'False');
   const billableSpend = Number(billableRows.reduce((s, r) => s + r.cost, 0).toFixed(2));
   const nonBillableSpend = Number(nonBillableRows.reduce((s, r) => s + r.cost, 0).toFixed(2));
   const billableSpendPercent = totalCost > 0 ? Number(((billableSpend / totalCost) * 100).toFixed(1)) : 0;
@@ -413,14 +469,13 @@ export async function calculateTokenCostSummary(
     };
   }).sort((a, b) => b.cost - a.cost);
 
-  // Monthly Trend breakdown (Month_Year / Month Id columns) with per-AI-tool cost split
+  // Monthly Trend breakdown (Year / Month columns) with per-AI-tool cost split
   const byMonthMap = groupBy(usageRows, r => String(r.monthId));
   const monthlyTrend = Array.from(byMonthMap.entries())
     .map(([, rows]) => {
       const monthId = rows[0].monthId;
       const monthLabel = rows[0].monthYear.replace(/_/g, ' ');
       const tokens = Math.round(rows.reduce((s, r) => s + r.tokenConsumption, 0));
-      const billableTokens = Math.round(rows.reduce((s, r) => s + r.dailyBillableTokens, 0));
       const cost = Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4));
       const userCount = new Set(rows.map(r => r.userMail.toLowerCase())).size;
       const costPer1kTokens = tokens > 0 ? Number((cost / (tokens / 1000)).toFixed(6)) : 0;
@@ -430,7 +485,6 @@ export async function calculateTokenCostSummary(
         monthLabel,
         tokens,
         cost,
-        billableTokens,
         userCount,
         costPer1kTokens,
       };
@@ -442,21 +496,22 @@ export async function calculateTokenCostSummary(
     })
     .sort((a, b) => a.monthId - b.monthId);
 
-  // User Engagement Cohorts: classify each active user by their average distinct
-  // active-days per active month, so retention/adoption health is measurable from
-  // the raw CSV instead of asserted.
-  const byUserDaysMap = groupBy(usageRows, r => r.userMail.toLowerCase());
+  // User Engagement Cohorts: with no day-level Activity Date, "habitual" is
+  // redefined from active-days-per-active-month to active-months-out-of-the-
+  // selected-window — the closest monthly-grained analog of the same idea
+  // (thresholds re-picked accordingly: 90%+/60%+/25%+ of the window's months).
+  const totalMonthsInWindow = new Set(currentRows.map(r => r.monthId)).size || 1;
+  const byUserMonthsMap = groupBy(usageRows, r => r.userMail.toLowerCase());
   let embeddedCount = 0, regularCount = 0, occasionalCount = 0, dropoutCount = 0;
-  for (const [, rows] of byUserDaysMap.entries()) {
-    const activeDays = new Set(rows.map(r => r.activityDate)).size;
-    const activeMonths = new Set(rows.map(r => r.monthId)).size || 1;
-    const avgDaysPerActiveMonth = activeDays / activeMonths;
-    if (avgDaysPerActiveMonth >= 16) embeddedCount++;
-    else if (avgDaysPerActiveMonth >= 9) regularCount++;
-    else if (avgDaysPerActiveMonth >= 4) occasionalCount++;
+  for (const [, rows] of byUserMonthsMap.entries()) {
+    const activeMonths = new Set(rows.map(r => r.monthId)).size;
+    const activeMonthRatio = activeMonths / totalMonthsInWindow;
+    if (activeMonthRatio >= 0.9) embeddedCount++;
+    else if (activeMonthRatio >= 0.6) regularCount++;
+    else if (activeMonthRatio >= 0.25) occasionalCount++;
     else dropoutCount++;
   }
-  const engagementTotalUsers = byUserDaysMap.size;
+  const engagementTotalUsers = byUserMonthsMap.size;
   const pct = (n: number) => (engagementTotalUsers > 0 ? Number(((n / engagementTotalUsers) * 100).toFixed(1)) : 0);
   const userEngagementCohorts = {
     embeddedCount,
@@ -472,14 +527,11 @@ export async function calculateTokenCostSummary(
 
   return {
     totalTokenConsumption: Math.round(totalTokenConsumption),
-    totalBillableTokens: Math.round(totalBillableTokens),
     totalCost: Number(totalCost.toFixed(4)),
-    avgDailyCost: Number(avgDailyCost.toFixed(4)),
     costPer1kTokens: Number(costPer1kTokens.toFixed(6)),
     billableUtilizationRate: Number(billableUtilizationRate.toFixed(2)),
     prevTotalCost: Number(prevTotalCost.toFixed(4)),
     prevTotalTokenConsumption: Math.round(prevTotalTokenConsumption),
-    prevTotalBillableTokens: Math.round(prevTotalBillableTokens),
     previousDataAvailable,
     byAiTool,
     multiToolOverlap,
@@ -493,6 +545,7 @@ export async function calculateTokenCostSummary(
     totalOverageCost: Number(totalOverageCost.toFixed(2)),
     licenseEfficiencyRate,
     ceilingRiskCount,
+    hardCeiling: Number(hardCeiling.toFixed(2)),
     userCapacityBreakdown,
     totalLicenseCost: Number(totalLicenseCost.toFixed(2)),
     licenseRoiPercent,

@@ -210,10 +210,10 @@ export default function ExecutiveOverviewPage() {
                     } else if (tool) {
                       const TOOL_ENTERPRISE_LABELS: Record<string, string> = {
                         chatgpt: 'ChatGPT Enterprise',
-                        copilot: 'GitHub Copilot Enterprise',
+                        github: 'GitHub Copilot Enterprise',
                         claude: 'Claude Enterprise',
                         replit: 'Replit Enterprise',
-                        factoryai: 'Factory AI Enterprise',
+                        factory: 'Factory AI Enterprise',
                         cursor: 'Cursor AI Enterprise',
                       };
                       const toolLabel = TOOL_ENTERPRISE_LABELS[tool.toLowerCase()] || tool;

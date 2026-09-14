@@ -5,7 +5,7 @@ export interface GlobalFilterState {
   endDate: string;
   comparisonPeriod: ComparisonPeriod;
   // CSV-derived filter dimensions
-  aiTool: string;           // 'all' | 'chatgpt' | 'copilot' | 'claude' | 'replit' | 'factoryai' | 'cursor'
+  aiTool: string;           // 'all' | 'chatgpt' | 'github' | 'claude' | 'replit' | 'factory' | 'cursor'
   managementRegion: string; // 'all' | 'EMEA' | 'APAC' | 'Americas'
   serviceLine: string;      // 'all' | 'Consulting' | 'Power' | 'Financial Services' | 'Technology'
   userMail: string;         // 'all' or specific user email
@@ -51,19 +51,19 @@ export interface MetricResult {
 }
 
 export interface TokenCostSummary {
-  // Totals from CSV fields: Token Consumption, Daily Billable Tokens, Cost in USD
+  // Totals from CSV fields: GenAI Tool Consumption, Cost (in $) — Usage rows only
   totalTokenConsumption: number;
-  totalBillableTokens: number;
   totalCost: number;
   // Derived insights
-  avgDailyCost: number;
   costPer1kTokens: number;
   costPerActiveUser?: number;
+  // % of consumption on billable (Engagement Code E-XXXXXX) rows — there is no
+  // separate "billable tokens" field in the new source, so this is derived
+  // from the same Engagement Code convention as billableSpendPercent below.
   billableUtilizationRate: number;
   // Previous period (for delta comparisons)
   prevTotalCost: number;
   prevTotalTokenConsumption: number;
-  prevTotalBillableTokens: number;
   // False when the previous-period window falls entirely outside the
   // dataset's real date coverage (see MetricDelta.previousDataAvailable)
   previousDataAvailable: boolean;
@@ -89,9 +89,9 @@ export interface TokenCostSummary {
       totalTokens: number;
     }[];
   };
-  byCtNonCt: { ctNonCt: string; tokens: number; cost: number; userCount?: number; uniqueDays?: number; uniqueMonths?: number }[];
+  byCtNonCt: { ctNonCt: string; tokens: number; cost: number; userCount?: number; uniqueMonths?: number }[];
   byManagementRegion: { region: string; tokens: number; cost: number; userCount?: number; countries?: string[] }[];
-  byCountry: { country: string; tokens: number; cost: number; userCount?: number; region?: string; managementRegion?: string }[];
+  byCountry: { country: string; tokens: number; cost: number; userCount?: number; superRegion?: string }[];
   byServiceLine: { serviceLine: string; tokens: number; cost: number; userCount?: number; subServiceLines?: string[] }[];
   bySubServiceLine?: { subServiceLine: string; serviceLine: string; tokens: number; cost: number; userCount: number }[];
   topUsers: { displayName: string; userMail: string; tokens: number; cost: number; aiTools?: string[] }[];
@@ -100,6 +100,7 @@ export interface TokenCostSummary {
   totalOverageCost: number;
   licenseEfficiencyRate: number;
   ceilingRiskCount: number;
+  hardCeiling: number;
   userCapacityBreakdown: UserCapacityRow[];
   // License Cost ROI (actual usage cost vs real per-seat License Cost in USD from CSV)
   totalLicenseCost: number;
@@ -154,7 +155,6 @@ export interface MonthlyTrendPoint {
   monthLabel: string;
   tokens: number;
   cost: number;
-  billableTokens: number;
   userCount: number;
   costPer1kTokens: number;
   // Dynamic per-AI-tool cost breakdown, e.g. { chatgpt: 12.3, copilot: 4.5, claude: 8.1 }

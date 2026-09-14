@@ -102,9 +102,9 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
       tagColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
       icon: Gauge,
       stat: `${fmtCost(summary.totalWasteCost)} Unconsumed Capacity`,
-      statSub: `${fmtCost(summary.totalOverageCost)} overage · ${summary.ceilingRiskCount} users near 100K cap`,
-      finding: `On average, only ${fmtPct(summary.licenseEfficiencyRate || 0)} of each user's per-tool free-token allowance is actually consumed, leaving ${fmtCost(summary.totalWasteCost)} in unconsumed capacity (Zone 1). Separately, ${fmtCost(summary.totalOverageCost)} was billed beyond those free limits (Zone 2), and ${summary.ceilingRiskCount} users have reached or exceeded 90% of the 100,000-token hard cap.`,
-      actionableInsight: 'Open the Token & Spend ROI page to review the Zone 1 waste and Zone 2 overage breakdown, and flag users nearing the 100K token ceiling before they hit hard limits.',
+      statSub: `${fmtCost(summary.totalOverageCost)} overage · ${summary.ceilingRiskCount} users near cap`,
+      finding: `On average, only ${fmtPct(summary.licenseEfficiencyRate || 0)} of each user's per-tool free-dollar limit is actually consumed, leaving ${fmtCost(summary.totalWasteCost)} in unconsumed capacity (Zone 1). Separately, ${fmtCost(summary.totalOverageCost)} was billed beyond those free-dollar limits (Zone 2), and ${summary.ceilingRiskCount} users have reached or exceeded 90% of the $${Math.round(summary.hardCeiling).toLocaleString()} hard spend ceiling.`,
+      actionableInsight: 'Open the Token & Spend ROI page to review the Zone 1 waste and Zone 2 overage breakdown, and flag users nearing the spend ceiling before they hit hard limits.',
     },
     {
       id: 'project_billability',
@@ -124,13 +124,13 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
       tagColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       icon: Users,
       stat: cohorts ? `${fmtPct(retainedPercent)} Habitual Retention` : 'No engagement data',
-      statSub: cohorts ? `${fmtPct(cohorts.embeddedPercent)} Embedded, ${fmtPct(cohorts.regularPercent)} Regular, ${fmtPct(cohorts.dropoutPercent)} Trial-only` : '-',
+      statSub: cohorts ? `${fmtPct(cohorts.embeddedPercent)} Embedded, ${fmtPct(cohorts.regularPercent)} Regular, ${fmtPct(cohorts.dropoutPercent)} Dropout` : '-',
       finding: cohorts
-        ? `Across ${cohorts.totalUsers} active users: ${fmtPct(cohorts.embeddedPercent)} are Embedded (16+ active days per active month), ${fmtPct(cohorts.regularPercent)} Regular (9-15 days), ${fmtPct(cohorts.occasionalPercent)} Occasional (4-8 days), and ${fmtPct(cohorts.dropoutPercent)} Trial-only (under 4 days).`
+        ? `Across ${cohorts.totalUsers} active users: ${fmtPct(cohorts.embeddedPercent)} are Embedded (active in ≥90% of months in the filtered window), ${fmtPct(cohorts.regularPercent)} Regular (≥60%), ${fmtPct(cohorts.occasionalPercent)} Occasional (≥25%), and ${fmtPct(cohorts.dropoutPercent)} Dropout (under 25%).`
         : 'No user engagement data available for the selected filters.',
       actionableInsight:
         cohorts && cohorts.dropoutPercent > 20
-          ? 'Investigate the Trial-only cohort for onboarding friction before expanding license seats further.'
+          ? 'Investigate the Dropout cohort for onboarding friction before expanding license seats further.'
           : 'AI tools show healthy habitual usage. Focus shift from basic onboarding to advanced competency training.',
     },
     {

@@ -13,6 +13,7 @@ interface RoiCapacityPanelProps {
   totalOverageCost: number;
   licenseEfficiencyRate: number;
   ceilingRiskCount: number;
+  hardCeiling: number;
   totalLicenseCost: number;
   licenseRoiPercent: number;
   licenseUnderutilizedCost: number;
@@ -29,6 +30,7 @@ export function RoiCapacityPanel({
   totalOverageCost,
   licenseEfficiencyRate,
   ceilingRiskCount,
+  hardCeiling,
   totalLicenseCost,
   licenseRoiPercent,
   licenseUnderutilizedCost,
@@ -147,9 +149,9 @@ export function RoiCapacityPanel({
           <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3.5 flex items-start space-x-3">
             <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-red-300 font-bold">100K Hard Token Cap Warning</p>
+              <p className="text-red-300 font-bold">Hard Dollar Cap Warning</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-red-200">{ceilingRiskCount} users</strong> have reached or exceeded 90% of the platform hard token ceiling (100,000 tokens).
+                <strong className="text-red-200">{ceilingRiskCount} users</strong> have reached or exceeded 90% of the platform hard spend ceiling (${Math.round(hardCeiling).toLocaleString()}).
               </p>
             </div>
           </div>

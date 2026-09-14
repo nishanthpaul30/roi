@@ -17,34 +17,36 @@ import {
 } from 'lucide-react';
 
 const REQUIRED_HEADERS = [
-  'AI Tool Flag',
-  'User Mail',
-  'Display Name',
-  'Activity Date',
-  'Month_Year',
-  'Month Id',
-  'Token Consumption',
-  'Daily Billable Tokens',
-  'Cost in USD',
+  'User Email',
+  'User Name',
+  'Year',
+  'Month',
+  'Product',
+  'Calculation Method',
+  'GenAI Tool Consumption',
+  'Credits',
+  'Cost USD',
+  'Cost (in $)',
   'CT/Non-CT',
   'Country',
+  'Super Region',
   'Service Line',
-  'Org Sub Service Line',
   'Sub-Service Line 1',
   'Sub-Service Line 2',
   'Engagement Code',
-  'Engagement Super Region',
+  'Engagement - Super Region',
   'Engagement Service Line',
-  'Engagement Sub Service Line',
+  'Engagement Sub-Service Line',
   'Engagement Competency',
-  'Region',
-  'Management Region',
-  'License Cost in USD',
-  'Usage Free Token Limit',
-  'Billable/Non-Billable',
-  'ProjectType',
+  'Engagement Invest Type',
   'GDS Location',
   'Cost Center',
+  'Portfolio - CT Product Family',
+  'Portfolio - CT Product',
+  'Entity',
+  'SL/SF',
+  'RS',
+  'GDS',
 ];
 
 interface DatasetMeta {
@@ -89,13 +91,13 @@ export default function AdminPage() {
   }, []);
 
   const handleDownloadTemplate = () => {
-    const templateCsv = `AI Tool Flag,User Mail,Display Name,Activity Date,Month_Year,Month Id,Token Consumption,Daily Billable Tokens,Cost in USD,CT/Non-CT,Country,Service Line,Org Sub Service Line,Sub-Service Line 1,Sub-Service Line 2,Engagement Code,Engagement Super Region,Engagement Service Line,Engagement Sub Service Line,Engagement Competency,Region,Management Region,License Cost in USD,Usage Free Token Limit,Billable/Non-Billable,ProjectType,GDS Location,Cost Center
-copilot,john.doe@enterprise-corp.com,John Doe,2026-03-01,March_2026,202603,25000,25000,0.35,CT,United States,Consulting,Strategy,Delivery,Hybrid Delivery,E-481920,Americas,Tax,Client Advisory,People Advisory,North America,Americas,35.00,20.00,True,External,Onshore,CC-CNS-101
-chatgpt,jane.smith@enterprise-corp.com,Jane Smith,2026-03-02,March_2026,202603,42000,42000,0.65,CT,United Kingdom,CBS,Data & AI,Innovation,Offshore Delivery,E-719302,EMEIA,Assurance,Risk & Compliance,Risk Management,Europe,EMEA,25.00,20.00,True,External,Wroclaw,CC-CBS-205
-claude,alex.wong@enterprise-corp.com,Alex Wong,2026-03-03,March_2026,202603,18000,18000,0.28,Non-CT,Singapore,Assurance,Reporting,Delivery,Onshore Delivery,I-304918,Asia-Pacific,Consulting,Digital Enablement,Technology,Southeast Asia,APAC,40.00,0.00,False,Internal,Bangalore,CC-ASU-318
-replit,maria.garcia@enterprise-corp.com,Maria Garcia,2026-03-04,March_2026,202603,15000,15000,0.18,CT,Spain,Consulting,Strategy,Delivery,Onshore Delivery,E-552104,EMEIA,Consulting,Client Advisory,Operations,Europe,EMEA,50.00,0.00,True,External,Madrid,CC-CNS-410
-factoryai,liam.oconnor@enterprise-corp.com,Liam O'Connor,2026-03-05,March_2026,202603,20000,20000,0.18,Non-CT,Ireland,CBS,Data & AI,Innovation,Onshore Delivery,I-118273,EMEIA,CBS,Risk & Compliance,Technology,Europe,EMEA,10.00,0.00,False,Internal,Dublin,CC-CBS-512
-cursor,priya.nair@enterprise-corp.com,Priya Nair,2026-03-06,March_2026,202603,22000,22000,0.24,CT,India,Tax,Tax Tech Transformation,Advisory,Onshore Delivery,E-663210,Asia-Pacific,Tax,Indirect Tax,Operations,South Asia,APAC,60.00,40.00,True,External,Bangalore,CC-TAX-720`;
+    const templateCsv = `User Email,User Name,Year,Month,Product,Calculation Method,GenAI Tool Consumption,Credits,Cost USD,Cost (in $),CT/Non-CT,Country,Super Region,Service Line,Sub-Service Line 1,Sub-Service Line 2,Engagement Code,Engagement - Super Region,Engagement Service Line,Engagement Sub-Service Line,Engagement Competency,Engagement Invest Type,GDS Location,Cost Center,Portfolio - CT Product Family,Portfolio - CT Product,Entity,SL/SF,RS,GDS
+john.doe@enterprise-corp.com,John Doe,2026,3,Github,License,0,0,35.00,35.00,CT,United States,USLI,Consulting,Business Consulting,Digital,E-481920,USLI,Consulting,Business Consulting,People Advisory,Growth,India,CC-CNS-101,Product Family A,Product A,Entity1,SL1,RS1,GDS1
+john.doe@enterprise-corp.com,John Doe,2026,3,Github,Usage,42431,-70,424.31,354.31,CT,United States,USLI,Consulting,Business Consulting,Digital,E-481920,USLI,Consulting,Business Consulting,People Advisory,Growth,India,CC-CNS-101,Product Family A,Product A,Entity1,SL1,RS1,GDS1
+jane.smith@enterprise-corp.com,Jane Smith,2026,3,ChatGPT,License,0,0,25.00,25.00,CT,United Kingdom,UK,CBS,AWS,CNS,E-719302,UK,CBS,CBS,Risk Management,Growth,Hungary,CC-CBS-205,Product Family B,Product B,Entity2,SL2,RS2,GDS2
+jane.smith@enterprise-corp.com,Jane Smith,2026,3,ChatGPT,Usage,1200,,1.84,1.84,CT,United Kingdom,UK,CBS,AWS,CNS,E-719302,UK,CBS,CBS,Risk Management,Growth,Hungary,CC-CBS-205,Product Family B,Product B,Entity2,SL2,RS2,GDS2
+alex.wong@enterprise-corp.com,Alex Wong,2026,3,Claude,License,0,0,40.00,40.00,Non-CT,Singapore,GDS,Assurance,Audit,Finance,I-304918,Asia East,Assurance,Audit,Technology,Maintain,Philippines,CC-ASU-318,Product Family C,Product C,Entity3,SL3,RS3,GDS3
+priya.nair@enterprise-corp.com,Priya Nair,2026,3,Cursor,Usage,15200,-40,16.72,0,CT,India,Canada,Tax,Risk Consulting,Client Experience,E-663210,MENA,Tax,Core Tax,Operations,Growth,Mexico,CC-TAX-720,Product Family D,Product D,Entity4,SL4,RS4,GDS4`;
 
     const blob = new Blob([templateCsv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -169,17 +171,20 @@ cursor,priya.nair@enterprise-corp.com,Priya Nair,2026-03-06,March_2026,202603,22
     const preview: any[] = [];
     for (let i = 1; i < Math.min(lines.length, 6); i++) {
       const cols = lines[i].split(',').map((c) => c.trim());
-      if (cols.length >= 10) {
+      if (cols.length >= 20) {
         preview.push({
-          aiTool: cols[0] || '',
-          userMail: cols[1] || '',
-          displayName: cols[2] || '',
-          activityDate: cols[3] || '',
+          userMail: cols[0] || '',
+          displayName: cols[1] || '',
+          month: cols[3] || '',
+          year: cols[2] || '',
+          aiTool: cols[4] || '',
+          calculationMethod: cols[5] || '',
           tokenConsumption: cols[6] || '0',
-          cost: cols[8] || '0',
-          serviceLine: cols[11] || '',
-          country: cols[10] || '',
-          region: cols[20] || '',
+          credits: cols[7],
+          cost: cols[9] || '0',
+          country: cols[11] || '',
+          superRegion: cols[12] || '',
+          serviceLine: cols[13] || '',
         });
       }
     }
@@ -463,7 +468,7 @@ cursor,priya.nair@enterprise-corp.com,Priya Nair,2026-03-06,March_2026,202603,22
               value={rawText}
               onChange={(e) => validateAndPreviewCsv(e.target.value, 'pasted_data.csv')}
               rows={8}
-              placeholder="AI Tool Flag,User Mail,Display Name,Activity Date,Month_Year,Month Id,Token Consumption,Daily Billable Tokens,Cost in USD,CT/Non-CT,Country,Service Line,Org Sub Service Line,Sub-Service Line 1,Sub-Service Line 2,Engagement Code,Engagement Super Region,Engagement Service Line,Engagement Sub Service Line,Engagement Competency,Region,Management Region,License Cost in USD,Usage Free Token Limit,Billable/Non-Billable,ProjectType,GDS Location,Cost Center&#10;chatgpt,user@corp.com,User Name,2026-03-01,March_2026,202603,25000,25000,0.35,CT,USA,Consulting,Strategy,Delivery,Hybrid Delivery,E-1234,Americas,Tax,Client Advisory,People Advisory,North America,Americas,100.00,80.00,True,External,Onshore,CC-CNS-101"
+              placeholder="User Email,User Name,Year,Month,Product,Calculation Method,GenAI Tool Consumption,Credits,Cost USD,Cost (in $),CT/Non-CT,Country,Super Region,Service Line,Sub-Service Line 1,Sub-Service Line 2,Engagement Code,Engagement - Super Region,Engagement Service Line,Engagement Sub-Service Line,Engagement Competency,Engagement Invest Type,GDS Location,Cost Center,Portfolio - CT Product Family,Portfolio - CT Product,Entity,SL/SF,RS,GDS&#10;user@corp.com,User Name,2026,3,ChatGPT,Usage,1200,,1.84,1.84,CT,USA,USLI,Consulting,Business Consulting,Digital,E-1234,USLI,Consulting,Business Consulting,People Advisory,Growth,India,CC-CNS-101,Product Family A,Product A,Entity1,SL1,RS1,GDS1"
               className="w-full bg-ey-black/60 border border-ey-border rounded-xl p-3 text-xs text-ey-light font-mono focus:outline-none focus:border-ey-yellow"
             />
           </div>
@@ -496,11 +501,13 @@ cursor,priya.nair@enterprise-corp.com,Priya Nair,2026-03-06,March_2026,202603,22
                   <tr>
                     <th className="px-3 py-2">AI Tool</th>
                     <th className="px-3 py-2">User</th>
-                    <th className="px-3 py-2">Date</th>
+                    <th className="px-3 py-2">Month</th>
+                    <th className="px-3 py-2">Method</th>
                     <th className="px-3 py-2">Tokens</th>
+                    <th className="px-3 py-2">Credits ($)</th>
                     <th className="px-3 py-2">Cost ($)</th>
                     <th className="px-3 py-2">Service Line</th>
-                    <th className="px-3 py-2">Region</th>
+                    <th className="px-3 py-2">Super Region</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ey-border/50">
@@ -508,11 +515,13 @@ cursor,priya.nair@enterprise-corp.com,Priya Nair,2026-03-06,March_2026,202603,22
                     <tr key={idx} className="hover:bg-ey-black/30">
                       <td className="px-3 py-2 font-semibold text-ey-yellow uppercase">{row.aiTool}</td>
                       <td className="px-3 py-2 text-ey-light">{row.userMail}</td>
-                      <td className="px-3 py-2 font-mono text-ey-muted">{row.activityDate}</td>
+                      <td className="px-3 py-2 font-mono text-ey-muted">{row.month}/{row.year}</td>
+                      <td className="px-3 py-2">{row.calculationMethod}</td>
                       <td className="px-3 py-2 font-mono">{Number(row.tokenConsumption).toLocaleString()}</td>
+                      <td className="px-3 py-2 font-mono text-ey-muted">{row.credits === '' || row.credits === undefined ? 'null' : Number(row.credits).toFixed(2)}</td>
                       <td className="px-3 py-2 font-mono text-emerald-400">${Number(row.cost).toFixed(2)}</td>
                       <td className="px-3 py-2">{row.serviceLine}</td>
-                      <td className="px-3 py-2 text-ey-muted">{row.region}</td>
+                      <td className="px-3 py-2 text-ey-muted">{row.superRegion}</td>
                     </tr>
                   ))}
                 </tbody>

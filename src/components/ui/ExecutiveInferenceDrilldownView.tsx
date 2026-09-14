@@ -42,7 +42,7 @@ import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 // can statically detect them even though they're picked dynamically at runtime). Any tool
 // not in this map (e.g. one added later purely via CSV data) falls back to the purple style.
 const TOOL_STYLES: Record<string, { label: string; shortLabel: string; color: string; badgeBg: string; barBg: string; hoverBorder: string }> = {
-  copilot: {
+  github: {
     label: 'GitHub Copilot Enterprise',
     shortLabel: 'Copilot',
     color: 'text-indigo-400',
@@ -74,7 +74,7 @@ const TOOL_STYLES: Record<string, { label: string; shortLabel: string; color: st
     barBg: 'bg-sky-500',
     hoverBorder: 'hover:border-sky-500/80',
   },
-  factoryai: {
+  factory: {
     label: 'Factory AI Enterprise',
     shortLabel: 'Factory AI',
     color: 'text-rose-400',
@@ -188,16 +188,35 @@ export function ExecutiveInferenceDrilldownView({
     }
   }, [filters]);
 
+  // Every held tool gets a 'License' row every month regardless of activity
+  // (flat seat fee, tokenConsumption always 0). Every cost/token aggregation
+  // below (monthly trend, engagement code, service line, region, country,
+  // per-tool breakdowns) must sum only genuine Usage rows — otherwise seat
+  // fees silently blend into what's presented as usage spend, inflating every
+  // figure far past summary.totalCost.
+  const usageRows = useMemo(
+    () => allRows.filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0),
+    [allRows]
+  );
+
   // Compute Active vs Inactive Telemetry Roster — real roster (all distinct users ever
-  // seen in the CSV) vs real period-active seats (matching summary.userCapacityBreakdown,
-  // the same source the Seat Utilization card on Executive Overview uses).
+  // seen in the CSV, License + Usage rows alike) vs real period-active seats. Note
+  // summary.userCapacityBreakdown covers the FULL roster too (every held seat gets a
+  // License row every month regardless of use), so "active" here is derived directly
+  // from having at least one real Usage row with consumption > 0 — the same rule
+  // roi.ts uses for its own activeUserCount.
   const totalRosterSeats = useMemo(
     () => new Set(allRows.map((r) => (r.userMail || '').toLowerCase().trim()).filter(Boolean)).size || 70,
     [allRows]
   );
   const periodActiveEmails = useMemo(
-    () => new Set((summary?.userCapacityBreakdown || []).map((u) => u.userMail.toLowerCase().trim())),
-    [summary]
+    () => new Set(
+      allRows
+        .filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0)
+        .map((r) => (r.userMail || '').toLowerCase().trim())
+        .filter(Boolean)
+    ),
+    [allRows]
   );
   const activeUserMap = useMemo(() => {
     const map = new Map<string, {
@@ -208,7 +227,7 @@ export function ExecutiveInferenceDrilldownView({
       tools: Set<string>;
       serviceLine: string;
       region: string;
-      activeDays: Set<string>;
+      activeMonths: Set<number>;
       billableTokens: number;
     }>();
 
@@ -225,17 +244,26 @@ export function ExecutiveInferenceDrilldownView({
           totalCost: 0,
           tools: new Set<string>(),
           serviceLine: r.orgServiceLine || 'General',
-          region: r.managementRegion || 'APAC',
-          activeDays: new Set<string>(),
+          region: r.superRegion || 'APAC',
+          activeMonths: new Set<number>(),
           billableTokens: 0,
         });
       }
       const u = map.get(email)!;
-      u.totalTokens += r.tokenConsumption;
-      u.totalCost += r.cost;
+      // Tools reflects every tool the seat holds a License or Usage row for
+      // (dual-license overhead is about held seats, not just active usage).
       if (r.aiTool) u.tools.add(r.aiTool.toLowerCase());
-      if (r.activityDate) u.activeDays.add(r.activityDate);
-      u.billableTokens += r.dailyBillableTokens || 0;
+      // Cost, consumption, active-months and billable consumption must only
+      // come from genuine Usage rows — License rows exist every month for
+      // every held tool regardless of activity, so including them here would
+      // both double-count spend (on top of License Cost tracked separately)
+      // and inflate every seat's active-months ratio to ~100%.
+      if (r.calculationMethod === 'Usage' && r.tokenConsumption > 0) {
+        u.totalTokens += r.tokenConsumption;
+        u.totalCost += r.cost;
+        if (r.monthId) u.activeMonths.add(r.monthId);
+        if (r.billableFlag === 'True') u.billableTokens += r.tokenConsumption || 0;
+      }
     }
     return map;
   }, [allRows, periodActiveEmails]);
@@ -260,26 +288,33 @@ export function ExecutiveInferenceDrilldownView({
       const email = (r.userMail || '').toLowerCase().trim();
       if (!email || periodActiveEmails.has(email) || seen.has(email)) continue;
       seen.add(email);
+      const cap = summary?.userCapacityBreakdown.find((u) => u.userMail.toLowerCase() === email);
       result.push({
         email,
         name: r.displayName || email.split('@')[0],
         serviceLine: r.orgServiceLine || 'General',
-        region: r.managementRegion || 'Unknown',
-        lastActivityDate: r.activityDate,
-        licenseCost: r.licenseCost || avgLicenseCostPerSeat,
+        region: r.superRegion || 'Unknown',
+        lastActivityDate: r.monthYear,
+        licenseCost: cap?.licenseCost || avgLicenseCostPerSeat,
       });
     }
     return result.sort((a, b) => (a.lastActivityDate < b.lastActivityDate ? 1 : -1));
-  }, [allRows, periodActiveEmails, avgLicenseCostPerSeat]);
+  }, [allRows, periodActiveEmails, avgLicenseCostPerSeat, summary]);
 
   // Compute Power Users (Pareto Analysis: Top 20%)
   const sortedUsersBySpend = useMemo(() => {
     return [...activeUserList].sort((a, b) => b.totalCost - a.totalCost);
   }, [activeUserList]);
 
+  // Usage cost only — matches summary.totalCost and the totalCost basis of
+  // top10Spend/top20Spend above. Summing raw allRows.cost here would blend in
+  // every held seat's flat License Cost, wildly understating the Pareto share.
   const totalOrgSpend = useMemo(() => {
-    return allRows.reduce((acc, r) => acc + r.cost, 0);
-  }, [allRows]);
+    if (summary) return summary.totalCost;
+    return allRows
+      .filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0)
+      .reduce((acc, r) => acc + r.cost, 0);
+  }, [allRows, summary]);
 
   const top10PercentCount = Math.max(1, Math.round(sortedUsersBySpend.length * 0.1));
   const top20PercentCount = Math.max(2, Math.round(sortedUsersBySpend.length * 0.2));
@@ -294,7 +329,7 @@ export function ExecutiveInferenceDrilldownView({
   // Compute Month-by-Month Spend
   const monthlySpend = useMemo(() => {
     const map = new Map<string, { month: string; cost: number; tokens: number; rowCount: number }>();
-    for (const r of allRows) {
+    for (const r of usageRows) {
       const m = r.monthYear || 'Unknown';
       if (!map.has(m)) {
         map.set(m, { month: m, cost: 0, tokens: 0, rowCount: 0 });
@@ -305,22 +340,26 @@ export function ExecutiveInferenceDrilldownView({
       item.rowCount += 1;
     }
     return Array.from(map.values());
-  }, [allRows]);
+  }, [usageRows]);
 
-  // Compute Habitual Cohorts
+  // Compute Habitual Cohorts. With no day-level Activity Date, "habitual" is
+  // redefined from active-days-per-active-month to active-months-out-of-the-
+  // selected-window (thresholds re-picked accordingly: 90%+/60%+ of the
+  // window's months), matching the same redesign in roi.ts's userEngagementCohorts.
+  const totalMonthsInWindow = useMemo(() => new Set(allRows.map((r) => r.monthId)).size || 1, [allRows]);
   const userCohorts = useMemo(() => {
     const embedded: typeof activeUserList = [];
     const regular: typeof activeUserList = [];
     const occasional: typeof activeUserList = [];
 
     for (const u of activeUserList) {
-      const days = u.activeDays.size;
-      if (days >= 16) embedded.push(u);
-      else if (days >= 9) regular.push(u);
+      const activeMonthRatio = u.activeMonths.size / totalMonthsInWindow;
+      if (activeMonthRatio >= 0.9) embedded.push(u);
+      else if (activeMonthRatio >= 0.6) regular.push(u);
       else occasional.push(u);
     }
     return { embedded, regular, occasional };
-  }, [activeUserList]);
+  }, [activeUserList, totalMonthsInWindow]);
 
   // Engagement Code Breakdown
   const projectCodeBreakdown = useMemo(() => {
@@ -333,7 +372,7 @@ export function ExecutiveInferenceDrilldownView({
       rowCount: number;
     }>();
 
-    for (const r of allRows) {
+    for (const r of usageRows) {
       const code = r.projectCode || 'Unassigned';
       if (!map.has(code)) {
         map.set(code, {
@@ -348,12 +387,12 @@ export function ExecutiveInferenceDrilldownView({
       const p = map.get(code)!;
       p.cost += r.cost;
       p.tokens += r.tokenConsumption;
-      p.billableTokens += r.dailyBillableTokens || 0;
+      if (r.billableFlag === 'True') p.billableTokens += r.tokenConsumption || 0;
       if (r.userMail) p.users.add(r.userMail);
       p.rowCount += 1;
     }
     return Array.from(map.values()).sort((a, b) => b.cost - a.cost);
-  }, [allRows]);
+  }, [usageRows]);
 
   // Service Line Comparative Usage & Cost Breakdown
   const serviceLineComparisonData = useMemo(() => {
@@ -369,7 +408,7 @@ export function ExecutiveInferenceDrilldownView({
       tools: Map<string, number>;
     }>();
 
-    for (const r of allRows) {
+    for (const r of usageRows) {
       const s = r.orgServiceLine || 'General';
       if (!map.has(s)) {
         map.set(s, {
@@ -392,7 +431,7 @@ export function ExecutiveInferenceDrilldownView({
       const isExt = (r.projectType || '').toLowerCase() === 'external' || (r.projectCode || '').startsWith('E-');
       if (isExt) item.externalCost += r.cost;
       else item.internalCost += r.cost;
-      const sub = r.orgSubServiceLine || 'General';
+      const sub = r.subServiceLine1 || 'General';
       item.subServices.set(sub, (item.subServices.get(sub) || 0) + r.cost);
       const tool = (r.aiTool || '').toLowerCase();
       item.tools.set(tool, (item.tools.get(tool) || 0) + r.cost);
@@ -408,13 +447,13 @@ export function ExecutiveInferenceDrilldownView({
         topSubService: Array.from(item.subServices.entries()).sort((a, b) => b[1] - a[1])[0] || ['General', 0],
       }))
       .sort((a, b) => b.cost - a.cost);
-  }, [allRows]);
+  }, [usageRows]);
 
   // Regional & Service Line Breakdown
   const regionBreakdown = useMemo(() => {
     const map = new Map<string, { region: string; cost: number; tokens: number; users: Set<string> }>();
-    for (const r of allRows) {
-      const reg = r.managementRegion || 'Other';
+    for (const r of usageRows) {
+      const reg = r.superRegion || 'Other';
       if (!map.has(reg)) {
         map.set(reg, { region: reg, cost: 0, tokens: 0, users: new Set<string>() });
       }
@@ -424,11 +463,11 @@ export function ExecutiveInferenceDrilldownView({
       if (r.userMail) item.users.add(r.userMail);
     }
     return Array.from(map.values()).sort((a, b) => b.cost - a.cost);
-  }, [allRows]);
+  }, [usageRows]);
 
   const countryBreakdown = useMemo(() => {
     const map = new Map<string, { country: string; cost: number; tokens: number; users: Set<string> }>();
-    for (const r of allRows) {
+    for (const r of usageRows) {
       const c = r.country || 'Unknown';
       if (!map.has(c)) {
         map.set(c, { country: c, cost: 0, tokens: 0, users: new Set<string>() });
@@ -439,7 +478,7 @@ export function ExecutiveInferenceDrilldownView({
       if (r.userMail) item.users.add(r.userMail);
     }
     return Array.from(map.values()).sort((a, b) => b.cost - a.cost);
-  }, [allRows]);
+  }, [usageRows]);
 
   // Multi-Tool Comprehensive Analytics
   const multiToolData = useMemo(() => {
@@ -458,7 +497,7 @@ export function ExecutiveInferenceDrilldownView({
       billableCost: number;
       externalCost: number;
       internalCost: number;
-      users: Map<string, { displayName: string; email: string; cost: number; tokens: number; activeDays: Set<string> }>;
+      users: Map<string, { displayName: string; email: string; cost: number; tokens: number; activeMonths: Set<number> }>;
       serviceLines: Map<string, { cost: number; tokens: number }>;
       projectCodes: Map<string, { cost: number; tokens: number }>;
       rowCount: number;
@@ -501,12 +540,16 @@ export function ExecutiveInferenceDrilldownView({
         };
       }
       const t = toolsMap[toolKey];
-      {
+      // License rows exist every month for every held tool regardless of
+      // activity and would otherwise dilute these unit-economics figures
+      // ($/M tokens, spend share, etc.) with flat seat fees — only genuine
+      // Usage rows count here.
+      if (r.calculationMethod === 'Usage' && r.tokenConsumption > 0) {
         t.cost += r.cost;
         t.tokens += r.tokenConsumption;
-        t.billableTokens += r.dailyBillableTokens || 0;
-        t.rowCount += 1;
         const isBillable = r.billableFlag === 'True' || r.billableFlag === 'true';
+        if (isBillable) t.billableTokens += r.tokenConsumption || 0;
+        t.rowCount += 1;
         if (isBillable) t.billableCost += r.cost;
         const isExt = (r.projectType || '').toLowerCase() === 'external' || (r.projectCode || '').startsWith('E-');
         if (isExt) t.externalCost += r.cost;
@@ -520,13 +563,13 @@ export function ExecutiveInferenceDrilldownView({
               email,
               cost: 0,
               tokens: 0,
-              activeDays: new Set(),
+              activeMonths: new Set(),
             });
           }
           const u = t.users.get(email)!;
           u.cost += r.cost;
           u.tokens += r.tokenConsumption;
-          if (r.activityDate) u.activeDays.add(r.activityDate);
+          if (r.monthId) u.activeMonths.add(r.monthId);
         }
 
         const sl = r.orgServiceLine || 'General';
@@ -540,25 +583,29 @@ export function ExecutiveInferenceDrilldownView({
         const prjObj = t.projectCodes.get(prj)!;
         prjObj.cost += r.cost;
         prjObj.tokens += r.tokenConsumption;
-      }
 
-      const uEmail = (r.userMail || '').toLowerCase();
-      if (uEmail) {
-        if (!userToolMap.has(uEmail)) {
-          userToolMap.set(uEmail, {
-            displayName: r.displayName || uEmail.split('@')[0],
-            email: uEmail,
-            tools: new Set(),
-            totalCost: 0,
-            totalTokens: 0,
-            serviceLine: r.orgServiceLine || 'General',
-            region: r.managementRegion || 'APAC',
-          });
+        // Dual-tool detection matches roi.ts's summary.multiToolOverlap: "used
+        // 2+ tools" based on Usage rows only, not "holds 2+ licenses" —
+        // otherwise this local total would double-count against a completely
+        // different (much larger) population than the authoritative Overview figure.
+        const uEmail = (r.userMail || '').toLowerCase();
+        if (uEmail) {
+          if (!userToolMap.has(uEmail)) {
+            userToolMap.set(uEmail, {
+              displayName: r.displayName || uEmail.split('@')[0],
+              email: uEmail,
+              tools: new Set(),
+              totalCost: 0,
+              totalTokens: 0,
+              serviceLine: r.orgServiceLine || 'General',
+              region: r.superRegion || 'APAC',
+            });
+          }
+          const ut = userToolMap.get(uEmail)!;
+          ut.tools.add(toolKey);
+          ut.totalCost += r.cost;
+          ut.totalTokens += r.tokenConsumption;
         }
-        const ut = userToolMap.get(uEmail)!;
-        ut.tools.add(toolKey);
-        ut.totalCost += r.cost;
-        ut.totalTokens += r.tokenConsumption;
       }
     }
 
@@ -607,7 +654,7 @@ export function ExecutiveInferenceDrilldownView({
     }
 
     // GitHub Copilot always displays first; the rest keep their existing relative order.
-    toolList.sort((a, b) => (a.tool === 'copilot' ? -1 : b.tool === 'copilot' ? 1 : 0));
+    toolList.sort((a, b) => (a.tool === 'github' ? -1 : b.tool === 'github' ? 1 : 0));
 
     const dualToolUsers = Array.from(userToolMap.values())
       .filter((u) => u.tools.size > 1)
@@ -702,19 +749,22 @@ export function ExecutiveInferenceDrilldownView({
         actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens) to reduce token spend.`,
       };
     })(),
-    project_billability: {
-      id: 'project_billability',
-      title: 'Client Billability & Project Telemetry Alignment',
-      tag: 'Project ROI Governance',
-      tagColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      icon: Layers,
-      stat: '78.4% Billable AI Spend',
-      statSub: '78.4% Billable vs 21.6% Non-Billable',
-      finding:
-        '78.4% of total AI spend is flagged Billable in the CSV, directly assigned to revenue-generating client engagements. Non-billable internal spend accounts for 21.6%, maintaining healthy innovation without excess cost leakage.',
-      actionableInsight:
-        'Audit the largest non-billable cost centers to ensure internal AI investment yields reusable intellectual property or client delivery templates.',
-    },
+    project_billability: (() => {
+      const billableSpendPercent = summary?.billableSpendPercent || 0;
+      const nonBillablePct = 100 - billableSpendPercent;
+      return {
+        id: 'project_billability',
+        title: 'Client Billability & Project Telemetry Alignment',
+        tag: 'Project ROI Governance',
+        tagColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+        icon: Layers,
+        stat: `${billableSpendPercent.toFixed(1)}% Billable AI Spend`,
+        statSub: `${billableSpendPercent.toFixed(1)}% Billable vs ${nonBillablePct.toFixed(1)}% Non-Billable`,
+        finding: `${billableSpendPercent.toFixed(1)}% of total AI spend ($${(summary?.billableSpend || 0).toFixed(2)}) is flagged Billable, derived from Engagement Codes starting with E-, and directly assigned to revenue-generating client engagements. Non-billable internal spend ($${(summary?.nonBillableSpend || 0).toFixed(2)}) accounts for ${nonBillablePct.toFixed(1)}%.`,
+        actionableInsight:
+          'Audit the largest non-billable cost centers to ensure internal AI investment yields reusable intellectual property or client delivery templates.',
+      };
+    })(),
     habitual_retention: (() => {
       const embeddedPct = (userCohorts.embedded.length / (activeUserCount || 1)) * 100;
       const regularPct = (userCohorts.regular.length / (activeUserCount || 1)) * 100;
@@ -727,7 +777,7 @@ export function ExecutiveInferenceDrilldownView({
         icon: Users,
         stat: `${(embeddedPct + regularPct).toFixed(0)}% Regular-or-Better Usage`,
         statSub: `${embeddedPct.toFixed(0)}% Embedded, ${regularPct.toFixed(0)}% Regular, ${occasionalPct.toFixed(0)}% Occasional (of ${activeUserCount} active users)`,
-        finding: `Across ${activeUserCount} active users this period: ${userCohorts.embedded.length} (${embeddedPct.toFixed(0)}%) are Embedded (16+ active days), ${userCohorts.regular.length} (${regularPct.toFixed(0)}%) are Regular (9-15 active days), and ${userCohorts.occasional.length} (${occasionalPct.toFixed(0)}%) are Occasional (under 9 active days). This is total active-day count over the whole period, not average days per active month — see the Habitual Retention card on Executive Overview for the per-month cohort breakdown, which also accounts for the ${inactiveUserCount} completely dormant seats.`,
+        finding: `Across ${activeUserCount} active users this period: ${userCohorts.embedded.length} (${embeddedPct.toFixed(0)}%) are Embedded (active in ≥90% of months in the filtered window), ${userCohorts.regular.length} (${regularPct.toFixed(0)}%) are Regular (≥60%), and ${userCohorts.occasional.length} (${occasionalPct.toFixed(0)}%) are Occasional (≥25%). This is measured as active-months ÷ total months in the filtered window, per user — see the Habitual Retention card on Executive Overview for the org-wide cohort breakdown, which also accounts for the ${inactiveUserCount} completely dormant seats.`,
         actionableInsight:
           occasionalPct > 20
             ? 'Investigate the Occasional cohort for onboarding friction or workflow gaps before expanding license seats further.'
@@ -761,7 +811,7 @@ export function ExecutiveInferenceDrilldownView({
         return (r.aiTool || '').toLowerCase() === lowerName;
       }
       if (type === 'region') {
-        return (r.managementRegion || '').toLowerCase() === lowerName;
+        return (r.superRegion || '').toLowerCase() === lowerName;
       }
       if (type === 'country') {
         return (r.country || '').toLowerCase() === lowerName;
@@ -778,15 +828,15 @@ export function ExecutiveInferenceDrilldownView({
       if (type === 'cohort') {
         const userObj = activeUserMap.get((r.userMail || '').toLowerCase());
         if (!userObj) return false;
-        const days = userObj.activeDays.size;
-        if (name === 'Embedded (16+ days)') return days >= 16;
-        if (name === 'Regular (9-15 days)') return days >= 9 && days < 16;
-        if (name === 'Occasional (4-8 days)') return days < 9;
+        const ratio = totalMonthsInWindow > 0 ? userObj.activeMonths.size / totalMonthsInWindow : 0;
+        if (name === 'Embedded') return ratio >= 0.9;
+        if (name === 'Regular') return ratio >= 0.6 && ratio < 0.9;
+        if (name === 'Occasional') return ratio < 0.6;
         return true;
       }
       return true;
     });
-  }, [allRows, selectedEntity, activeUserMap]);
+  }, [allRows, selectedEntity, activeUserMap, totalMonthsInWindow]);
 
   // Search filter on granular rows
   const filteredGranularRows = useMemo(() => {
@@ -800,7 +850,7 @@ export function ExecutiveInferenceDrilldownView({
         (r.projectCode || '').toLowerCase().includes(s) ||
         (r.orgServiceLine || '').toLowerCase().includes(s) ||
         (r.country || '').toLowerCase().includes(s) ||
-        (r.activityDate || '').includes(s)
+        (r.monthYear || '').toLowerCase().includes(s)
     );
   }, [granularRows, searchTerm]);
 
@@ -837,27 +887,27 @@ export function ExecutiveInferenceDrilldownView({
   const handleExportFilteredCsv = () => {
     if (filteredGranularRows.length === 0) return;
     const headers = [
-      'Activity Date',
+      'Month',
       'Display Name',
       'User Email',
       'AI Tool',
       'Engagement Code',
       'Service Line',
       'Country',
-      'Region',
+      'Super Region',
       'Billable Flag',
       'Token Consumption',
       'Cost (USD)',
     ];
     const rows = filteredGranularRows.map((r) => [
-      r.activityDate,
+      r.monthYear,
       `"${r.displayName}"`,
       r.userMail,
       r.aiTool,
       r.projectCode,
       r.orgServiceLine,
       r.country,
-      r.managementRegion,
+      r.superRegion,
       r.billableFlag,
       r.tokenConsumption,
       r.cost.toFixed(4),
@@ -1490,12 +1540,12 @@ export function ExecutiveInferenceDrilldownView({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Client Billable Spend</span>
-                  <p className="text-2xl font-bold text-emerald-400">78.4%</p>
+                  <p className="text-2xl font-bold text-emerald-400">{(summary?.billableSpendPercent || 0).toFixed(1)}%</p>
                   <p className="text-[10px] text-emerald-300/80">Billable Client Engagements</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Non-Billable Investment</span>
-                  <p className="text-2xl font-bold text-cyan-400">21.6%</p>
+                  <p className="text-2xl font-bold text-cyan-400">{(100 - (summary?.billableSpendPercent || 0)).toFixed(1)}%</p>
                   <p className="text-[10px] text-cyan-300/80">Internal R&amp;D &amp; Innovation Spend</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
@@ -1523,14 +1573,14 @@ export function ExecutiveInferenceDrilldownView({
                   >
                     <div className="flex items-center justify-between">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                        Core Habitual (16+ Days)
+                        Core Habitual (≥90% Months)
                       </span>
                       <span className="text-[10px] text-ey-muted">{userCohorts.embedded.length} Users</span>
                     </div>
                     <p className="text-2xl font-bold text-emerald-400">
                       {((userCohorts.embedded.length / (activeUserCount || 1)) * 100).toFixed(0)}%
                     </p>
-                    <p className="text-xs text-ey-muted">Daily core workflow embedding</p>
+                    <p className="text-xs text-ey-muted">Active in nearly every month in window</p>
                     <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
                       <span>Continue to Hierarchy</span>
                       <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
@@ -1543,14 +1593,14 @@ export function ExecutiveInferenceDrilldownView({
                   >
                     <div className="flex items-center justify-between">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                        Regular (9-15 Days)
+                        Regular (≥60% Months)
                       </span>
                       <span className="text-[10px] text-ey-muted">{userCohorts.regular.length} Users</span>
                     </div>
                     <p className="text-2xl font-bold text-cyan-400">
                       {((userCohorts.regular.length / (activeUserCount || 1)) * 100).toFixed(0)}%
                     </p>
-                    <p className="text-xs text-ey-muted">Frequent bi-weekly task assistance</p>
+                    <p className="text-xs text-ey-muted">Frequent, consistent monthly usage</p>
                     <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
                       <span>Continue to Hierarchy</span>
                       <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
@@ -1563,7 +1613,7 @@ export function ExecutiveInferenceDrilldownView({
                   >
                     <div className="flex items-center justify-between">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                        Occasional (4-8 Days)
+                        Occasional (≥25% Months)
                       </span>
                       <span className="text-[10px] text-ey-muted">{userCohorts.occasional.length} Users</span>
                     </div>
@@ -1757,12 +1807,12 @@ export function ExecutiveInferenceDrilldownView({
           <table className="w-full text-left text-xs font-mono">
             <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
               <tr>
-                <th className="px-4 py-3">Activity Date</th>
+                <th className="px-4 py-3">Month</th>
                 <th className="px-4 py-3">Employee &amp; Email</th>
                 <th className="px-4 py-3">AI Tool</th>
                 <th className="px-4 py-3">Engagement Code</th>
                 <th className="px-4 py-3">Service Line</th>
-                <th className="px-4 py-3">Region</th>
+                <th className="px-4 py-3">Super Region</th>
                 <th className="px-4 py-3 text-center">Billable</th>
                 <th className="px-4 py-3 text-right">Tokens</th>
                 <th className="px-4 py-3 text-right">Cost (USD)</th>
@@ -1777,7 +1827,7 @@ export function ExecutiveInferenceDrilldownView({
                     className="hover:bg-ey-card-hover/90 transition cursor-pointer"
                     onClick={() => setInspectingRecord(r)}
                   >
-                    <td className="px-4 py-3 text-ey-muted whitespace-nowrap">{r.activityDate}</td>
+                    <td className="px-4 py-3 text-ey-muted whitespace-nowrap">{r.monthYear.replace(/_/g, ' ')}</td>
                     <td className="px-4 py-3 font-medium text-ey-light">
                       <div>{r.displayName}</div>
                       <div className="text-[10px] text-ey-muted">{r.userMail}</div>
@@ -1795,7 +1845,7 @@ export function ExecutiveInferenceDrilldownView({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-ey-muted">{r.orgServiceLine}</td>
-                    <td className="px-4 py-3 text-ey-muted">{r.managementRegion}</td>
+                    <td className="px-4 py-3 text-ey-muted">{r.superRegion}</td>
                     <td className="px-4 py-3 text-center">
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -1922,10 +1972,6 @@ export function ExecutiveInferenceDrilldownView({
 
             <div className="grid grid-cols-2 gap-3 bg-ey-black/60 p-4 rounded-xl border border-ey-border">
               <div>
-                <span className="text-ey-muted text-[10px] block">ACTIVITY DATE</span>
-                <span className="text-ey-light font-bold">{inspectingRecord.activityDate}</span>
-              </div>
-              <div>
                 <span className="text-ey-muted text-[10px] block">MONTH / YEAR</span>
                 <span className="text-ey-light font-bold">{inspectingRecord.monthYear} ({inspectingRecord.monthId})</span>
               </div>
@@ -1950,12 +1996,12 @@ export function ExecutiveInferenceDrilldownView({
                 <span className="text-ey-light">{inspectingRecord.orgServiceLine}</span>
               </div>
               <div>
-                <span className="text-ey-muted text-[10px] block">SUB SERVICE LINE</span>
-                <span className="text-ey-light">{inspectingRecord.orgSubServiceLine || 'N/A'}</span>
+                <span className="text-ey-muted text-[10px] block">SUB-SERVICE LINE 1</span>
+                <span className="text-ey-light">{inspectingRecord.subServiceLine1 || 'N/A'}</span>
               </div>
               <div>
-                <span className="text-ey-muted text-[10px] block">COUNTRY / REGION</span>
-                <span className="text-ey-light">{inspectingRecord.country} ({inspectingRecord.managementRegion})</span>
+                <span className="text-ey-muted text-[10px] block">COUNTRY / SUPER REGION</span>
+                <span className="text-ey-light">{inspectingRecord.country} ({inspectingRecord.superRegion})</span>
               </div>
               <div>
                 <span className="text-ey-muted text-[10px] block">BILLABLE FLAG</span>
@@ -1972,12 +2018,12 @@ export function ExecutiveInferenceDrilldownView({
                 <span className="text-ey-yellow font-bold text-sm">${inspectingRecord.cost.toFixed(4)}</span>
               </div>
               <div>
-                <span className="text-ey-muted text-[10px] block">FIXED LICENSE COST</span>
-                <span className="text-ey-light">${inspectingRecord.licenseCost?.toFixed(2) || '100.00'}</span>
+                <span className="text-ey-muted text-[10px] block">CALCULATION METHOD</span>
+                <span className="text-ey-light">{inspectingRecord.calculationMethod}</span>
               </div>
               <div>
-                <span className="text-ey-muted text-[10px] block">FREE TOKEN LIMIT</span>
-                <span className="text-ey-light">{inspectingRecord.usageFreeTokenLimit || 80.0}</span>
+                <span className="text-ey-muted text-[10px] block">CREDITS</span>
+                <span className="text-ey-light">{inspectingRecord.creditsLimit}</span>
               </div>
             </div>
 

@@ -21,10 +21,10 @@ interface GlobalFilterBarProps {
 
 const TOOL_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT',
-  copilot: 'GitHub Copilot',
+  github: 'GitHub Copilot',
   claude: 'Claude',
   replit: 'Replit',
-  factoryai: 'Factory AI',
+  factory: 'Factory AI',
   cursor: 'Cursor AI',
 };
 
@@ -106,7 +106,7 @@ export function GlobalFilterBar({
       className={selectClass}
     >
       <option value="all">All Tools</option>
-      {(filterOptions?.aiTools || ['chatgpt', 'copilot', 'claude']).map(t => (
+      {(filterOptions?.aiTools || ['chatgpt', 'github', 'claude']).map(t => (
         <option key={t} value={t}>{TOOL_LABELS[t] || t}</option>
       ))}
     </select>

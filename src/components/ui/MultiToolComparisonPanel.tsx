@@ -38,7 +38,7 @@ const TOOL_CONFIG: Record<
     border: 'border-emerald-500/30',
     barBg: 'bg-emerald-500',
   },
-  copilot: {
+  github: {
     label: 'GitHub Copilot Enterprise',
     bg: 'bg-indigo-500/10',
     text: 'text-indigo-400',
@@ -59,7 +59,7 @@ const TOOL_CONFIG: Record<
     border: 'border-sky-500/30',
     barBg: 'bg-sky-500',
   },
-  factoryai: {
+  factory: {
     label: 'Factory AI Enterprise',
     bg: 'bg-rose-500/10',
     text: 'text-rose-400',
@@ -101,7 +101,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
   }
 
   // GitHub Copilot always displays first; the rest keep their existing relative order.
-  const byAiTool = [...summary.byAiTool].sort((a, b) => (a.tool === 'copilot' ? -1 : b.tool === 'copilot' ? 1 : 0));
+  const byAiTool = [...summary.byAiTool].sort((a, b) => (a.tool === 'github' ? -1 : b.tool === 'github' ? 1 : 0));
 
   // Find lowest cost per 1k tokens for efficiency highlight
   const minCostPer1k = Math.min(...byAiTool.map((t) => t.costPer1kTokens || 0));
