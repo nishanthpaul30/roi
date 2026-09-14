@@ -730,10 +730,9 @@ export function ExecutiveInferenceDrilldownView({
       const sorted = [...multiToolData.toolList].sort((a, b) => a.costPerM - b.costPerM);
       const cheapest = sorted[0];
       const priciest = sorted[sorted.length - 1];
-      const spread = cheapest && priciest && cheapest.costPerM > 0
-        ? ((priciest.costPerM - cheapest.costPerM) / cheapest.costPerM) * 100
+      const priceMultiple = cheapest && priciest && cheapest.costPerM > 0
+        ? priciest.costPerM / cheapest.costPerM
         : 0;
-      const topSpend = [...multiToolData.toolList].sort((a, b) => b.cost - a.cost)[0];
       const rateLine = sorted.map((t) => `${t.shortLabel} $${t.costPerM.toFixed(2)}/M`).join(' vs ');
       return {
         id: 'multi_tool_comparison',
@@ -741,9 +740,9 @@ export function ExecutiveInferenceDrilldownView({
         tag: 'Cross-Platform Unit Economics',
         tagColor: 'bg-ey-yellow/10 text-ey-yellow border-ey-yellow/30',
         icon: Layers,
-        stat: `${spread.toFixed(1)}% Rate Spread ($${(cheapest?.costPerM || 0).toFixed(2)} - $${(priciest?.costPerM || 0).toFixed(2)}/M)`,
+        stat: `${priceMultiple.toFixed(1)}x Price Gap ($${(cheapest?.costPerM || 0).toFixed(2)} - $${(priciest?.costPerM || 0).toFixed(2)}/M)`,
         statSub: rateLine,
-        finding: `Unit economics vary by up to ${spread.toFixed(1)}% across ${sorted.length} tools: ${cheapest?.label} delivers the benchmark rate at $${(cheapest?.costPerM || 0).toFixed(2)}/M tokens, while ${priciest?.label} is the highest at $${(priciest?.costPerM || 0).toFixed(2)}/M. ${topSpend?.label} drives ${(topSpend?.spendShare || 0).toFixed(1)}% of total spend ($${(topSpend?.cost || 0).toFixed(2)}) across ${topSpend?.userCount || 0} active users. Multi-platform license overlap was identified across ${multiToolData.dualToolUsers.length} dual-tool users with redundant license overhead.`,
+        finding: `${cheapest?.label} is the cheapest tool at $${(cheapest?.costPerM || 0).toFixed(2)} per million tokens. ${priciest?.label} is the most expensive at $${(priciest?.costPerM || 0).toFixed(2)} per million tokens — about ${priceMultiple.toFixed(1)}x more for the same volume of usage.`,
         actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens). Consolidate overlapping dual-tool licenses to eliminate redundant fixed license fees across ${multiToolData.dualToolUsers.length} users.`,
       };
     })(),
@@ -751,8 +750,8 @@ export function ExecutiveInferenceDrilldownView({
       const sorted = [...multiToolData.toolList].sort((a, b) => a.costPerM - b.costPerM);
       const cheapest = sorted[0];
       const priciest = sorted[sorted.length - 1];
-      const spread = cheapest && priciest && cheapest.costPerM > 0
-        ? ((priciest.costPerM - cheapest.costPerM) / cheapest.costPerM) * 100
+      const priceMultiple = cheapest && priciest && cheapest.costPerM > 0
+        ? priciest.costPerM / cheapest.costPerM
         : 0;
       const topSpend = [...multiToolData.toolList].sort((a, b) => b.cost - a.cost)[0];
       const rateLine = sorted.map((t) => `${t.shortLabel} $${t.costPerM.toFixed(2)}/M`).join(' vs ');
@@ -762,7 +761,7 @@ export function ExecutiveInferenceDrilldownView({
         tag: 'Vendor Optimization',
         tagColor: 'bg-ey-yellow/10 text-ey-yellow border-ey-yellow/30',
         icon: Layers,
-        stat: `${spread.toFixed(1)}% Rate Spread ($${(cheapest?.costPerM || 0).toFixed(2)} - $${(priciest?.costPerM || 0).toFixed(2)}/M)`,
+        stat: `${priceMultiple.toFixed(1)}x Price Gap ($${(cheapest?.costPerM || 0).toFixed(2)} - $${(priciest?.costPerM || 0).toFixed(2)}/M)`,
         statSub: rateLine,
         finding: `${cheapest?.label} unit cost is $${(cheapest?.costPerM || 0).toFixed(2)}/M tokens, and ${priciest?.label} is the highest at $${(priciest?.costPerM || 0).toFixed(2)}/M. ${topSpend?.label} accounts for ${(topSpend?.spendShare || 0).toFixed(1)}% of spend ($${(topSpend?.cost || 0).toFixed(2)}) across ${sorted.length} active tools. Multi-platform license overlap was identified across dual-tool users with redundant license overhead.`,
         actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens) to reduce token spend.`,
@@ -1470,14 +1469,6 @@ export function ExecutiveInferenceDrilldownView({
                         </p>
                       </div>
                     </div>
-
-                    <button
-                      onClick={() => handleTriggerAction(`1-Click License Consolidation Workflow queued for ${multiToolData.dualToolUsers.length} dual-platform users.`)}
-                      className="px-3.5 py-1.5 bg-amber-500 text-ey-black font-bold text-xs rounded-xl shadow hover:bg-amber-400 transition flex items-center space-x-1.5 self-start sm:self-center cursor-pointer"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Consolidate Dual Licenses</span>
-                    </button>
                   </div>
 
                   <HierarchyDrilldownPanel
@@ -1555,49 +1546,6 @@ export function ExecutiveInferenceDrilldownView({
                       </div>
                     );
                   })}
-                </div>
-              </div>
-
-              {/* Vendor Arbitrage Simulation Action Box */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-3">
-                <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-ey-yellow" />
-                  <span>Strategic Vendor Arbitrage &amp; Model Routing Potential</span>
-                </h3>
-                <p className="text-xs text-ey-muted leading-relaxed">
-                  {(() => {
-                    const sorted = [...multiToolData.toolList].sort((a, b) => a.costPerM - b.costPerM);
-                    const cheapest = sorted[0];
-                    const pricier = sorted.slice(1).filter((t) => cheapest && t.costPerM > cheapest.costPerM * 1.05);
-                    if (!cheapest || pricier.length === 0) {
-                      return 'Insufficient multi-tool rate variance to model routing arbitrage right now.';
-                    }
-                    const pricierList = pricier.map((t) => `${t.shortLabel} ($${t.costPerM.toFixed(2)}/M)`).join(' and ');
-                    const monthlySavings = pricier.reduce(
-                      (sum, t) => sum + (t.tokens * (t.costPerM - cheapest.costPerM)) / 1000000,
-                      0
-                    ) / 6;
-                    return (
-                      <>
-                        Steering routine, low-complexity queries currently routed to {pricierList} down to {cheapest.shortLabel} (${cheapest.costPerM.toFixed(2)}/M) can recover an estimated{' '}
-                        <strong>${(monthlySavings * 0.3).toFixed(0)} - ${(monthlySavings * 0.6).toFixed(0)}/month</strong> without sacrificing deliverable quality. Furthermore, consolidating overlapping dual-tool licenses eliminates duplicate license fees across {multiToolData.dualToolUsers.length} power users.
-                      </>
-                    );
-                  })()}
-                </p>
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <button
-                    onClick={() => handleTriggerAction('Model routing policy configured: lower-tier prompts automatically diverted to Copilot.')}
-                    className="px-3.5 py-1.5 bg-ey-yellow text-ey-black font-bold text-xs rounded-xl shadow hover:bg-yellow-400 transition cursor-pointer"
-                  >
-                    Enforce Cost-Aware Model Routing
-                  </button>
-                  <button
-                    onClick={() => handleTriggerAction('Negotiation brief with OpenAI and Anthropic compiled based on token volume.')}
-                    className="px-3.5 py-1.5 bg-ey-black border border-ey-border hover:border-ey-yellow text-ey-light text-xs font-semibold rounded-xl transition cursor-pointer"
-                  >
-                    Generate Vendor Volume Negotiation Brief
-                  </button>
                 </div>
               </div>
             </div>
