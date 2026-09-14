@@ -67,20 +67,20 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
   const inferences = [
     {
       id: 'seat_utilization',
-      title: 'Active / Inactive Users Telemetry (Seat Utilization)',
+      title: 'Active / Inactive Users Telemetry (License Utilization)',
       tag: 'User Engagement Telemetry',
       tagColor: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
       icon: UserCheck,
       stat: `${activeSeatPercent.toFixed(1)}% Active Utilization`,
-      statSub: `${activeUserCount} Active vs ${inactiveUserCount} Inactive Seats (${fmtCost(inactiveLeakageCost)}/mo Leakage)`,
+      statSub: `${activeUserCount} Active vs ${inactiveUserCount} Inactive Licenses (${fmtCost(inactiveLeakageCost)}/mo Leakage)`,
       finding:
         inactiveUserCount > 0
-          ? `Out of ${rosterSeats} provisioned seats (full dataset roster), ${activeUserCount} users (${activeSeatPercent.toFixed(1)}%) recorded prompt activity in the selected window, while ${inactiveUserCount} seats remained inactive, implying ${fmtCost(inactiveLeakageCost)}/mo in unutilized average per-seat license cost.`
-          : `All ${rosterSeats} seats in the dataset recorded active prompt consumption during this window, achieving ${activeSeatPercent.toFixed(1)}% active seat engagement with zero dormant license overhead.`,
+          ? `Out of ${rosterSeats} provisioned licenses (full dataset roster), ${activeUserCount} users (${activeSeatPercent.toFixed(1)}%) recorded prompt activity in the selected window, while ${inactiveUserCount} licenses remained inactive, implying ${fmtCost(inactiveLeakageCost)}/mo in unutilized average per-license cost.`
+          : `All ${rosterSeats} licenses in the dataset recorded active prompt consumption during this window, achieving ${activeSeatPercent.toFixed(1)}% active license engagement with zero dormant license overhead.`,
       actionableInsight:
         inactiveUserCount > 0
-          ? 'Automate a 30-day inactivity license reclamation workflow: reallocate dormant seats to waitlisted teams or convert low-activity seats to consumption-only API keys.'
-          : 'Maintain active monitoring and expand license seat capacity proactively as new engineering cohorts onboard.',
+          ? 'Automate a 30-day inactivity license reclamation workflow: reallocate dormant licenses to waitlisted teams or convert low-activity licenses to consumption-only API keys.'
+          : 'Maintain active monitoring and expand license capacity proactively as new engineering cohorts onboard.',
     },
     {
       id: 'license_roi_governance',
@@ -91,7 +91,7 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
       icon: Wallet,
       stat: `${fmtPct(licenseRoiPercent)} License ROI`,
       statSub: `${fmtCost(licenseUnderutilizedCost)} unconsumed${overlap && overlap.dualToolUserCount > 0 ? ` + ${fmtCost(overlap.totalDualToolSpend)} dual-license` : ''}`,
-      finding: `Only ${fmtPct(licenseRoiPercent)} of the ${fmtCost(summary.totalLicenseCost)} in real per-seat License Cost in USD was actually consumed as usage, leaving ${fmtCost(licenseUnderutilizedCost)} unconsumed.${overlap && overlap.dualToolUserCount > 0 ? ` On top of that, ${overlap.dualToolUserCount} users run two or more AI platforms concurrently, adding ${fmtCost(overlap.totalDualToolSpend)} in consolidatable dual-license spend.` : ''}`,
+      finding: `Only ${fmtPct(licenseRoiPercent)} of the ${fmtCost(summary.totalLicenseCost)} in real per-license Cost in USD was actually consumed as usage, leaving ${fmtCost(licenseUnderutilizedCost)} unconsumed.${overlap && overlap.dualToolUserCount > 0 ? ` On top of that, ${overlap.dualToolUserCount} users run two or more AI platforms concurrently, adding ${fmtCost(overlap.totalDualToolSpend)} in consolidatable dual-license spend.` : ''}`,
       actionableInsight: 'Open the Token & Spend ROI page to reclaim or downgrade underutilized licenses, and standardize dual-platform users onto a single primary AI tool.',
     },
     {
@@ -130,7 +130,7 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
         : 'No user engagement data available for the selected filters.',
       actionableInsight:
         cohorts && cohorts.dropoutPercent > 20
-          ? 'Investigate the Dropout cohort for onboarding friction before expanding license seats further.'
+          ? 'Investigate the Dropout cohort for onboarding friction before expanding license capacity further.'
           : 'AI tools show healthy habitual usage. Focus shift from basic onboarding to advanced competency training.',
     },
     {

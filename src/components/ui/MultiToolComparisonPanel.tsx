@@ -122,7 +122,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
               </span>
             </h2>
             <p className="text-xs text-ey-muted mt-0.5">
-              Unit economics, user spend density, token cost efficiency ($/1K tokens), and seat overlap detection.
+              Unit economics, user spend density, token cost efficiency ($/1K tokens), and license overlap detection.
             </p>
           </div>
         </div>
@@ -329,7 +329,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
               </div>
               <div>
                 <h3 className="text-sm font-bold text-ey-light tracking-tight flex items-center gap-2">
-                  <span>Multi-Tool Seat Overlap &amp; License Consolidation Alert</span>
+                  <span>Multi-Tool License Overlap &amp; License Consolidation Alert</span>
                 </h3>
                 <p className="text-xs text-ey-muted">
                   Users active across multiple AI platforms concurrently during this period.
@@ -357,7 +357,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
             <div className="flex items-start space-x-2 bg-ey-black/60 p-3 rounded-lg border border-ey-border/60">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <p>
-                <strong className="text-ey-light">Consolidation Insight:</strong> {multiToolOverlap.dualToolUserCount} power users generated active billable events on multiple AI tools (e.g., ChatGPT + Copilot or Claude + ChatGPT). Standardizing these seats to a single primary Enterprise AI platform can eliminate redundant license costs while concentrating volume discounts.
+                <strong className="text-ey-light">Consolidation Insight:</strong> {multiToolOverlap.dualToolUserCount} power users generated active billable events on multiple AI tools (e.g., ChatGPT + Copilot or Claude + ChatGPT). Standardizing these users to a single primary Enterprise AI platform can eliminate redundant license costs while concentrating volume discounts.
               </p>
             </div>
 
@@ -385,7 +385,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
                   <div className="mt-3">
                     <HierarchyDrilldownPanel
                       rows={overlapHierarchyRows}
-                      title="Dual-Platform Seat Hierarchy"
+                      title="Dual-Platform License Hierarchy"
                       subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
                       onSelectUser={(email) => onDrilldown?.(undefined, email)}
                     />

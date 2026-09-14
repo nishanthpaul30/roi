@@ -156,13 +156,13 @@ export default function ExecutiveOverviewPage() {
                     title="Cost per Active User"
                     delta={data.metrics.costPerActiveUser?.summary}
                     formatType="currency"
-                    description="Average spend per active developer seat. Click to view top power user spend rankings."
+                    description="Average spend per active developer license. Click to view top power user spend rankings."
                     comparisonLabel="vs prev period"
                     onClick={() =>
                       openDrilldown(
                         'cost_per_user',
                         'Cost per Active User',
-                        'Per-user seat expenditure and developer adoption rankings',
+                        'Per-user license expenditure and developer adoption rankings',
                         `$${(data.metrics.costPerActiveUser?.summary?.current || 0).toFixed(2)} / user`,
                         data.metrics.costPerActiveUser?.summary,
                         data.metrics.cost.series

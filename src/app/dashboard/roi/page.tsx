@@ -106,13 +106,13 @@ export default function RoiPage() {
                   previousDataAvailable,
                 }}
                 unit="%"
-                description={`Total actual usage cost ÷ total per-seat License Cost in USD ($${summary.totalLicenseCost.toLocaleString()}). Click to inspect per-seat license ROI.`}
+                description={`Total actual usage cost ÷ total per-license Cost in USD ($${summary.totalLicenseCost.toLocaleString()}). Click to inspect per-license ROI.`}
                 onClick={() =>
                   openDrilldown({
                     type: 'metric',
                     id: 'efficiency',
                     title: 'License Investment ROI Analysis',
-                    subtitle: 'Actual telemetry spend vs real per-seat License Cost in USD.',
+                    subtitle: 'Actual telemetry spend vs real per-license Cost in USD.',
                     badge: 'License ROI',
                   })
                 }
@@ -129,13 +129,13 @@ export default function RoiPage() {
                   previousDataAvailable,
                 }}
                 formatType="currency"
-                description="Zone 1: Unused free-dollar limit across under-utilized seats (limit - gross cost, per month). Click to drill down to raw usage logs."
+                description="Zone 1: Unused free-dollar limit across under-utilized licenses (limit - gross cost, per month). Click to drill down to raw usage logs."
                 onClick={() =>
                   openDrilldown({
                     type: 'zone',
                     id: 'waste',
                     title: 'Zone 1: Unconsumed Capacity Waste',
-                    subtitle: 'Under-utilized employee seats with unconsumed free-dollar limit (per-tool free limit - gross usage cost).',
+                    subtitle: 'Under-utilized employee licenses with unconsumed free-dollar limit (per-tool free limit - gross usage cost).',
                     badge: 'Zone 1 Waste',
                   })
                 }
@@ -219,7 +219,7 @@ export default function RoiPage() {
                     zone === 'zone1_under'
                       ? 'Zone 1: Under-Utilized Capacity'
                       : zone === 'zone2_over'
-                      ? 'Zone 2: Over-Utilized Seats'
+                      ? 'Zone 2: Over-Utilized Licenses'
                       : 'Dollar Ceiling Risk',
                   subtitle: 'Detailed employee breakdown and live CSV log telemetry.',
                   badge: zone.toUpperCase(),
@@ -318,7 +318,7 @@ export default function RoiPage() {
                   { label: 'Total API Cost', value: `$${summary.totalCost.toLocaleString()}`, sub: 'actual billed USD', color: 'text-ey-light' },
                   { label: 'Cost per 1K tokens', value: `$${summary.costPer1kTokens.toFixed(6)}`, sub: '/ 1K tokens', color: 'text-ey-yellow' },
                   { label: 'Near Dollar Cap Users', value: `${summary.ceilingRiskCount} users`, sub: `≥90% of $${Math.round(summary.hardCeiling).toLocaleString()}`, color: 'text-red-400' },
-                  { label: 'Total License Cost', value: `$${summary.totalLicenseCost.toLocaleString()}`, sub: 'sum of per-seat License Cost in USD', color: 'text-sky-400' },
+                  { label: 'Total License Cost', value: `$${summary.totalLicenseCost.toLocaleString()}`, sub: 'sum of per-license Cost in USD', color: 'text-sky-400' },
                   { label: 'License Investment ROI', value: `${summary.licenseRoiPercent}%`, sub: 'actual cost ÷ license cost', color: 'text-sky-400' },
                 ].map((item) => (
                   <div key={item.label} className="bg-ey-black border border-ey-border rounded-lg p-3">

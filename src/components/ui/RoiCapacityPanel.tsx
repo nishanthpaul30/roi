@@ -97,7 +97,7 @@ export function RoiCapacityPanel({
                   : 'bg-ey-black text-ey-muted border-ey-border hover:text-ey-light'
               }`}
             >
-              All Seats — Mixed Data ({userCapacityBreakdown.length})
+              All Licenses — Mixed Data ({userCapacityBreakdown.length})
             </button>
 
             <button
@@ -164,7 +164,7 @@ export function RoiCapacityPanel({
             <div>
               <p className="text-sky-300 font-bold">License Investment ROI</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-sky-200">{licenseRoiPercent}%</strong> of total per-seat License Cost in USD (${totalLicenseCost.toLocaleString()}) was actually consumed as usage.
+                <strong className="text-sky-200">{licenseRoiPercent}%</strong> of total per-license Cost in USD (${totalLicenseCost.toLocaleString()}) was actually consumed as usage.
               </p>
             </div>
           </div>
@@ -199,7 +199,7 @@ export function RoiCapacityPanel({
             ? 'Zone 1: Unconsumed AI License Waste Hierarchy'
             : activeTab === 'zone2'
             ? 'Zone 2: Budget Breach & Overage Hierarchy'
-            : 'All User Seats — Capacity & Zone Hierarchy'
+            : 'All User Licenses — Capacity & Zone Hierarchy'
         }
         onSelectUser={(email) => {
           const row = capacityByEmail.get(email.toLowerCase());

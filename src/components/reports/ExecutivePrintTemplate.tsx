@@ -144,7 +144,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
         {summary?.multiToolOverlap && (
           <div className="border border-amber-300 bg-amber-50/70 p-3 rounded-lg flex items-center justify-between text-xs font-mono text-slate-800">
             <div>
-              <span className="font-bold text-amber-900">Seat Consolidation Alert:</span>{' '}
+              <span className="font-bold text-amber-900">License Consolidation Alert:</span>{' '}
               <span>
                 <strong>{summary.multiToolOverlap.dualToolUserCount} users</strong> generate active usage across 2+ AI platforms concurrently.
               </span>

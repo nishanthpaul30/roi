@@ -151,6 +151,9 @@ export function ExecutiveInferenceDrilldownView({
   // Pre-hierarchy facet selection: habitual_retention picks a cohort before
   // handing off to the mandated hierarchy navigator.
   const [selectedCohortFacet, setSelectedCohortFacet] = useState<'embedded' | 'regular' | 'occasional' | null>(null);
+  // Dormant Seats Action Ledger: which Service Line row (if any) is expanded
+  // to show its individual dormant employees.
+  const [expandedDormantServiceLine, setExpandedDormantServiceLine] = useState<string | null>(null);
 
   // Level 4 Search, Pagination & Modal Record Inspector State
   const [searchTerm, setSearchTerm] = useState('');
@@ -300,6 +303,22 @@ export function ExecutiveInferenceDrilldownView({
     }
     return result.sort((a, b) => (a.lastActivityDate < b.lastActivityDate ? 1 : -1));
   }, [allRows, periodActiveEmails, avgLicenseCostPerSeat, summary]);
+
+  // C-suite view groups dormant seats by Service Line instead of naming each
+  // individual employee — leadership acts on "reclaim N seats in Tax", not on
+  // a 97-row employee roster.
+  const dormantByServiceLine = useMemo(() => {
+    const map = new Map<string, { serviceLine: string; count: number; monthlyCost: number }>();
+    for (const u of dormantUsers) {
+      if (!map.has(u.serviceLine)) {
+        map.set(u.serviceLine, { serviceLine: u.serviceLine, count: 0, monthlyCost: 0 });
+      }
+      const entry = map.get(u.serviceLine)!;
+      entry.count += 1;
+      entry.monthlyCost += u.licenseCost;
+    }
+    return Array.from(map.values()).sort((a, b) => b.monthlyCost - a.monthlyCost);
+  }, [dormantUsers]);
 
   // Compute Power Users (Pareto Analysis: Top 20%)
   const sortedUsersBySpend = useMemo(() => {
@@ -680,20 +699,20 @@ export function ExecutiveInferenceDrilldownView({
   const inferencesMeta: Record<string, InferenceDefinition> = {
     seat_utilization: {
       id: 'seat_utilization',
-      title: 'Active / Inactive Users Telemetry (Seat Utilization)',
+      title: 'Active / Inactive Users Telemetry (License Utilization)',
       tag: 'User Engagement Telemetry',
       tagColor: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
       icon: UserCheck,
       stat: `${activeSeatPercent}% Active Utilization`,
-      statSub: `${activeUserCount} Active vs ${inactiveUserCount} Inactive Seats ($${inactiveLeakageCost}/mo Leakage)`,
+      statSub: `${activeUserCount} Active vs ${inactiveUserCount} Inactive Licenses ($${inactiveLeakageCost}/mo Leakage)`,
       finding:
         inactiveUserCount > 0
-          ? `Out of ${totalRosterSeats} provisioned enterprise license seats, ${activeUserCount} users (${activeSeatPercent}%) recorded prompt activity, while ${inactiveUserCount} seats remain completely dormant, incurring $${inactiveLeakageCost}/mo in unutilized fixed seat costs.`
-          : `All ${totalRosterSeats} provisioned enterprise license seats recorded active prompt consumption during this window.`,
+          ? `Out of ${totalRosterSeats} provisioned enterprise licenses, ${activeUserCount} users (${activeSeatPercent}%) recorded prompt activity, while ${inactiveUserCount} licenses remain completely dormant, incurring $${inactiveLeakageCost}/mo in unutilized fixed license costs.`
+          : `All ${totalRosterSeats} provisioned enterprise licenses recorded active prompt consumption during this window.`,
       actionableInsight:
         inactiveUserCount > 0
-          ? `Automate a 30-day inactivity license reclamation workflow: reallocate dormant seats to waitlisted teams or convert low-activity seats to consumption-only API keys.`
-          : `Maintain active monitoring and expand license seat capacity proactively.`,
+          ? `Automate a 30-day inactivity license reclamation workflow: reallocate dormant licenses to waitlisted teams or convert low-activity licenses to consumption-only API keys.`
+          : `Maintain active monitoring and expand license capacity proactively.`,
     },
     pareto_risk: {
       id: 'pareto_risk',
@@ -725,7 +744,7 @@ export function ExecutiveInferenceDrilldownView({
         stat: `${spread.toFixed(1)}% Rate Spread ($${(cheapest?.costPerM || 0).toFixed(2)} - $${(priciest?.costPerM || 0).toFixed(2)}/M)`,
         statSub: rateLine,
         finding: `Unit economics vary by up to ${spread.toFixed(1)}% across ${sorted.length} tools: ${cheapest?.label} delivers the benchmark rate at $${(cheapest?.costPerM || 0).toFixed(2)}/M tokens, while ${priciest?.label} is the highest at $${(priciest?.costPerM || 0).toFixed(2)}/M. ${topSpend?.label} drives ${(topSpend?.spendShare || 0).toFixed(1)}% of total spend ($${(topSpend?.cost || 0).toFixed(2)}) across ${topSpend?.userCount || 0} active users. Multi-platform license overlap was identified across ${multiToolData.dualToolUsers.length} dual-tool users with redundant license overhead.`,
-        actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens). Consolidate overlapping dual-tool licenses to eliminate redundant fixed seat fees across ${multiToolData.dualToolUsers.length} users.`,
+        actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens). Consolidate overlapping dual-tool licenses to eliminate redundant fixed license fees across ${multiToolData.dualToolUsers.length} users.`,
       };
     })(),
     vendor_spread: (() => {
@@ -777,11 +796,11 @@ export function ExecutiveInferenceDrilldownView({
         icon: Users,
         stat: `${(embeddedPct + regularPct).toFixed(0)}% Regular-or-Better Usage`,
         statSub: `${embeddedPct.toFixed(0)}% Embedded, ${regularPct.toFixed(0)}% Regular, ${occasionalPct.toFixed(0)}% Occasional (of ${activeUserCount} active users)`,
-        finding: `Across ${activeUserCount} active users this period: ${userCohorts.embedded.length} (${embeddedPct.toFixed(0)}%) are Embedded (active in ≥90% of months in the filtered window), ${userCohorts.regular.length} (${regularPct.toFixed(0)}%) are Regular (≥60%), and ${userCohorts.occasional.length} (${occasionalPct.toFixed(0)}%) are Occasional (≥25%). This is measured as active-months ÷ total months in the filtered window, per user — see the Habitual Retention card on Executive Overview for the org-wide cohort breakdown, which also accounts for the ${inactiveUserCount} completely dormant seats.`,
+        finding: `Across ${activeUserCount} active users this period: ${userCohorts.embedded.length} (${embeddedPct.toFixed(0)}%) are Embedded (active in ≥90% of months in the filtered window), ${userCohorts.regular.length} (${regularPct.toFixed(0)}%) are Regular (≥60%), and ${userCohorts.occasional.length} (${occasionalPct.toFixed(0)}%) are Occasional (≥25%). This is measured as active-months ÷ total months in the filtered window, per user — see the Habitual Retention card on Executive Overview for the org-wide cohort breakdown, which also accounts for the ${inactiveUserCount} completely dormant licenses.`,
         actionableInsight:
           occasionalPct > 20
-            ? 'Investigate the Occasional cohort for onboarding friction or workflow gaps before expanding license seats further.'
-            : 'AI tools show healthy habitual usage among active seats. Focus shift from basic onboarding to advanced competency training.',
+            ? 'Investigate the Occasional cohort for onboarding friction or workflow gaps before expanding license capacity further.'
+            : 'AI tools show healthy habitual usage among active licenses. Focus shift from basic onboarding to advanced competency training.',
       };
     })(),
   };
@@ -854,21 +873,28 @@ export function ExecutiveInferenceDrilldownView({
     );
   }, [granularRows, searchTerm]);
 
-  // Aggregates for the current granular slice
-  const sliceTotalCost = useMemo(
-    () => filteredGranularRows.reduce((acc, r) => acc + r.cost, 0),
+  // Aggregates for the current granular slice — Usage rows only. The raw log
+  // table below still shows every row (License included, for audit
+  // transparency), but License rows would otherwise blend flat seat fees
+  // into what's presented as usage spend here.
+  const usageGranularRows = useMemo(
+    () => filteredGranularRows.filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0),
     [filteredGranularRows]
   );
+  const sliceTotalCost = useMemo(
+    () => usageGranularRows.reduce((acc, r) => acc + r.cost, 0),
+    [usageGranularRows]
+  );
   const sliceTotalTokens = useMemo(
-    () => filteredGranularRows.reduce((acc, r) => acc + r.tokenConsumption, 0),
-    [filteredGranularRows]
+    () => usageGranularRows.reduce((acc, r) => acc + r.tokenConsumption, 0),
+    [usageGranularRows]
   );
   const sliceBillableCount = useMemo(
     () =>
-      filteredGranularRows.filter(
+      usageGranularRows.filter(
         (r) => r.billableFlag === 'True' || r.billableFlag === 'true'
       ).length,
-    [filteredGranularRows]
+    [usageGranularRows]
   );
 
   const totalPages = Math.ceil(filteredGranularRows.length / itemsPerPage) || 1;
@@ -1041,16 +1067,16 @@ export function ExecutiveInferenceDrilldownView({
               {/* Mandated Hierarchy Navigator — always shown first, at the top */}
               <HierarchyDrilldownPanel
                 rows={activePeriodRows}
-                title={`Level 3: Active Seat Hierarchy (${activeUserList.length} Users)`}
+                title={`Level 3: Active License Hierarchy (${activeUserList.length} Users)`}
                 onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
               />
 
               {/* Level 2 KPI Tiles */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Total Provisioned Seats</span>
-                  <p className="text-2xl font-bold text-ey-light">{totalRosterSeats} Seats</p>
-                  <p className="text-[10px] text-ey-muted">Real per-seat License Cost in USD</p>
+                  <span className="text-ey-muted text-[10px] uppercase font-bold">Total Provisioned Licenses</span>
+                  <p className="text-2xl font-bold text-ey-light">{totalRosterSeats} Licenses</p>
+                  <p className="text-[10px] text-ey-muted">Real per-license Cost in USD</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Active Engaged Users</span>
@@ -1058,27 +1084,27 @@ export function ExecutiveInferenceDrilldownView({
                   <p className="text-[10px] text-emerald-300/80">{activeSeatPercent}% of Provisioned Pool</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Dormant Unutilized Seats</span>
-                  <p className="text-2xl font-bold text-rose-400">{inactiveUserCount} Seats</p>
+                  <span className="text-ey-muted text-[10px] uppercase font-bold">Dormant Unutilized Licenses</span>
+                  <p className="text-2xl font-bold text-rose-400">{inactiveUserCount} Licenses</p>
                   <p className="text-[10px] text-rose-300/80">0 Tokens in Selected Period</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Annualized Seat Leakage</span>
+                  <span className="text-ey-muted text-[10px] uppercase font-bold">Annualized License Leakage</span>
                   <p className="text-2xl font-bold text-ey-yellow">${(inactiveLeakageCost * 12).toLocaleString()}/yr</p>
                   <p className="text-[10px] text-ey-yellow/80">${inactiveLeakageCost}/mo Direct Waste</p>
                 </div>
               </div>
 
-              {/* Level 3: Inactive Seats Roster & Reclamation Table */}
+              {/* Level 3: Inactive Licenses Roster & Reclamation Table */}
               <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ey-border/60 pb-3">
                   <div>
                     <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
                       <UserX className="w-4 h-4 text-rose-400" />
-                      <span>Level 3: Dormant Seats Action Ledger (1-Click Reclamation)</span>
+                      <span>Level 3: Dormant Licenses Action Ledger (1-Click Reclamation)</span>
                     </h3>
                     <p className="text-xs text-ey-muted mt-0.5">
-                      Identified dormant provisioned seats incurring real per-seat license fees without prompt telemetry in the selected period.
+                      Identified dormant provisioned licenses incurring real per-license fees without prompt telemetry in the selected period.
                     </p>
                   </div>
                   <button
@@ -1086,7 +1112,7 @@ export function ExecutiveInferenceDrilldownView({
                     className="px-3 py-1.5 bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 self-start sm:self-center"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Reclaim All Dormant Seats</span>
+                    <span>Reclaim All Dormant Licenses</span>
                   </button>
                 </div>
 
@@ -1094,39 +1120,87 @@ export function ExecutiveInferenceDrilldownView({
                   <table className="w-full text-left text-xs font-mono">
                     <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
                       <tr>
-                        <th className="px-4 py-3">Provisioned Employee</th>
                         <th className="px-4 py-3">Service Line</th>
-                        <th className="px-4 py-3">Region</th>
-                        <th className="px-4 py-3 text-center">Inactivity Duration</th>
+                        <th className="px-4 py-3 text-center">Dormant Licenses</th>
                         <th className="px-4 py-3 text-right">Fixed Monthly Cost</th>
                         <th className="px-4 py-3 text-center">Action Trigger</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-ey-border">
-                      {dormantUsers.map((u, i) => (
-                        <tr key={i} className="hover:bg-ey-card-hover/80 transition">
+                      {dormantByServiceLine.map((sl) => {
+                        const isExpanded = expandedDormantServiceLine === sl.serviceLine;
+                        return (
+                        <React.Fragment key={sl.serviceLine}>
+                        <tr
+                          onClick={() => setExpandedDormantServiceLine(isExpanded ? null : sl.serviceLine)}
+                          className="hover:bg-ey-card-hover/80 transition cursor-pointer"
+                          title={`Click to ${isExpanded ? 'hide' : 'view'} individual dormant licenses in ${sl.serviceLine}`}
+                        >
                           <td className="px-4 py-3 font-medium text-ey-light">
-                            <div>{u.name}</div>
-                            <div className="text-[10px] text-ey-muted">{u.email}</div>
-                          </td>
-                          <td className="px-4 py-3 text-ey-muted">{u.serviceLine}</td>
-                          <td className="px-4 py-3 text-ey-muted">{u.region}</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
-                              No Activity in Period (Last: {u.lastActivityDate})
+                            <span className="flex items-center gap-1.5">
+                              <ChevronRight className={`w-3.5 h-3.5 text-ey-muted transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                              {sl.serviceLine}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right font-bold text-rose-400">${u.licenseCost.toFixed(2)} / mo</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                              {sl.count} license{sl.count === 1 ? '' : 's'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-rose-400">${sl.monthlyCost.toFixed(2)} / mo</td>
                           <td className="px-4 py-3 text-center">
                             <button
-                              onClick={() => handleTriggerAction(`License for ${u.name} reclaimed and returned to pool.`)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTriggerAction(`${sl.count} dormant license${sl.count === 1 ? '' : 's'} in ${sl.serviceLine} reclaimed and returned to pool.`);
+                              }}
                               className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
                             >
-                              Reclaim Seat
+                              Reclaim {sl.count} License{sl.count === 1 ? '' : 's'}
                             </button>
                           </td>
                         </tr>
-                      ))}
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={4} className="p-0 bg-ey-black/40">
+                              <table className="w-full text-left text-xs font-mono">
+                                <thead className="text-ey-muted uppercase tracking-wider border-b border-ey-border/60">
+                                  <tr>
+                                    <th className="px-4 py-2 pl-10">Provisioned Employee</th>
+                                    <th className="px-4 py-2">Region</th>
+                                    <th className="px-4 py-2 text-center">Last Activity</th>
+                                    <th className="px-4 py-2 text-right">Fixed Monthly Cost</th>
+                                    <th className="px-4 py-2 text-center">Action Trigger</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-ey-border/40">
+                                  {dormantUsers.filter((u) => u.serviceLine === sl.serviceLine).map((u) => (
+                                    <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
+                                      <td className="px-4 py-2.5 pl-10 font-medium text-ey-light">
+                                        <div>{u.name}</div>
+                                        <div className="text-[10px] text-ey-muted">{u.email}</div>
+                                      </td>
+                                      <td className="px-4 py-2.5 text-ey-muted">{u.region}</td>
+                                      <td className="px-4 py-2.5 text-center text-[10px] text-ey-muted">{u.lastActivityDate}</td>
+                                      <td className="px-4 py-2.5 text-right font-bold text-rose-400">${u.licenseCost.toFixed(2)} / mo</td>
+                                      <td className="px-4 py-2.5 text-center">
+                                        <button
+                                          onClick={() => handleTriggerAction(`License for ${u.name} reclaimed and returned to pool.`)}
+                                          className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
+                                        >
+                                          Reclaim License
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1198,7 +1272,7 @@ export function ExecutiveInferenceDrilldownView({
 
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-ey-muted text-[10px] uppercase font-bold">Dual-Seat Overlap</span>
+                    <span className="text-ey-muted text-[10px] uppercase font-bold">Dual-License Overlap</span>
                     <span className="text-[10px] text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30">License Waste</span>
                   </div>
                   <p className="text-2xl font-bold text-ey-yellow">{multiToolData.dualToolUsers.length} Users</p>
@@ -1389,10 +1463,10 @@ export function ExecutiveInferenceDrilldownView({
                       </div>
                       <div>
                         <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider font-mono flex items-center gap-2">
-                          <span>Multi-Platform Seat Overlap &amp; License Redundancy Cohort</span>
+                          <span>Multi-Platform License Overlap &amp; License Redundancy Cohort</span>
                         </h3>
                         <p className="text-xs text-ey-muted mt-0.5 font-sans">
-                          {multiToolData.dualToolUsers.length} developers active on multiple AI tools concurrently, generating redundant fixed seat licenses.
+                          {multiToolData.dualToolUsers.length} developers active on multiple AI tools concurrently, generating redundant fixed license fees.
                         </p>
                       </div>
                     </div>
@@ -1408,7 +1482,7 @@ export function ExecutiveInferenceDrilldownView({
 
                   <HierarchyDrilldownPanel
                     rows={dualToolHierarchyRows}
-                    title="Level 3: Dual-Platform Seat Hierarchy"
+                    title="Level 3: Dual-Platform License Hierarchy"
                     subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
                     onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
                   />
@@ -1506,7 +1580,7 @@ export function ExecutiveInferenceDrilldownView({
                     return (
                       <>
                         Steering routine, low-complexity queries currently routed to {pricierList} down to {cheapest.shortLabel} (${cheapest.costPerM.toFixed(2)}/M) can recover an estimated{' '}
-                        <strong>${(monthlySavings * 0.3).toFixed(0)} - ${(monthlySavings * 0.6).toFixed(0)}/month</strong> without sacrificing deliverable quality. Furthermore, consolidating overlapping dual-tool licenses eliminates duplicate seat license fees across {multiToolData.dualToolUsers.length} power users.
+                        <strong>${(monthlySavings * 0.3).toFixed(0)} - ${(monthlySavings * 0.6).toFixed(0)}/month</strong> without sacrificing deliverable quality. Furthermore, consolidating overlapping dual-tool licenses eliminates duplicate license fees across {multiToolData.dualToolUsers.length} power users.
                       </>
                     );
                   })()}
@@ -1692,9 +1766,9 @@ export function ExecutiveInferenceDrilldownView({
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
             <div className="bg-ey-black/60 p-3 rounded-xl border border-ey-border/60">
-              <span className="text-[10px] text-ey-muted uppercase">Filtered Spend</span>
+              <span className="text-[10px] text-ey-muted uppercase">Total Spend</span>
               <p className="text-xl font-bold text-ey-yellow">${sliceTotalCost.toFixed(2)}</p>
               <span className="text-[10px] text-ey-muted font-mono">
                 {totalOrgSpend > 0 ? ((sliceTotalCost / totalOrgSpend) * 100).toFixed(1) : 0}% of company spend
@@ -1706,14 +1780,9 @@ export function ExecutiveInferenceDrilldownView({
               <span className="text-[10px] text-ey-muted font-mono">{sliceTotalTokens.toLocaleString()} tokens</span>
             </div>
             <div className="bg-ey-black/60 p-3 rounded-xl border border-ey-border/60">
-              <span className="text-[10px] text-ey-muted uppercase">Log Transactions</span>
-              <p className="text-xl font-bold text-ey-light">{filteredGranularRows.length} events</p>
-              <span className="text-[10px] text-ey-muted font-mono">CSV ledger records</span>
-            </div>
-            <div className="bg-ey-black/60 p-3 rounded-xl border border-ey-border/60">
               <span className="text-[10px] text-ey-muted uppercase">Client Billable</span>
               <p className="text-xl font-bold text-emerald-400">
-                {filteredGranularRows.length > 0 ? ((sliceBillableCount / filteredGranularRows.length) * 100).toFixed(1) : 0}%
+                {usageGranularRows.length > 0 ? ((sliceBillableCount / usageGranularRows.length) * 100).toFixed(1) : 0}%
               </p>
               <span className="text-[10px] text-emerald-300/80 font-mono">{sliceBillableCount} billable events</span>
             </div>
