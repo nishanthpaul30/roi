@@ -32,9 +32,13 @@ export default function OrgAndRegionalPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const topServiceLine = serviceLines[0];
-  const topRegion = regions[0];
-  const topSubPractice = subServiceLines[0];
+  // These arrays arrive sorted by token consumption, but every card below
+  // displays and is labelled by SPEND — so rank by cost here. The two rankings
+  // used to coincide, which hid the mismatch until licence fees were folded in.
+  const byCostDesc = <T extends { cost: number }>(arr: T[]) => [...arr].sort((a, b) => b.cost - a.cost);
+  const topServiceLine = byCostDesc(serviceLines)[0];
+  const topRegion = byCostDesc(regions)[0];
+  const topSubPractice = byCostDesc(subServiceLines)[0];
 
   // Every KPI card below compares its current value against that same
   // entity's own real previous-period value (e.g. this period's leading
@@ -46,8 +50,10 @@ export default function OrgAndRegionalPage() {
   const pctDeltaFor = (current: number, previous: number): number =>
     previous === 0 ? (current > 0 ? 100 : 0) : ((current - previous) / previous) * 100;
 
-  const prevTotalCost = summary?.prevTotalCost || 0;
-  const totalCostDelta = (summary?.totalCost || 0) - prevTotalCost;
+  // Total AI Investment basis (usage + licence), matching the service-line and
+  // region cards beside it — those breakdowns now include License row costs.
+  const prevTotalCost = summary?.prevTotalSpend || 0;
+  const totalCostDelta = (summary?.totalSpend || 0) - prevTotalCost;
 
   const prevTopServiceLineCost =
     summary?.prevByServiceLine?.find((s) => s.serviceLine === topServiceLine?.serviceLine)?.cost || 0;
@@ -168,7 +174,7 @@ export default function OrgAndRegionalPage() {
                       previousDataAvailable,
                     }}
                     formatType="currency"
-                    description={`Leading organizational expenditure (${((topServiceLine?.tokens / (summary.totalTokenConsumption || 1)) * 100).toFixed(1)}% of total). Click to drill down into raw usage logs.`}
+                    description={`Leading organizational expenditure — ${(((topServiceLine?.cost || 0) / (summary.totalSpend || 1)) * 100).toFixed(1)}% of Total AI Investment. Click to drill down into raw usage logs.`}
                     onClick={() =>
                       topServiceLine &&
                       openDrilldown({
@@ -193,7 +199,7 @@ export default function OrgAndRegionalPage() {
                       previousDataAvailable,
                     }}
                     formatType="currency"
-                    description={`Top management region (${((topRegion?.tokens / (summary.totalTokenConsumption || 1)) * 100).toFixed(1)}% regional share). Click to drill down into regional telemetry.`}
+                    description={`Top management region — ${(((topRegion?.cost || 0) / (summary.totalSpend || 1)) * 100).toFixed(1)}% of Total AI Investment. Click to drill down into regional telemetry.`}
                     onClick={() =>
                       topRegion &&
                       openDrilldown({
@@ -233,12 +239,12 @@ export default function OrgAndRegionalPage() {
                   />
 
                   <KpiCard
-                    title="Total Org Token Spend"
+                    title="Total Org Spend"
                     delta={{
-                      current: summary.totalCost,
+                      current: summary.totalSpend,
                       previous: prevTotalCost,
                       absoluteDelta: totalCostDelta,
-                      percentageDelta: Number(pctDeltaFor(summary.totalCost, prevTotalCost).toFixed(2)),
+                      percentageDelta: Number(pctDeltaFor(summary.totalSpend, prevTotalCost).toFixed(2)),
                       trend: trendFor(totalCostDelta),
                       previousDataAvailable,
                     }}

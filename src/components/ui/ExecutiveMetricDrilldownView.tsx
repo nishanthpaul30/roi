@@ -338,7 +338,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters }: Executiv
         {!subDrilldown && !pendingFacet && byCtNonCt.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             {byCtNonCt.map((c: any) => {
-              const seg = ctNonCtSegmentDisplay(id, c, summaryData?.totalCost);
+              const seg = ctNonCtSegmentDisplay(id, c, summaryData?.totalSpend);
               return (
                 <button
                   key={c.ctNonCt}

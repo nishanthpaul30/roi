@@ -54,6 +54,10 @@ export interface TokenCostSummary {
   // Totals from CSV fields: GenAI Tool Consumption, Cost (in $) — Usage rows only
   totalTokenConsumption: number;
   totalCost: number;
+  // Total AI Investment: usage + License row costs. Every dimension breakdown
+  // below sums to this, so it — not totalCost — is the denominator for any
+  // "% of total" display.
+  totalSpend: number;
   // Derived insights
   costPer1kTokens: number;
   costPerActiveUser?: number;
@@ -63,6 +67,7 @@ export interface TokenCostSummary {
   billableUtilizationRate: number;
   // Previous period (for delta comparisons)
   prevTotalCost: number;
+  prevTotalSpend: number;
   prevTotalTokenConsumption: number;
   // False when the previous-period window falls entirely outside the
   // dataset's real date coverage (see MetricDelta.previousDataAvailable)

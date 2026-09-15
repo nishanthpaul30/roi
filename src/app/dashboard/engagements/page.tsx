@@ -7,7 +7,7 @@ import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { useRawRows } from '@/hooks/useRawRows';
-import { Briefcase, ChevronRight, RotateCcw, ArrowUpRight, X, Search } from 'lucide-react';
+import { Briefcase, ChevronRight, RotateCcw, ArrowUpRight, X, Search, Info } from 'lucide-react';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
 interface LevelField {
@@ -51,7 +51,13 @@ function summarize(rows: CsvUsageRow[], field: keyof CsvUsageRow) {
     .map(([value, groupRows]) => ({
       value,
       rowCount: groupRows.length,
-      userCount: new Set(groupRows.map((r) => r.userMail.toLowerCase())).size,
+      // Active = someone who actually used the tool. A License row records a
+      // held seat, not activity, so it must not inflate this count.
+      userCount: new Set(
+        groupRows
+          .filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0)
+          .map((r) => r.userMail.toLowerCase())
+      ).size,
       tokens: Math.round(groupRows.reduce((s, r) => s + r.tokenConsumption, 0)),
       cost: Number(groupRows.reduce((s, r) => s + r.cost, 0).toFixed(2)),
     }))
@@ -77,11 +83,10 @@ function EngagementAnalytics() {
     setCodeQuery('');
   }, [userParam]);
 
-  // Usage rows only: License rows carry no engagement consumption to analyse.
-  const usageRows = useMemo(
-    () => baseRows.filter((r) => r.calculationMethod === 'Usage'),
-    [baseRows]
-  );
+  // Costs here are Total AI Investment (Usage + License rows), matching the
+  // Executive Overview and ROI pages. License rows carry an engagement code, so
+  // seat fees attribute to a real engagement rather than being dropped.
+  const usageRows = baseRows;
 
   const scopedRows = useMemo(
     () => (userParam ? usageRows.filter((r) => (r.userMail || '').toLowerCase() === userParam) : usageRows),
@@ -111,10 +116,18 @@ function EngagementAnalytics() {
   const totals = useMemo(
     () => ({
       rowCount: pathRows.length,
-      users: new Set(pathRows.map((r) => r.userMail.toLowerCase())).size,
+      users: new Set(
+        pathRows.filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0).map((r) => r.userMail.toLowerCase())
+      ).size,
       engagements: new Set(pathRows.map((r) => r.projectCode)).size,
       tokens: Math.round(pathRows.reduce((s, r) => s + r.tokenConsumption, 0)),
       cost: Number(pathRows.reduce((s, r) => s + r.cost, 0).toFixed(2)),
+      usageCost: Number(
+        pathRows.filter((r) => r.calculationMethod === 'Usage').reduce((s, r) => s + r.cost, 0).toFixed(2)
+      ),
+      licenseCost: Number(
+        pathRows.filter((r) => r.calculationMethod === 'License').reduce((s, r) => s + r.cost, 0).toFixed(2)
+      ),
     }),
     [pathRows]
   );
@@ -203,14 +216,28 @@ function EngagementAnalytics() {
         {/* Live totals for the current path */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {[
-            { label: 'Rows Matching Path', value: formatCompactNumber(totals.rowCount) },
-            { label: 'Engagement Codes', value: formatCompactNumber(totals.engagements) },
-            { label: 'Active Users', value: formatCompactNumber(totals.users) },
-            { label: 'Token Consumption', value: formatCompactNumber(totals.tokens) },
-            { label: 'Total Cost', value: fmtCost(totals.cost) },
+            { label: 'Rows Matching Path', value: formatCompactNumber(totals.rowCount), info: '' },
+            { label: 'Engagement Codes', value: formatCompactNumber(totals.engagements), info: '' },
+            { label: 'Active Users', value: formatCompactNumber(totals.users), info: 'Users with at least one metered Usage row. Held licenses with no activity are excluded.' },
+            { label: 'Token Consumption', value: formatCompactNumber(totals.tokens), info: '' },
+            {
+              label: 'Total Cost',
+              value: fmtCost(totals.cost),
+              info: `Total AI Investment for this path: ${fmtCost(totals.usageCost)} metered usage + ${fmtCost(totals.licenseCost)} license fees.`,
+            },
           ].map((tile) => (
             <div key={tile.label} className="bg-ey-card border border-ey-border rounded-xl p-4">
-              <p className="text-[10px] uppercase font-semibold text-ey-muted mb-1">{tile.label}</p>
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <p className="text-[10px] uppercase font-semibold text-ey-muted">{tile.label}</p>
+                {tile.info && (
+                  <div className="group/info relative cursor-pointer shrink-0">
+                    <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
+                    <div className="absolute right-0 top-5 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-52 z-50">
+                      {tile.info}
+                    </div>
+                  </div>
+                )}
+              </div>
               <p className={`text-lg font-bold text-ey-light ${rowsLoading ? 'opacity-40 animate-pulse' : ''}`}>
                 {rowsLoading ? '—' : tile.value}
               </p>

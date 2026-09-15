@@ -281,7 +281,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
           <div className="flex justify-between text-xs font-mono">
             <span className="text-ey-muted">Spend Distribution ($):</span>
             <span className="text-ey-light">
-              Total {fmtCost(summary.totalCost)}
+              Total {fmtCost(summary.totalSpend)}
             </span>
           </div>
           <div className="w-full bg-ey-card h-3.5 rounded-lg overflow-hidden flex p-0.5 gap-0.5">

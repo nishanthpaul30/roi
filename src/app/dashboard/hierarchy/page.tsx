@@ -7,7 +7,7 @@ import { DataTable, Column } from '@/components/ui/DataTable';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { useRawRows } from '@/hooks/useRawRows';
 import Link from 'next/link';
-import { GitBranch, ChevronRight, RotateCcw, ArrowUpRight, TableProperties, Globe2, Briefcase } from 'lucide-react';
+import { GitBranch, ChevronRight, RotateCcw, ArrowUpRight, TableProperties, Globe2, Briefcase, Info } from 'lucide-react';
 import { GeoHierarchyMap } from '@/components/ui/GeoHierarchyMap';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
@@ -56,7 +56,13 @@ function summarize(rows: CsvUsageRow[], field: keyof CsvUsageRow) {
     .map(([value, groupRows]) => ({
       value,
       rowCount: groupRows.length,
-      userCount: new Set(groupRows.map((r) => r.userMail.toLowerCase())).size,
+      // Active = someone who actually used the tool. A License row records a
+      // held seat, not activity, so it must not inflate this count.
+      userCount: new Set(
+        groupRows
+          .filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0)
+          .map((r) => r.userMail.toLowerCase())
+      ).size,
       tokens: Math.round(groupRows.reduce((s, r) => s + r.tokenConsumption, 0)),
       cost: Number(groupRows.reduce((s, r) => s + r.cost, 0).toFixed(2)),
     }))
@@ -72,15 +78,13 @@ export default function HierarchyDrilldownPage() {
   // The server already applies the global filters, so these rows arrive scoped.
   const { rows: baseRows, loading: rowsLoading } = useRawRows(filters);
 
-  // Every held tool gets a 'License' row every month regardless of activity
-  // (flat seat fee, tokenConsumption always 0). Cost/token totals throughout
-  // this hierarchy must sum only genuine Usage rows, or seat fees silently
-  // blend into what's presented as usage spend (e.g. total cost far exceeding
-  // summary.totalCost elsewhere in the app).
-  const usageRows = useMemo(
-    () => baseRows.filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0),
-    [baseRows]
-  );
+  // Costs here are Total AI Investment: Usage rows plus the License rows that
+  // carry the flat seat fees, matching the Executive Overview and ROI pages.
+  // License rows hold every dimension (CT/Non-CT, country, service line, user)
+  // fully populated, so the attribution is real rather than apportioned.
+  // Token sums are unaffected — License rows are always 0 — and user counts
+  // stay active-only (see summarize above).
+  const usageRows = baseRows;
 
   const pathRows = useMemo(
     () => usageRows.filter((r) => path.every((p) => String(r[p.field] || '').trim() === p.value)),
@@ -93,8 +97,14 @@ export default function HierarchyDrilldownPage() {
   const overallTotals = useMemo(() => {
     const tokens = Math.round(pathRows.reduce((s, r) => s + r.tokenConsumption, 0));
     const cost = Number(pathRows.reduce((s, r) => s + r.cost, 0).toFixed(2));
-    const users = new Set(pathRows.map((r) => r.userMail.toLowerCase())).size;
-    return { tokens, cost, users, rowCount: pathRows.length };
+    const usageCost = Number(
+      pathRows.filter((r) => r.calculationMethod === 'Usage').reduce((s, r) => s + r.cost, 0).toFixed(2)
+    );
+    const licenseCost = Number((cost - usageCost).toFixed(2));
+    const users = new Set(
+      pathRows.filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0).map((r) => r.userMail.toLowerCase())
+    ).size;
+    return { tokens, cost, usageCost, licenseCost, users, rowCount: pathRows.length };
   }, [pathRows]);
 
   const selectValue = (levelId: string, field: keyof CsvUsageRow, fieldLabel: string, value: string) => {
@@ -187,13 +197,27 @@ export default function HierarchyDrilldownPage() {
         {/* Live totals for current path */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Rows Matching Path', value: formatCompactNumber(overallTotals.rowCount) },
-            { label: 'Active Users', value: formatCompactNumber(overallTotals.users) },
-            { label: 'Token Consumption', value: formatCompactNumber(overallTotals.tokens) },
-            { label: 'Total Cost', value: fmtCost(overallTotals.cost) },
+            { label: 'Rows Matching Path', value: formatCompactNumber(overallTotals.rowCount), info: '' },
+            { label: 'Active Users', value: formatCompactNumber(overallTotals.users), info: 'Users with at least one metered Usage row. Held licenses with no activity are excluded.' },
+            { label: 'Token Consumption', value: formatCompactNumber(overallTotals.tokens), info: '' },
+            {
+              label: 'Total Cost',
+              value: fmtCost(overallTotals.cost),
+              info: `Total AI Investment for this path: ${fmtCost(overallTotals.usageCost)} metered usage + ${fmtCost(overallTotals.licenseCost)} license fees.`,
+            },
           ].map((tile) => (
             <div key={tile.label} className="bg-ey-card border border-ey-border rounded-xl p-4">
-              <p className="text-[10px] uppercase font-semibold text-ey-muted mb-1">{tile.label}</p>
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <p className="text-[10px] uppercase font-semibold text-ey-muted">{tile.label}</p>
+                {tile.info && (
+                  <div className="group/info relative cursor-pointer shrink-0">
+                    <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
+                    <div className="absolute right-0 top-5 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-52 z-50">
+                      {tile.info}
+                    </div>
+                  </div>
+                )}
+              </div>
               <p className={`text-lg font-bold text-ey-light ${rowsLoading ? 'opacity-40 animate-pulse' : ''}`}>
                 {rowsLoading ? '—' : tile.value}
               </p>

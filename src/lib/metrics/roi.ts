@@ -200,9 +200,31 @@ export async function calculateTokenCostSummary(
   const totalTokenConsumption = usageRows.reduce((s, r) => s + r.tokenConsumption, 0);
   const totalCost = usageRows.reduce((s, r) => s + r.cost, 0);
 
+  // Every dimension breakdown below groups this pool rather than usageRows, so
+  // the parts add up to Total AI Investment (usage + licence) instead of to
+  // usage alone. License rows carry every dimension — CT/Non-CT, country,
+  // service line, engagement code, user — fully populated, so the attribution
+  // is real rather than apportioned.
+  //
+  // Two things deliberately stay usage-based inside those breakdowns:
+  //   tokens    — License rows are always 0, so sums are unchanged either way
+  //   userCount — "active" means someone actually used the tool; a License row
+  //               records a held seat, not activity
+  const spendRows = currentRows;
+  const totalSpend = spendRows.reduce((s, r) => s + r.cost, 0);
+  const activeUsersIn = (rows: CsvUsageRow[]) =>
+    new Set(
+      rows
+        .filter(r => r.calculationMethod === 'Usage' && r.tokenConsumption > 0)
+        .map(r => r.userMail.toLowerCase())
+    ).size;
+  const usageCostOf = (rows: CsvUsageRow[]) =>
+    rows.filter(r => r.calculationMethod === 'Usage').reduce((s, r) => s + r.cost, 0);
+
   const previousUsageRows = previousRows.filter(r => r.calculationMethod === 'Usage' && r.tokenConsumption > 0);
   const prevTotalTokenConsumption = previousUsageRows.reduce((s, r) => s + r.tokenConsumption, 0);
   const prevTotalCost = previousUsageRows.reduce((s, r) => s + r.cost, 0);
+  const prevTotalSpend = previousRows.reduce((s, r) => s + r.cost, 0);
 
   const costPer1kTokens = totalTokenConsumption > 0 ? (totalCost / (totalTokenConsumption / 1000)) : 0;
 
@@ -214,16 +236,17 @@ export async function calculateTokenCostSummary(
   const billableUtilizationRate = totalTokenConsumption > 0 ? (billableConsumption / totalTokenConsumption) * 100 : 0;
 
   // By AI Tool breakdown with Unit Economics
-  const byToolMap = groupBy(usageRows, r => r.aiTool);
+  const byToolMap = groupBy(spendRows, r => r.aiTool);
   const byAiTool = Array.from(byToolMap.entries())
     .map(([tool, rows]) => {
       const tokens = rows.reduce((s, r) => s + r.tokenConsumption, 0);
       const cost = Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4));
-      const userSet = new Set(rows.map(r => r.userMail.toLowerCase()));
-      const userCount = userSet.size;
+      const userCount = activeUsersIn(rows);
       const avgCostPerUser = userCount > 0 ? Number((cost / userCount).toFixed(2)) : 0;
-      const toolCostPer1k = tokens > 0 ? Number((cost / (tokens / 1000)).toFixed(6)) : 0;
-      const spendSharePercent = totalCost > 0 ? Number(((cost / totalCost) * 100).toFixed(1)) : 0;
+      // Unit economics stay metered: dividing the licence-inclusive cost by
+      // tokens would stop this being comparable to a vendor's per-token price.
+      const toolCostPer1k = tokens > 0 ? Number((usageCostOf(rows) / (tokens / 1000)).toFixed(6)) : 0;
+      const spendSharePercent = totalSpend > 0 ? Number(((cost / totalSpend) * 100).toFixed(1)) : 0;
       const tokenSharePercent = totalTokenConsumption > 0 ? Number(((tokens / totalTokenConsumption) * 100).toFixed(1)) : 0;
 
       return {
@@ -289,55 +312,55 @@ export async function calculateTokenCostSummary(
 
   // By CT / Non-CT breakdown — the hierarchy's own top-level split (Client-Tagged
   // vs Non-Client-Tagged engagements).
-  const byCtNonCtMap = groupBy(usageRows, r => r.ctNonCt || 'Unclassified');
+  const byCtNonCtMap = groupBy(spendRows, r => r.ctNonCt || 'Unclassified');
   const byCtNonCt = Array.from(byCtNonCtMap.entries())
     .map(([ctNonCt, rows]) => ({
       ctNonCt,
       tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
       cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
-      userCount: new Set(rows.map(r => r.userMail.toLowerCase())).size,
+      userCount: activeUsersIn(rows),
       uniqueMonths: new Set(rows.map(r => r.monthId)).size,
     }))
     .sort((a, b) => b.cost - a.cost);
 
   // By Super Region breakdown (replaces the old Region / Management Region pair)
-  const byRegionMap = groupBy(usageRows, r => r.superRegion);
+  const byRegionMap = groupBy(spendRows, r => r.superRegion);
   const byManagementRegion = Array.from(byRegionMap.entries())
     .map(([region, rows]) => ({
       region,
       tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
       cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
-      userCount: new Set(rows.map(r => r.userMail.toLowerCase())).size,
+      userCount: activeUsersIn(rows),
       countries: Array.from(new Set(rows.map(r => r.country).filter(Boolean))),
     }))
     .sort((a, b) => b.tokens - a.tokens);
 
   // By Country breakdown
-  const byCountryMap = groupBy(usageRows, r => r.country);
+  const byCountryMap = groupBy(spendRows, r => r.country);
   const byCountry = Array.from(byCountryMap.entries())
     .map(([country, rows]) => ({
       country,
       superRegion: rows[0]?.superRegion || 'N/A',
       tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
       cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
-      userCount: new Set(rows.map(r => r.userMail.toLowerCase())).size,
+      userCount: activeUsersIn(rows),
     }))
     .sort((a, b) => b.tokens - a.tokens);
 
   // By Service Line breakdown
-  const bySlMap = groupBy(usageRows, r => r.orgServiceLine);
+  const bySlMap = groupBy(spendRows, r => r.orgServiceLine);
   const byServiceLine = Array.from(bySlMap.entries())
     .map(([serviceLine, rows]) => ({
       serviceLine,
       tokens: rows.reduce((s, r) => s + r.tokenConsumption, 0),
       cost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4)),
-      userCount: new Set(rows.map(r => r.userMail.toLowerCase())).size,
+      userCount: activeUsersIn(rows),
       subServiceLines: Array.from(new Set(rows.map(r => r.subServiceLine1).filter(Boolean))),
     }))
     .sort((a, b) => b.tokens - a.tokens);
 
   // By Sub-Service Line breakdown
-  const bySubSlMap = groupBy(usageRows, r => `${r.orgServiceLine}:::${r.subServiceLine1 || 'General'}`);
+  const bySubSlMap = groupBy(spendRows, r => `${r.orgServiceLine}:::${r.subServiceLine1 || 'General'}`);
   const bySubServiceLine = Array.from(bySubSlMap.entries())
     .map(([key, rows]) => {
       const [serviceLine, subServiceLine] = key.split(':::');
@@ -449,18 +472,19 @@ export async function calculateTokenCostSummary(
   ).size;
 
   // Billable vs Non-Billable Insights
-  const billableRows = usageRows.filter(r => r.billableFlag === 'True');
-  const nonBillableRows = usageRows.filter(r => r.billableFlag === 'False');
+  // Shares of Total AI Investment, so billable + non-billable reconcile with it.
+  const billableRows = spendRows.filter(r => r.billableFlag === 'True');
+  const nonBillableRows = spendRows.filter(r => r.billableFlag === 'False');
   const billableSpend = Number(billableRows.reduce((s, r) => s + r.cost, 0).toFixed(2));
   const nonBillableSpend = Number(nonBillableRows.reduce((s, r) => s + r.cost, 0).toFixed(2));
-  const billableSpendPercent = totalCost > 0 ? Number(((billableSpend / totalCost) * 100).toFixed(1)) : 0;
+  const billableSpendPercent = totalSpend > 0 ? Number(((billableSpend / totalSpend) * 100).toFixed(1)) : 0;
 
   // By ProjectCode breakdown
-  const byProjectCodeMap = groupBy(usageRows, r => r.projectCode || 'Unassigned');
+  const byProjectCodeMap = groupBy(spendRows, r => r.projectCode || 'Unassigned');
   const byProjectCode = Array.from(byProjectCodeMap.entries()).map(([pCode, rows]) => {
     const tokens = Math.round(rows.reduce((s, r) => s + r.tokenConsumption, 0));
     const cost = Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(2));
-    const userCount = new Set(rows.map(r => r.userMail)).size;
+    const userCount = activeUsersIn(rows);
     return {
       projectCode: pCode,
       tokens,
@@ -470,15 +494,16 @@ export async function calculateTokenCostSummary(
   }).sort((a, b) => b.cost - a.cost);
 
   // Monthly Trend breakdown (Year / Month columns) with per-AI-tool cost split
-  const byMonthMap = groupBy(usageRows, r => String(r.monthId));
+  const byMonthMap = groupBy(spendRows, r => String(r.monthId));
   const monthlyTrend = Array.from(byMonthMap.entries())
     .map(([, rows]) => {
       const monthId = rows[0].monthId;
       const monthLabel = rows[0].monthYear.replace(/_/g, ' ');
       const tokens = Math.round(rows.reduce((s, r) => s + r.tokenConsumption, 0));
       const cost = Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(4));
-      const userCount = new Set(rows.map(r => r.userMail.toLowerCase())).size;
-      const costPer1kTokens = tokens > 0 ? Number((cost / (tokens / 1000)).toFixed(6)) : 0;
+      const userCount = activeUsersIn(rows);
+      // Metered rate, as in byAiTool above.
+      const costPer1kTokens = tokens > 0 ? Number((usageCostOf(rows) / (tokens / 1000)).toFixed(6)) : 0;
 
       const point: Record<string, number | string> = {
         monthId,
@@ -528,9 +553,14 @@ export async function calculateTokenCostSummary(
   return {
     totalTokenConsumption: Math.round(totalTokenConsumption),
     totalCost: Number(totalCost.toFixed(4)),
+    // Total AI Investment (usage + licence) — the denominator for every
+    // "% of total" the breakdowns feed. totalCost above stays usage-only,
+    // since the unit-economics figures are still measured against it.
+    totalSpend: Number(totalSpend.toFixed(4)),
     costPer1kTokens: Number(costPer1kTokens.toFixed(6)),
     billableUtilizationRate: Number(billableUtilizationRate.toFixed(2)),
     prevTotalCost: Number(prevTotalCost.toFixed(4)),
+    prevTotalSpend: Number(prevTotalSpend.toFixed(4)),
     prevTotalTokenConsumption: Math.round(prevTotalTokenConsumption),
     previousDataAvailable,
     byAiTool,

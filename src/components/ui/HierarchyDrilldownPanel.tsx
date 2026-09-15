@@ -48,7 +48,13 @@ function summarize(rows: CsvUsageRow[], field: keyof CsvUsageRow) {
   return Array.from(map.entries())
     .map(([value, groupRows]) => ({
       value,
-      userCount: new Set(groupRows.map((r) => r.userMail.toLowerCase())).size,
+      // Active = someone who actually used the tool. A License row records a
+      // held seat, not activity, so it must not inflate this count.
+      userCount: new Set(
+        groupRows
+          .filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0)
+          .map((r) => r.userMail.toLowerCase())
+      ).size,
       tokens: Math.round(groupRows.reduce((s, r) => s + r.tokenConsumption, 0)),
       cost: Number(groupRows.reduce((s, r) => s + r.cost, 0).toFixed(2)),
     }))
@@ -80,15 +86,10 @@ interface HierarchyDrilldownPanelProps {
  * inference drilldown so user-level detail only ever appears at the last level.
  */
 export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, initialPath, onPathChange }: HierarchyDrilldownPanelProps) {
-  // Every held tool gets a 'License' row every month regardless of activity
-  // (flat seat fee, tokenConsumption always 0). Cost/token figures throughout
-  // this hierarchy navigator represent actual usage, so License rows are
-  // excluded here rather than double-counting seat fees on top of consumption
-  // — callers that already pass usage-only rows are unaffected.
-  const usageRows = useMemo(
-    () => rows.filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0),
-    [rows]
-  );
+  // Costs are Total AI Investment (Usage + License rows), matching the figures
+  // this panel sits beside in the Executive Overview and ROI drilldowns. Tokens
+  // are unaffected (License rows are always 0) and user counts stay active-only.
+  const usageRows = rows;
   const basePath = useMemo(() => initialPath || [], [initialPath]);
   const [path, setPath] = useState<PathEntry[]>(basePath);
 
