@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { GlobalFilterState } from '@/lib/metrics/types';
+import { fetchJsonWithRetry } from '@/lib/fetchWithRetry';
 
 // Defaults to "All Months" — the full span of the dataset (March - August 2026).
 const DEFAULT_FILTERS: GlobalFilterState = {
@@ -46,9 +47,7 @@ export function useMetricsData() {
         userMail: filters.userMail,
         country: filters.country,
       });
-      const res = await fetch(`/api/metrics/overview?${params.toString()}`);
-      if (!res.ok) throw new Error(`Server returned status ${res.status}`);
-      const result = await res.json();
+      const result = await fetchJsonWithRetry(`/api/metrics/overview?${params.toString()}`);
       setData(result);
     } catch (err: any) {
       console.error('Failed to load metrics:', err);

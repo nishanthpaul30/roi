@@ -10,6 +10,13 @@ export const dynamic = 'force-dynamic';
 const DEFAULT_START = '2026-03-01';
 const DEFAULT_END = '2026-08-31';
 
+// See the note in ../raw-rows/route.ts — the dataset is fixed at build time, so
+// the CDN can absorb repeat requests instead of waking a Worker isolate for each.
+// Keep the two in step, including the caveat about `public` and authentication.
+const CACHE_HEADERS = {
+  'Cache-Control': 'public, max-age=30, s-maxage=300, stale-while-revalidate=600',
+};
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
@@ -80,7 +87,7 @@ export async function GET(request: Request) {
         avgMonthlyCost,
       },
       tokenCostSummary,
-    });
+    }, { headers: CACHE_HEADERS });
   } catch (error: any) {
     console.error('Error fetching overview metrics:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { GlobalFilterState } from '@/lib/metrics/types';
+import { fetchJsonWithRetry } from '@/lib/fetchWithRetry';
 
 /**
  * Row-level CSV records for the drilldown views, fetched from the server
@@ -23,6 +24,7 @@ export function useRawRows(filters?: GlobalFilterState) {
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
 
     const params = new URLSearchParams();
@@ -36,11 +38,7 @@ export function useRawRows(filters?: GlobalFilterState) {
       params.set('country', filters.country);
     }
 
-    fetch(`/api/metrics/raw-rows?${params.toString()}`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Server returned status ${res.status}`);
-        return res.json();
-      })
+    fetchJsonWithRetry(`/api/metrics/raw-rows?${params.toString()}`, { signal: controller.signal })
       .then((json) => {
         // A response that arrived after the filters changed again is stale — drop it.
         if (cancelled) return;
@@ -57,6 +55,7 @@ export function useRawRows(filters?: GlobalFilterState) {
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [filters]);
 
