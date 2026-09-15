@@ -8,6 +8,7 @@ import { HierarchicalTable, HierGroup } from '@/components/ui/HierarchicalTable'
 import { RoiDrilldownView, RoiDrilldownTarget } from '@/components/ui/RoiDrilldownView';
 import { Building2, Layers } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
+import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
 const SERVICE_LINE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   Consulting: { bg: 'bg-blue-500/15', text: 'text-blue-300', border: 'border-blue-500/30' },
@@ -65,7 +66,6 @@ export default function OrgAndRegionalPage() {
   // Hierarchical breakdowns: Service Line -> its Sub-Service Line practices,
   // and Management Region -> its Countries, folded into one expandable table each
   // instead of two separate flat tables per relationship.
-  const fmtCost = (v: number) => `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const fmtShare = (tokens: number) => `${((tokens / (summary?.totalTokenConsumption || 1)) * 100).toFixed(1)}%`;
 
   const serviceLineGroups: HierGroup[] = [...serviceLines]
@@ -83,7 +83,7 @@ export default function OrgAndRegionalPage() {
           id: ssl.subServiceLine,
           plainLabel: ssl.subServiceLine,
           users: `${ssl.userCount || '-'} active`,
-          tokens: ssl.tokens.toLocaleString(),
+          tokens: formatCompactNumber(ssl.tokens),
           cost: fmtCost(ssl.cost),
           share: fmtShare(ssl.tokens),
         }));
@@ -92,7 +92,7 @@ export default function OrgAndRegionalPage() {
           id: sl.serviceLine,
           badge: { label: sl.serviceLine, bg: slStyle.bg, textColor: slStyle.text, border: slStyle.border },
           users: `${sl.userCount || '-'} active`,
-          tokens: sl.tokens.toLocaleString(),
+          tokens: formatCompactNumber(sl.tokens),
           cost: fmtCost(sl.cost),
           share: fmtShare(sl.tokens),
         },

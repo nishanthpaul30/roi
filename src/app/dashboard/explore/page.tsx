@@ -7,6 +7,7 @@ import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { ExplorerChart } from '@/components/ui/ExplorerChart';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { LayoutGrid, Sparkles, Download, SlidersHorizontal, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { formatCompactCurrency, formatCompactNumber } from '@/lib/format';
 
 interface DimensionOption {
   key: string;
@@ -24,6 +25,24 @@ interface PivotResult {
   rows: Record<string, any>[];
 }
 
+interface DatasetInsights {
+  totalRecords: number;
+  usageRecords: number;
+  licenseRecords: number;
+  distinctUsers: number;
+  activeUsers: number;
+  dormantUsers: number;
+  distinctTools: number;
+  topTool: { name: string; cost: number } | null;
+  distinctCountries: number;
+  topCountry: { name: string; userCount: number } | null;
+  distinctMonths: number;
+  dateRangeLabel: string;
+  totalCost: number;
+  totalTokens: number;
+  totalLicenseCost: number;
+}
+
 export default function DataExplorerPage() {
   const { filters, setFilters, data } = useMetricsData();
 
@@ -35,6 +54,14 @@ export default function DataExplorerPage() {
   const [result, setResult] = useState<PivotResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [insights, setInsights] = useState<DatasetInsights | null>(null);
+
+  useEffect(() => {
+    fetch('/api/metrics/dataset-insights')
+      .then((res) => res.json())
+      .then(setInsights)
+      .catch((err) => console.error('Failed to load dataset insights:', err));
+  }, []);
 
   // Extra filters this page exposes beyond the shared GlobalFilterBar — every
   // dimension with no dedicated panel elsewhere (Engagement chain, GDS
@@ -113,7 +140,7 @@ export default function DataExplorerPage() {
     if (!result) return [];
     const base: Column<Record<string, any>>[] = [
       { header: result.rowDimLabel, accessorKey: 'label' },
-      { header: 'Active Users', accessorKey: 'userCount', cell: (r) => r.userCount.toLocaleString() },
+      { header: 'Active Users', accessorKey: 'userCount', cell: (r) => formatCompactNumber(r.userCount) },
     ];
     if (result.colDim === 'none') {
       base.push({
@@ -141,6 +168,23 @@ export default function DataExplorerPage() {
   };
 
   const handleResetExtraFilters = () => setExtraFilters({});
+
+  const handleDownloadRawCsv = async () => {
+    try {
+      const res = await fetch('/ai_usage_data.csv', { cache: 'no-store' });
+      const csvContent = await res.text();
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'ai_usage_data.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Failed to download raw dataset:', err);
+    }
+  };
 
   const handleExportExcel = async () => {
     if (!result) return;
@@ -196,33 +240,75 @@ export default function DataExplorerPage() {
 
       <main className="p-6 space-y-6 max-w-7xl mx-auto w-full no-print">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-ey-card/50 border border-ey-border rounded-xl p-4 shadow-sm">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-indigo-500/15 border border-indigo-500/30 rounded-xl text-indigo-400 shrink-0">
-              <LayoutGrid className="w-6 h-6" />
+        <div className="bg-ey-card/50 border border-ey-border rounded-xl p-4 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 bg-indigo-500/15 border border-indigo-500/30 rounded-xl text-indigo-400 shrink-0">
+                <LayoutGrid className="w-6 h-6" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-ey-light tracking-wide flex items-center gap-2.5">
+                  <span>Data Playground</span>
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300">
+                    <Sparkles className="w-3 h-3" />
+                    Any dimension &times; any dimension &times; any metric
+                  </span>
+                </h1>
+                <p className="text-xs text-ey-muted mt-0.5">
+                  Cross-tabulate every field on demand &mdash; including the CT/Non-CT &rarr; Country &rarr; Service Line &rarr; Engagement hierarchy, GDS Location, and Cost Center, which have no dedicated panel elsewhere.
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-ey-light tracking-wide flex items-center gap-2.5">
-                <span>Data Playground</span>
-                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300">
-                  <Sparkles className="w-3 h-3" />
-                  Any dimension &times; any dimension &times; any metric
-                </span>
-              </h1>
-              <p className="text-xs text-ey-muted mt-0.5">
-                Cross-tabulate every field on demand &mdash; including the CT/Non-CT &rarr; Country &rarr; Service Line &rarr; Engagement hierarchy, GDS Location, and Cost Center, which have no dedicated panel elsewhere.
-              </p>
-            </div>
+
+            <button
+              onClick={handleDownloadRawCsv}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 bg-ey-yellow text-ey-black rounded-lg hover:bg-yellow-400 transition-colors shrink-0"
+              title="Download the full raw dataset as CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download CSV</span>
+            </button>
           </div>
 
-          <button
-            onClick={handleExportExcel}
-            disabled={exporting || loading || !result}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 bg-ey-yellow text-ey-black rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>{exporting ? 'Exporting…' : 'Export Excel'}</span>
-          </button>
+          {/* Data Source Insights — unfiltered facts about the active dataset itself */}
+          {insights && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 border-t border-ey-border pt-4">
+              <div className="bg-ey-black/40 border border-ey-border/70 rounded-lg px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-ey-muted">Total Records</p>
+                <p className="text-sm font-bold text-ey-light font-mono">{formatCompactNumber(insights.totalRecords)}</p>
+                <p className="text-[10px] text-ey-muted">{formatCompactNumber(insights.usageRecords)} usage · {formatCompactNumber(insights.licenseRecords)} license</p>
+              </div>
+              <div className="bg-ey-black/40 border border-ey-border/70 rounded-lg px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-ey-muted">Users</p>
+                <p className="text-sm font-bold text-ey-light font-mono">{formatCompactNumber(insights.distinctUsers)}</p>
+                <p className="text-[10px] text-ey-muted">{formatCompactNumber(insights.activeUsers)} active · {formatCompactNumber(insights.dormantUsers)} dormant</p>
+              </div>
+              <div className="bg-ey-black/40 border border-ey-border/70 rounded-lg px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-ey-muted">AI Tools</p>
+                <p className="text-sm font-bold text-ey-light font-mono">{insights.distinctTools}</p>
+                {insights.topTool && (
+                  <p className="text-[10px] text-ey-muted">top: {insights.topTool.name} ({formatCompactCurrency(insights.topTool.cost)})</p>
+                )}
+              </div>
+              <div className="bg-ey-black/40 border border-ey-border/70 rounded-lg px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-ey-muted">Countries</p>
+                <p className="text-sm font-bold text-ey-light font-mono">{insights.distinctCountries}</p>
+                {insights.topCountry && (
+                  <p className="text-[10px] text-ey-muted">top: {insights.topCountry.name} ({insights.topCountry.userCount} users)</p>
+                )}
+              </div>
+              <div className="bg-ey-black/40 border border-ey-border/70 rounded-lg px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-ey-muted">Date Range</p>
+                <p className="text-sm font-bold text-ey-light">{insights.dateRangeLabel}</p>
+                <p className="text-[10px] text-ey-muted">{insights.distinctMonths} months</p>
+              </div>
+              <div className="bg-ey-black/40 border border-ey-border/70 rounded-lg px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-ey-muted">Total AI Investment</p>
+                <p className="text-sm font-bold text-ey-light font-mono">{formatCompactCurrency(insights.totalCost)}</p>
+                <p className="text-[10px] text-ey-muted">{formatCompactNumber(insights.totalTokens)} tokens</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Pivot Controls */}
@@ -336,6 +422,21 @@ export default function DataExplorerPage() {
           </div>
         ) : (
           <>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-ey-muted">
+                Reflects the Rows, Columns, Metric, and Additional Filters selected above.
+              </p>
+              <button
+                onClick={handleExportExcel}
+                disabled={exporting}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 bg-ey-yellow text-ey-black rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                title="Export this filtered cross-tabulation to Excel"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{exporting ? 'Exporting…' : 'Export Excel'}</span>
+              </button>
+            </div>
+
             <ExplorerChart
               title={`${result.metricLabel} by ${result.rowDimLabel}${result.colDim !== 'none' ? ` × ${result.colDimLabel}` : ''}`}
               subtitle={`Top ${chartData.length} of ${result.rows.length} ${result.rowDimLabel.toLowerCase()} values`}
@@ -361,6 +462,5 @@ export default function DataExplorerPage() {
 }
 
 function formatMetricValue(value: number, metric: string): string {
-  if (metric === 'cost') return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  return value.toLocaleString();
+  return metric === 'cost' ? formatCompactCurrency(value) : formatCompactNumber(value);
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { GlobalFilterState, TokenCostSummary } from '@/lib/metrics/types';
+import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
 interface ExecutivePrintTemplateProps {
   data: any;
@@ -62,7 +63,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
         <div className="border border-slate-300 rounded-xl p-4 bg-slate-50/80 shadow-xs">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total AI Investment</span>
           <div className="text-2xl font-black text-slate-900 font-mono mt-1">
-            ${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {fmtCost(totalCost)}
           </div>
           <p className="text-[11px] text-slate-600 mt-1 font-medium">Actual billed cost (USD)</p>
         </div>
@@ -70,7 +71,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
         <div className="border border-slate-300 rounded-xl p-4 bg-slate-50/80 shadow-xs">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Total Token Consumption</span>
           <div className="text-2xl font-black text-slate-900 font-mono mt-1">
-            {Math.round(totalTokens).toLocaleString()}
+            {formatCompactNumber(Math.round(totalTokens))}
           </div>
           <p className="text-[11px] text-slate-600 mt-1 font-medium">Token consumption volume</p>
         </div>
@@ -78,7 +79,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
         <div className="border border-slate-300 rounded-xl p-4 bg-slate-50/80 shadow-xs">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Avg Monthly Cost</span>
           <div className="text-2xl font-black text-slate-900 font-mono mt-1">
-            ${avgMonthlyCost.toFixed(2)}
+            {fmtCost(avgMonthlyCost)}
           </div>
           <p className="text-[11px] text-slate-600 mt-1 font-medium">Cost per active month</p>
         </div>
@@ -119,7 +120,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
                   {TOOL_LABELS[row.tool] || row.tool}
                 </td>
                 <td className="px-3 py-2.5 font-bold text-slate-900">
-                  ${row.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {fmtCost(row.cost)}
                 </td>
                 <td className="px-3 py-2.5 font-bold text-slate-700">
                   <div className="flex items-center space-x-1.5">
@@ -132,9 +133,9 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
                     </div>
                   </div>
                 </td>
-                <td className="px-3 py-2.5 font-semibold text-slate-900">{Math.round(row.tokens).toLocaleString()}</td>
+                <td className="px-3 py-2.5 font-semibold text-slate-900">{formatCompactNumber(Math.round(row.tokens))}</td>
                 <td className="px-3 py-2.5 font-semibold text-slate-800">{row.userCount || 0} users</td>
-                <td className="px-3 py-2.5 font-bold text-slate-900">${(row.avgCostPerUser || 0).toFixed(2)}</td>
+                <td className="px-3 py-2.5 font-bold text-slate-900">{fmtCost(row.avgCostPerUser || 0)}</td>
                 <td className="px-3 py-2.5 font-bold text-slate-900">${(row.costPer1kTokens || 0).toFixed(4)}</td>
               </tr>
             ))}
@@ -150,7 +151,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
               </span>
             </div>
             <div className="font-bold text-slate-900 bg-white border border-amber-300 px-2.5 py-1 rounded">
-              Overlap Spend: ${summary.multiToolOverlap.totalDualToolSpend.toFixed(2)}
+              Overlap Spend: {fmtCost(summary.multiToolOverlap.totalDualToolSpend)}
             </div>
           </div>
         )}
@@ -178,8 +179,8 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
               {regionalBreakdown.map((r: any, idx: number) => (
                 <tr key={r.region} className={idx % 2 === 1 ? 'bg-slate-50' : 'bg-white'}>
                   <td className="px-3 py-2 font-bold text-slate-900">{r.region}</td>
-                  <td className="px-3 py-2 font-bold text-slate-900">${r.cost.toFixed(2)}</td>
-                  <td className="px-3 py-2 text-slate-700">{Math.round(r.tokens).toLocaleString()}</td>
+                  <td className="px-3 py-2 font-bold text-slate-900">{fmtCost(r.cost)}</td>
+                  <td className="px-3 py-2 text-slate-700">{formatCompactNumber(Math.round(r.tokens))}</td>
                 </tr>
               ))}
             </tbody>
@@ -208,8 +209,8 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
                   <td className="px-3 py-2 font-bold text-slate-900 truncate max-w-[130px]" title={u.displayName || u.userMail}>
                     {u.displayName || u.userMail}
                   </td>
-                  <td className="px-3 py-2 font-bold text-slate-900">${u.cost.toFixed(2)}</td>
-                  <td className="px-3 py-2 text-slate-700">{Math.round(u.tokens).toLocaleString()}</td>
+                  <td className="px-3 py-2 font-bold text-slate-900">{fmtCost(u.cost)}</td>
+                  <td className="px-3 py-2 text-slate-700">{formatCompactNumber(Math.round(u.tokens))}</td>
                 </tr>
               ))}
             </tbody>
@@ -223,7 +224,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
           <span>4. Strategic Observations &amp; Executive Cost Guidance</span>
         </h3>
         <ul className="list-disc pl-4 text-slate-700 space-y-1 text-xs font-medium">
-          <li>Average spend per active user stands at <strong>${costPerActiveUser.toFixed(2)}</strong> across the filtered period.</li>
+          <li>Average spend per active user stands at <strong>{fmtCost(costPerActiveUser)}</strong> across the filtered period.</li>
           <li>Dominant portfolio tool is <strong>{dominantTool}</strong>, driving the largest share of total AI spend.</li>
           <li>Telemetry data verified directly from source usage log entries.</li>
         </ul>

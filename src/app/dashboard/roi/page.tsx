@@ -12,6 +12,7 @@ import { RoiDrilldownView, RoiDrilldownTarget } from '@/components/ui/RoiDrilldo
 import { ExecutivePrintTemplate } from '@/components/reports/ExecutivePrintTemplate';
 import { Coins, ShieldCheck, Zap } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
+import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
 const TOOL_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT',
@@ -80,7 +81,7 @@ export default function RoiPage() {
               <div className="flex items-center space-x-3">
                 <div className="hidden md:flex items-center space-x-2 text-xs bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 text-amber-300 shrink-0">
                   <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="font-mono text-[11px]">Free Limit: <strong>Per-Tool Credits ($)</strong> · Ceiling: <strong>${summary ? Math.round(summary.hardCeiling).toLocaleString() : '—'}</strong></span>
+                  <span className="font-mono text-[11px]">Free Limit: <strong>Per-Tool Credits ($)</strong> · Ceiling: <strong>{summary ? fmtCost(summary.hardCeiling) : '—'}</strong></span>
                 </div>
               </div>
             </div>
@@ -106,7 +107,7 @@ export default function RoiPage() {
                   previousDataAvailable,
                 }}
                 unit="%"
-                description={`Total actual usage cost ÷ total per-license Cost in USD ($${summary.totalLicenseCost.toLocaleString()}). Click to inspect per-license ROI.`}
+                description={`Total actual usage cost ÷ total per-license Cost in USD (${fmtCost(summary.totalLicenseCost)}). Click to inspect per-license ROI.`}
                 onClick={() =>
                   openDrilldown({
                     type: 'metric',
@@ -175,13 +176,13 @@ export default function RoiPage() {
                   previousDataAvailable,
                 }}
                 unit="users"
-                description={`Users who have reached or exceeded 90% of the $${Math.round(summary.hardCeiling).toLocaleString()} spend ceiling. Click to inspect power users.`}
+                description={`Users who have reached or exceeded 90% of the ${fmtCost(summary.hardCeiling)} spend ceiling. Click to inspect power users.`}
                 onClick={() =>
                   openDrilldown({
                     type: 'zone',
                     id: 'ceiling',
                     title: 'Dollar Ceiling Risk Telemetry',
-                    subtitle: `High-volume power users who have reached or exceeded 90% ($${Math.round(summary.hardCeiling * 0.9).toLocaleString()}+) of the spend cap.`,
+                    subtitle: `High-volume power users who have reached or exceeded 90% (${fmtCost(summary.hardCeiling * 0.9)}+) of the spend cap.`,
                     badge: 'Cap Risk Telemetry',
                   })
                 }
@@ -279,8 +280,8 @@ export default function RoiPage() {
                 data={summary.byAiTool.map((t) => ({
                   rawTool: t.tool,
                   tool: TOOL_LABELS[t.tool] || t.tool,
-                  tokens: t.tokens.toLocaleString(),
-                  cost: `$${t.cost.toFixed(4)}`,
+                  tokens: formatCompactNumber(t.tokens),
+                  cost: fmtCost(t.cost),
                   share: `${((t.tokens / summary.totalTokenConsumption) * 100).toFixed(1)}%`,
                   costPer1k: `$${t.costPer1kTokens.toFixed(6)}`,
                 }))}
@@ -312,13 +313,13 @@ export default function RoiPage() {
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
                 {[
-                  { label: 'Wasted Capacity (total)', value: `$${summary.totalWasteCost.toLocaleString()}`, sub: 'unconsumed free-dollar limit', color: 'text-amber-400' },
-                  { label: 'Overage Spend (total)', value: `$${summary.totalOverageCost.toLocaleString()}`, sub: 'billed beyond per-tool free-dollar limit', color: 'text-purple-400' },
+                  { label: 'Wasted Capacity (total)', value: fmtCost(summary.totalWasteCost), sub: 'unconsumed free-dollar limit', color: 'text-amber-400' },
+                  { label: 'Overage Spend (total)', value: fmtCost(summary.totalOverageCost), sub: 'billed beyond per-tool free-dollar limit', color: 'text-purple-400' },
                   { label: 'Quota Efficiency Rate', value: `${summary.licenseEfficiencyRate}%`, sub: 'actual ÷ limit', color: 'text-emerald-400' },
-                  { label: 'Total API Cost', value: `$${summary.totalCost.toLocaleString()}`, sub: 'actual billed USD', color: 'text-ey-light' },
+                  { label: 'Total API Cost', value: fmtCost(summary.totalCost), sub: 'actual billed USD', color: 'text-ey-light' },
                   { label: 'Cost per 1K tokens', value: `$${summary.costPer1kTokens.toFixed(6)}`, sub: '/ 1K tokens', color: 'text-ey-yellow' },
-                  { label: 'Near Dollar Cap Users', value: `${summary.ceilingRiskCount} users`, sub: `≥90% of $${Math.round(summary.hardCeiling).toLocaleString()}`, color: 'text-red-400' },
-                  { label: 'Total License Cost', value: `$${summary.totalLicenseCost.toLocaleString()}`, sub: 'sum of per-license Cost in USD', color: 'text-sky-400' },
+                  { label: 'Near Dollar Cap Users', value: `${summary.ceilingRiskCount} users`, sub: `≥90% of ${fmtCost(summary.hardCeiling)}`, color: 'text-red-400' },
+                  { label: 'Total License Cost', value: fmtCost(summary.totalLicenseCost), sub: 'sum of per-license Cost in USD', color: 'text-sky-400' },
                   { label: 'License Investment ROI', value: `${summary.licenseRoiPercent}%`, sub: 'actual cost ÷ license cost', color: 'text-sky-400' },
                 ].map((item) => (
                   <div key={item.label} className="bg-ey-black border border-ey-border rounded-lg p-3">

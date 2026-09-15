@@ -26,8 +26,9 @@ export type CalculationMethod = 'License' | 'Usage' | string;
 export interface CsvUsageRow {
   userMail: string;             // User Email
   displayName: string;          // User Name
-  year: number;                 // Year: 2026
-  month: number;                // Month: 1-12
+  year: number;                  // Calendar year, derived from the Month column's date (not the Year column — see fiscalYear)
+  month: number;                 // Calendar month 1-12, derived from the Month column's date
+  fiscalYear: string;            // Year column's raw value, e.g. "FY26" — a fiscal-year label, not a calendar year; kept for display only, never used in date math
   monthYear: string;             // Derived: "March_2026" — kept for chart labels
   monthId: number;               // Derived: 202603 — kept for sorting/filtering
   aiTool: string;                // Product: chatgpt | github | claude | replit | factory | cursor
@@ -63,9 +64,6 @@ export interface CsvUsageRow {
 }
 
 let _cache: CsvUsageRow[] | null = null;
-let _customOverrideRaw: string | null = null;
-let _isCustomActive: boolean = false;
-let _customFileName: string = 'ai_usage_data.csv';
 
 function getCsvFilePath(): string {
   if (typeof window !== 'undefined') return '';
@@ -95,9 +93,8 @@ function getCsvFilePath(): string {
   return path.join(process.cwd(), 'public', 'ai_usage_data.csv');
 }
 
-// Column order matches the current ai_usage_data.csv header exactly. Cost USD
-// sits between Credits and Cost (in $) — placeholder position pending the
-// real file's actual column order, which isn't known yet.
+// Column order matches the current ai_usage_data.csv header exactly — Cost
+// USD sits between Credits and Cost (in $), confirmed against real data.
 const COL = {
   userMail: 0, displayName: 1, year: 2, month: 3, aiTool: 4, calculationMethod: 5,
   tokenConsumption: 6, creditsLimit: 7, costUsd: 8, cost: 9,
@@ -115,7 +112,7 @@ const MONTH_NAME_TO_NUMBER: Record<string, number> = {
 const MONTH_NUMBER_TO_NAME = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
-/** Parses either a month name ("March") or a numeric month (3 / "03") into 1-12. */
+/** Parses either a month name ("March") or a numeric month (3 / "03") into 1-12. Legacy fallback only — see parseMonthDateField for the current source format. */
 function parseMonth(value: string): number {
   const trimmed = value.trim();
   const named = MONTH_NAME_TO_NUMBER[trimmed.toLowerCase()];
@@ -124,12 +121,41 @@ function parseMonth(value: string): number {
   return Number.isNaN(num) ? 0 : num;
 }
 
+// The Month column is a date in D/M/YYYY order — confirmed against real
+// data — but shows up with either delimiter and with or without a
+// time-of-day suffix (e.g. "1/6/2026 12:00:00 AM" = June 2026, or
+// "01-03-2026" = March 2026). The time-of-day, when present, is always
+// midnight and carries no meaning. This is the authoritative source for
+// calendar year/month everywhere in the app: the separate Year column is a
+// fiscal-year label (e.g. "FY26") that doesn't necessarily line up with the
+// calendar year, so it's never used for date math.
+function parseMonthDateField(value: string): { year: number; month: number } | null {
+  const datePart = value.trim().split(' ')[0];
+  const parts = datePart.split(/[/-]/);
+  if (parts.length !== 3) return null;
+  const month = parseInt(parts[1], 10);
+  const year = parseInt(parts[2], 10);
+  if (!month || month < 1 || month > 12 || !year || year < 1000) return null;
+  return { year, month };
+}
+
 // parseFloat(x) || fallback silently replaces a legitimate 0 (falsy in JS)
 // with fallback — some tools genuinely have a $0.00 free-credit allowance by
 // design. Only fall back when the field is truly unparseable (NaN).
 function parseNumOrDefault(value: string, fallback: number): number {
   const parsed = parseFloat(value);
   return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+// Last-resort year fallback for a row whose Month value doesn't parse as a
+// date at all. The Year column is normally a fiscal label like "FY26", which
+// parseInt() can't read directly (it doesn't start with a digit) — pull the
+// digits out and expand a 2-digit year instead of silently producing 0.
+function parseFiscalYearFallback(fiscalYear: string): number {
+  const digits = fiscalYear.replace(/\D/g, '');
+  if (digits.length === 4) return parseInt(digits, 10);
+  if (digits.length === 2) return 2000 + parseInt(digits, 10);
+  return parseInt(fiscalYear, 10) || 0;
 }
 
 export function parseRawCsvText(raw: string): CsvUsageRow[] {
@@ -143,8 +169,12 @@ export function parseRawCsvText(raw: string): CsvUsageRow[] {
 
     const get = (idx: number, fallback = '') => (cols[idx] !== undefined ? cols[idx].trim() : fallback);
 
-    const year = parseInt(get(COL.year), 10) || 0;
-    const month = parseMonth(get(COL.month));
+    const fiscalYear = get(COL.year);
+    const monthDate = parseMonthDateField(get(COL.month));
+    // Fall back to the legacy plain-numeric/month-name shape if the Month
+    // column doesn't parse as a date (e.g. a malformed or legacy-format row).
+    const year = monthDate ? monthDate.year : parseFiscalYearFallback(fiscalYear);
+    const month = monthDate ? monthDate.month : parseMonth(get(COL.month));
     const projectCode = get(COL.projectCode);
     // Billability is a convention on the Engagement Code itself, not a
     // separate source column: E-XXXXXX is an external/billable engagement,
@@ -156,6 +186,7 @@ export function parseRawCsvText(raw: string): CsvUsageRow[] {
       displayName: get(COL.displayName),
       year,
       month,
+      fiscalYear,
       monthYear: month >= 1 && month <= 12 ? `${MONTH_NUMBER_TO_NAME[month - 1]}_${year}` : '',
       monthId: year * 100 + month,
       aiTool: get(COL.aiTool).toLowerCase(),
@@ -196,16 +227,13 @@ export function parseRawCsvText(raw: string): CsvUsageRow[] {
 }
 
 /**
- * Load and parse ai_usage_data.csv from memory override, file system, or embedded string fallback.
- * Results are cached in-memory for the lifetime of the server process.
+ * Load and parse ai_usage_data.csv from the file system, or the embedded
+ * string fallback when a filesystem read isn't available (e.g. edge
+ * runtimes). Results are cached in-memory for the lifetime of the server
+ * process.
  */
 export function loadCsvData(): CsvUsageRow[] {
-  if (_cache && process.env.NODE_ENV !== 'development' && !_isCustomActive) return _cache;
-
-  if (_isCustomActive && _customOverrideRaw) {
-    _cache = parseRawCsvText(_customOverrideRaw);
-    return _cache;
-  }
+  if (_cache && process.env.NODE_ENV !== 'development') return _cache;
 
   let raw = '';
   try {
@@ -225,27 +253,6 @@ export function loadCsvData(): CsvUsageRow[] {
 
   _cache = parseRawCsvText(raw);
   return _cache;
-}
-
-/** Set custom raw CSV content dynamically */
-export function setCustomCsvData(raw: string, fileName = 'custom_uploaded.csv'): { success: boolean; rowsParsed: number } {
-  const parsed = parseRawCsvText(raw);
-  if (parsed.length === 0) {
-    return { success: false, rowsParsed: 0 };
-  }
-  _customOverrideRaw = raw;
-  _isCustomActive = true;
-  _customFileName = fileName;
-  _cache = parsed;
-  return { success: true, rowsParsed: parsed.length };
-}
-
-/** Reset to default embedded CSV dataset */
-export function resetCustomCsvData() {
-  _customOverrideRaw = null;
-  _isCustomActive = false;
-  _customFileName = 'ai_usage_data.csv';
-  _cache = null;
 }
 
 /** Converts a "YYYY-MM-DD" filter boundary string into a comparable monthId (YYYYMM). */
@@ -272,16 +279,83 @@ export function getDatasetMonthIdBounds(): { minMonthId: number; maxMonthId: num
   return { minMonthId, maxMonthId };
 }
 
-/** Get metadata about active dataset */
-export function getDatasetMetadata() {
+const INSIGHT_TOOL_LABELS: Record<string, string> = {
+  github: 'GitHub Copilot',
+  chatgpt: 'ChatGPT',
+  claude: 'Claude',
+  replit: 'Replit',
+  factory: 'Factory AI',
+  cursor: 'Cursor AI',
+};
+
+/** High-level facts about the active data source, unfiltered — for a quick "what am I looking at" summary. */
+export function getDatasetInsights() {
   const rows = loadCsvData();
-  const usageRows = rows.filter(r => r.calculationMethod === 'Usage');
+  const usageRows = rows.filter((r) => r.calculationMethod === 'Usage');
+  const licenseRows = rows.filter((r) => r.calculationMethod === 'License');
+
+  const allUsers = new Set<string>();
+  const activeUsers = new Set<string>();
+  const tools = new Set<string>();
+  const countries = new Set<string>();
+  const months = new Set<number>();
+  const toolCost = new Map<string, number>();
+  const countryUsers = new Map<string, Set<string>>();
+
+  for (const r of rows) {
+    if (r.userMail) allUsers.add(r.userMail.toLowerCase());
+    if (r.aiTool) tools.add(r.aiTool);
+    if (r.country) countries.add(r.country);
+    if (r.monthId) months.add(r.monthId);
+    if (r.country && r.userMail) {
+      if (!countryUsers.has(r.country)) countryUsers.set(r.country, new Set());
+      countryUsers.get(r.country)!.add(r.userMail.toLowerCase());
+    }
+  }
+  for (const r of usageRows) {
+    if (r.userMail) activeUsers.add(r.userMail.toLowerCase());
+    toolCost.set(r.aiTool, (toolCost.get(r.aiTool) || 0) + r.cost);
+  }
+
+  const bounds = getDatasetMonthIdBounds();
+  let dateRangeLabel = '';
+  if (bounds) {
+    const toLabel = (monthId: number) => {
+      const m = monthId % 100;
+      const y = Math.floor(monthId / 100);
+      return m >= 1 && m <= 12 ? `${MONTH_NUMBER_TO_NAME[m - 1]} ${y}` : String(monthId);
+    };
+    dateRangeLabel = bounds.minMonthId === bounds.maxMonthId
+      ? toLabel(bounds.minMonthId)
+      : `${toLabel(bounds.minMonthId)} - ${toLabel(bounds.maxMonthId)}`;
+  }
+
+  let topTool: { name: string; cost: number } | null = null;
+  for (const [tool, cost] of toolCost.entries()) {
+    if (!topTool || cost > topTool.cost) topTool = { name: INSIGHT_TOOL_LABELS[tool] || tool, cost: Number(cost.toFixed(2)) };
+  }
+
+  let topCountry: { name: string; userCount: number } | null = null;
+  for (const [country, countryUserSet] of countryUsers.entries()) {
+    if (!topCountry || countryUserSet.size > topCountry.userCount) topCountry = { name: country, userCount: countryUserSet.size };
+  }
+
   return {
-    isCustom: _isCustomActive,
-    fileName: _customFileName,
-    rowCount: rows.length,
+    totalRecords: rows.length,
+    usageRecords: usageRows.length,
+    licenseRecords: licenseRows.length,
+    distinctUsers: allUsers.size,
+    activeUsers: activeUsers.size,
+    dormantUsers: allUsers.size - activeUsers.size,
+    distinctTools: tools.size,
+    topTool,
+    distinctCountries: countries.size,
+    topCountry,
+    distinctMonths: months.size,
+    dateRangeLabel,
     totalCost: Number(usageRows.reduce((sum, r) => sum + r.cost, 0).toFixed(2)),
     totalTokens: Math.round(usageRows.reduce((sum, r) => sum + r.tokenConsumption, 0)),
+    totalLicenseCost: Number(licenseRows.reduce((sum, r) => sum + r.cost, 0).toFixed(2)),
   };
 }
 

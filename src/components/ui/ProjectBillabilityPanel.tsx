@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { TokenCostSummary } from '@/lib/metrics/types';
 import { FolderKanban, Building, Briefcase, Search, ArrowUpDown, ArrowUpRight } from 'lucide-react';
+import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
 interface ProjectBillabilityPanelProps {
   summary: TokenCostSummary;
@@ -62,7 +63,7 @@ export function ProjectBillabilityPanel({
           </div>
           <div className="flex items-baseline justify-between">
             <div className="text-xl font-bold text-ey-light font-mono group-hover:text-blue-300 transition-colors">
-              ${(summary.billableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {fmtCost(summary.billableSpend || 0)}
             </div>
             <div className="text-xs font-semibold font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
               {billablePercent}% of Total
@@ -89,7 +90,7 @@ export function ProjectBillabilityPanel({
           </div>
           <div className="flex items-baseline justify-between">
             <div className="text-xl font-bold text-ey-light font-mono group-hover:text-purple-300 transition-colors">
-              ${(summary.nonBillableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {fmtCost(summary.nonBillableSpend || 0)}
             </div>
             <div className="text-xs font-semibold font-mono text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
               {(100 - billablePercent).toFixed(1)}% of Total
@@ -196,11 +197,11 @@ export function ProjectBillabilityPanel({
                       </td>
 
                       <td className="px-4 py-3 text-right font-mono text-ey-light">
-                        {row.tokens.toLocaleString()} tokens
+                        {formatCompactNumber(row.tokens)} tokens
                       </td>
 
                       <td className="px-4 py-3 text-right font-mono font-bold text-ey-yellow">
-                        ${row.cost.toFixed(2)}
+                        {fmtCost(row.cost)}
                       </td>
                     </tr>
                   );

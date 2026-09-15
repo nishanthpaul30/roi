@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CsvUsageRow } from '@/lib/data/csvLoader';
 import { ChevronRight, RotateCcw, ArrowUpRight, GitBranch } from 'lucide-react';
+import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
 interface LevelField {
   key: keyof CsvUsageRow;
@@ -54,8 +55,6 @@ function summarize(rows: CsvUsageRow[], field: keyof CsvUsageRow) {
     }))
     .sort((a, b) => b.cost - a.cost);
 }
-
-const fmtCost = (v: number) => `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 interface HierarchyDrilldownPanelProps {
   rows: CsvUsageRow[];
@@ -210,7 +209,7 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
                       <div className="group-hover:text-ey-yellow transition-colors font-semibold">{u.name}</div>
                       <div className="text-[10px] text-ey-muted">{u.email}</div>
                     </td>
-                    <td className="px-4 py-3 text-right">{u.tokens.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right">{formatCompactNumber(u.tokens)}</td>
                     <td className="px-4 py-3 text-right font-bold text-ey-yellow">{fmtCost(u.cost)}</td>
                     <td className="px-4 py-3 text-center text-ey-muted">{u.rowCount}</td>
                     <td className="px-4 py-3 text-center">
@@ -242,7 +241,7 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
                   {groups.length > 1 && (
                     <p className="text-xs font-semibold text-ey-light font-mono text-right">
                       Total: <span className="font-extrabold text-sm">{fmtCost(combinedCost)}</span>
-                      {' · '}{combinedUsers} users · {combinedTokens.toLocaleString()} tokens
+                      {' · '}{combinedUsers} users · {formatCompactNumber(combinedTokens)} tokens
                     </p>
                   )}
                 </div>
@@ -273,7 +272,7 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
                             </span>
                           </div>
                           <p className="text-[11px] text-ey-muted mt-0.5">
-                            {g.userCount} users · {g.tokens.toLocaleString()} tokens
+                            {g.userCount} users · {formatCompactNumber(g.tokens)} tokens
                           </p>
                         </div>
                         <div className="p-2 bg-cyan-500/15 border border-cyan-500/40 rounded-xl text-cyan-300 group-hover:bg-cyan-500/25 group-hover:scale-110 transition-all shrink-0">
@@ -305,7 +304,7 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
                           >
                             <td className="px-3 py-2 font-semibold text-ey-light group-hover:text-ey-yellow">{g.value}</td>
                             <td className="px-3 py-2 text-right">{g.userCount}</td>
-                            <td className="px-3 py-2 text-right font-mono">{g.tokens.toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right font-mono">{formatCompactNumber(g.tokens)}</td>
                             <td className="px-3 py-2 text-right font-mono font-bold">{fmtCost(g.cost)}</td>
                             <td className="px-3 py-2 text-right text-ey-muted text-[10px]">Drill Down</td>
                           </tr>

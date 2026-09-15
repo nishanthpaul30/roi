@@ -11,6 +11,7 @@ import { ExecutiveInferenceDrilldownView } from '@/components/ui/ExecutiveInfere
 import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
 import { ExecutivePrintTemplate } from '@/components/reports/ExecutivePrintTemplate';
 import { Sparkles, Printer } from 'lucide-react';
+import { formatCompactCurrency, formatCompactNumber } from '@/lib/format';
 
 export default function ExecutiveOverviewPage() {
   const { filters, setFilters, data, loading } = useMetricsData();
@@ -127,7 +128,7 @@ export default function ExecutiveOverviewPage() {
                         'total_investment',
                         'Total AI Investment',
                         'Financial spend distribution across billable projects, external clients, and regions',
-                        `$${(data.metrics.cost.summary.current || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                        formatCompactCurrency(data.metrics.cost.summary.current || 0),
                         data.metrics.cost.summary,
                         data.metrics.cost.series
                       )
@@ -145,7 +146,7 @@ export default function ExecutiveOverviewPage() {
                         'avg_monthly_cost',
                         'Avg Monthly AI Cost',
                         'Monthly spending volatility and active calendar month run-rate analysis',
-                        `$${(data.metrics.avgMonthlyCost.summary.current || 0).toFixed(2)} / month`,
+                        `${formatCompactCurrency(data.metrics.avgMonthlyCost.summary.current || 0)} / month`,
                         data.metrics.avgMonthlyCost.summary,
                         data.metrics.avgMonthlyCost.series
                       )
@@ -163,7 +164,7 @@ export default function ExecutiveOverviewPage() {
                         'cost_per_user',
                         'Cost per Active User',
                         'Per-user license expenditure and developer adoption rankings',
-                        `$${(data.metrics.costPerActiveUser?.summary?.current || 0).toFixed(2)} / user`,
+                        `${formatCompactCurrency(data.metrics.costPerActiveUser?.summary?.current || 0)} / user`,
                         data.metrics.costPerActiveUser?.summary,
                         data.metrics.cost.series
                       )
@@ -182,7 +183,7 @@ export default function ExecutiveOverviewPage() {
                         'token_consumption',
                         'Total Token Consumption',
                         'Comprehensive volume breakdown across tools, regions, and service lines',
-                        `${new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(data.metrics.tokenConsumption.summary.current || 0)} tokens`,
+                        `${formatCompactNumber(data.metrics.tokenConsumption.summary.current || 0)} tokens`,
                         data.metrics.tokenConsumption.summary,
                         data.metrics.tokenConsumption.series
                       )

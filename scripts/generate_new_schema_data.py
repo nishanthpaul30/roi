@@ -7,7 +7,9 @@ reusing the existing 442-user roster's identity fields (email, name, country,
 CT/Non-CT, engagement code) from the CURRENT ai_usage_data.csv, while
 regenerating the org-hierarchy dimension values and Product names to match
 the real source system's actual vocabulary, and restructuring activity into
-the Usage/License row-pair-per-month shape.
+the Usage/License row-pair-per-month shape. Year is written as a fiscal-year
+label ("FY26") and Month as a full D/M/YYYY date-time ("1/6/2026 12:00:00
+AM"), matching the real source's actual column formats.
 
 Usage:
     python scripts/generate_new_schema_data.py
@@ -23,8 +25,6 @@ OUT = 'public/ai_usage_data.csv'  # overwrite in place (old file backed up by ca
 
 MONTHS = [3, 4, 5, 6, 7, 8]  # March - August 2026
 YEAR = 2026
-MONTH_NAMES = {1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June',
-               7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'}
 
 # Per-tool economics: flat monthly license fee ($), $-per-unit gross usage
 # rate, and a fixed monthly free-dollar limit (0 = no free tier). Confirmed
@@ -169,8 +169,14 @@ def main():
                 base_row = {
                     'User Email': email,
                     'User Name': profile['name'],
-                    'Year': YEAR,
-                    'Month': MONTH_NAMES[month],
+                    # Year is a fiscal-year label (e.g. "FY26"), not the plain
+                    # calendar year — confirmed against real data. Month is a
+                    # full date-time in D/M/YYYY order (e.g. "1/6/2026 12:00:00
+                    # AM" = June 2026); the time-of-day is always midnight and
+                    # the calendar year/month used everywhere downstream is
+                    # parsed from this field, not from Year.
+                    'Year': f'FY{str(YEAR)[-2:]}',
+                    'Month': f'1/{month}/{YEAR} 12:00:00 AM',
                     'Product': tool,
                     'CT/Non-CT': profile['ctNonCt'],
                     'Country': profile['country'],

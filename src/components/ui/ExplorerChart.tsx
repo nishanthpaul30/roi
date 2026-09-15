@@ -16,6 +16,7 @@ import {
   LabelList,
 } from 'recharts';
 import { BarChart3, PieChart as PieChartIcon, Table2 } from 'lucide-react';
+import { formatCompactCurrency, formatCompactNumber } from '@/lib/format';
 
 export const CHART_PALETTE = ['#FFE600', '#6366f1', '#10a37f', '#8957e5', '#d97706', '#ec4899', '#06b6d4', '#84cc16'];
 
@@ -32,10 +33,12 @@ interface ExplorerChartProps {
   embedded?: boolean;
 }
 
+// Axis ticks need to stay short regardless of magnitude — always whole-number
+// compact (no decimals), unlike the 2-decimal precision used below 1,000 for
+// headline/table values.
 function abbreviate(value: number): string {
   const abs = Math.abs(value);
-  if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  if (abs >= 1_000) return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
   return value.toFixed(0);
 }
 
@@ -44,11 +47,17 @@ function formatAxisValue(value: number, metric: string): string {
   return metric === 'cost' ? `$${n}` : n;
 }
 
+// Exact (uncompacted) value — used only in the hover tooltip, where the
+// point is to reveal the precise figure behind a compacted chart/table value.
 function formatFullValue(value: number, metric: string): string {
   if (metric === 'cost') {
     return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
   return value.toLocaleString();
+}
+
+function formatTableValue(value: number, metric: string): string {
+  return metric === 'cost' ? formatCompactCurrency(value) : formatCompactNumber(value);
 }
 
 function truncateLabel(label: string, max = 20): string {
@@ -211,13 +220,13 @@ export function ExplorerChart({ title, subtitle, rows, colDim, columns, metric, 
                 <tr key={idx} className="hover:bg-ey-card-hover/60 transition">
                   <td className="px-4 py-2.5 font-medium">{r.label}</td>
                   {colDim === 'none' ? (
-                    <td className="px-4 py-2.5 text-right font-mono">{formatFullValue(r.value || 0, metric)}</td>
+                    <td className="px-4 py-2.5 text-right font-mono" title={formatFullValue(r.value || 0, metric)}>{formatTableValue(r.value || 0, metric)}</td>
                   ) : (
                     <>
                       {columns.map((c) => (
-                        <td key={c} className="px-4 py-2.5 text-right font-mono">{formatFullValue(r[c] || 0, metric)}</td>
+                        <td key={c} className="px-4 py-2.5 text-right font-mono" title={formatFullValue(r[c] || 0, metric)}>{formatTableValue(r[c] || 0, metric)}</td>
                       ))}
-                      <td className="px-4 py-2.5 text-right font-mono font-bold text-ey-yellow">{formatFullValue(r.total || 0, metric)}</td>
+                      <td className="px-4 py-2.5 text-right font-mono font-bold text-ey-yellow" title={formatFullValue(r.total || 0, metric)}>{formatTableValue(r.total || 0, metric)}</td>
                     </>
                   )}
                 </tr>

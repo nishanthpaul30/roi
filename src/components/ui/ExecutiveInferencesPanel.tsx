@@ -15,13 +15,13 @@ import {
   Gauge,
 } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
+import { formatCompactCurrency as fmtCost } from '@/lib/format';
 
 interface ExecutiveInferencesPanelProps {
   summary?: TokenCostSummary;
   onSelectInference?: (inferenceId: string) => void;
 }
 
-const fmtCost = (v: number) => `$${(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtPct = (v: number) => `${(Number.isFinite(v) ? v : 0).toFixed(1)}%`;
 
 export function ExecutiveInferencesPanel({ summary, onSelectInference }: ExecutiveInferencesPanelProps) {
@@ -103,7 +103,7 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
       icon: Gauge,
       stat: `${fmtCost(summary.totalWasteCost)} Unconsumed Capacity`,
       statSub: `${fmtCost(summary.totalOverageCost)} overage · ${summary.ceilingRiskCount} users near cap`,
-      finding: `On average, only ${fmtPct(summary.licenseEfficiencyRate || 0)} of each user's per-tool free-dollar limit is actually consumed, leaving ${fmtCost(summary.totalWasteCost)} in unconsumed capacity (Zone 1). Separately, ${fmtCost(summary.totalOverageCost)} was billed beyond those free-dollar limits (Zone 2), and ${summary.ceilingRiskCount} users have reached or exceeded 90% of the $${Math.round(summary.hardCeiling).toLocaleString()} hard spend ceiling.`,
+      finding: `On average, only ${fmtPct(summary.licenseEfficiencyRate || 0)} of each user's per-tool free-dollar limit is actually consumed, leaving ${fmtCost(summary.totalWasteCost)} in unconsumed capacity (Zone 1). Separately, ${fmtCost(summary.totalOverageCost)} was billed beyond those free-dollar limits (Zone 2), and ${summary.ceilingRiskCount} users have reached or exceeded 90% of the ${fmtCost(summary.hardCeiling)} hard spend ceiling.`,
       actionableInsight: 'Open the Token & Spend ROI page to review the Zone 1 waste and Zone 2 overage breakdown, and flag users nearing the spend ceiling before they hit hard limits.',
     },
     {

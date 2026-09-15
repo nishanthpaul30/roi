@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps';
 import { Globe2, ArrowUpRight, MapPin } from 'lucide-react';
 import countries110m from 'world-atlas/countries-110m.json';
+import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
 // Approximate centroid coordinates [longitude, latitude] for the countries present
 // in ai_usage_data.csv. Any country not listed here still appears in the fallback
@@ -31,8 +32,6 @@ interface GeoHierarchyMapProps {
   groups: GeoGroup[];
   onSelect: (country: string) => void;
 }
-
-const fmtCost = (v: number) => `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export function GeoHierarchyMap({ groups, onSelect }: GeoHierarchyMapProps) {
   const [hovered, setHovered] = useState<string | null>(null);
@@ -131,7 +130,7 @@ export function GeoHierarchyMap({ groups, onSelect }: GeoHierarchyMapProps) {
                   {activeGroup.value}
                 </p>
                 <p className="text-ey-muted mt-0.5">
-                  {activeGroup.userCount} users &middot; {activeGroup.tokens.toLocaleString()} tokens
+                  {activeGroup.userCount} users &middot; {formatCompactNumber(activeGroup.tokens)} tokens
                 </p>
                 <p className="text-ey-yellow font-bold font-mono">{fmtCost(activeGroup.cost)}</p>
               </>

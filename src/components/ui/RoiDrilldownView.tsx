@@ -33,6 +33,7 @@ import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
 import { TokenCostSummary, UserCapacityRow, GlobalFilterState } from '@/lib/metrics/types';
 import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
+import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
 const TOOL_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT',
@@ -648,7 +649,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                 <div>
                   <span className="text-[10px] text-ey-muted block">TOTAL LICENSE COST</span>
                   <span className="text-base font-bold text-ey-yellow">
-                    ${sliceLicenseCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {fmtCost(sliceLicenseCost)}
                   </span>
                 </div>
                 <div className="w-px h-8 bg-ey-border" />
@@ -662,14 +663,14 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                 <div>
                   <span className="text-[10px] text-ey-muted block">TOTAL WASTED CAPACITY</span>
                   <span className="text-base font-bold text-amber-400">
-                    ${sliceWasteAndOverage.wasteCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {fmtCost(sliceWasteAndOverage.wasteCost)}
                   </span>
                 </div>
                 <div className="w-px h-8 bg-ey-border" />
                 <div>
                   <span className="text-[10px] text-ey-muted block">AVG WASTE / USER</span>
                   <span className="text-base font-bold text-ey-light">
-                    ${sliceWasteAndOverage.userCount > 0 ? (sliceWasteAndOverage.wasteCost / sliceWasteAndOverage.userCount).toFixed(2) : '0.00'}
+                    {fmtCost(sliceWasteAndOverage.userCount > 0 ? sliceWasteAndOverage.wasteCost / sliceWasteAndOverage.userCount : 0)}
                   </span>
                 </div>
               </>
@@ -678,14 +679,14 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                 <div>
                   <span className="text-[10px] text-ey-muted block">TOTAL OVERAGE</span>
                   <span className="text-base font-bold text-purple-400">
-                    ${sliceWasteAndOverage.overageCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {fmtCost(sliceWasteAndOverage.overageCost)}
                   </span>
                 </div>
                 <div className="w-px h-8 bg-ey-border" />
                 <div>
                   <span className="text-[10px] text-ey-muted block">AVG OVERAGE / USER</span>
                   <span className="text-base font-bold text-ey-light">
-                    ${sliceWasteAndOverage.userCount > 0 ? (sliceWasteAndOverage.overageCost / sliceWasteAndOverage.userCount).toFixed(2) : '0.00'}
+                    {fmtCost(sliceWasteAndOverage.userCount > 0 ? sliceWasteAndOverage.overageCost / sliceWasteAndOverage.userCount : 0)}
                   </span>
                 </div>
               </>
@@ -693,12 +694,12 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
               <>
                 <div>
                   <span className="text-[10px] text-ey-muted block">AGGREGATE COST</span>
-                  <span className="text-base font-bold text-ey-yellow">${totalSliceCost.toFixed(2)}</span>
+                  <span className="text-base font-bold text-ey-yellow">{fmtCost(totalSliceCost)}</span>
                 </div>
                 <div className="w-px h-8 bg-ey-border" />
                 <div>
                   <span className="text-[10px] text-ey-muted block">TOTAL TOKENS</span>
-                  <span className="text-base font-bold text-ey-light">{totalSliceTokens.toLocaleString()}</span>
+                  <span className="text-base font-bold text-ey-light">{formatCompactNumber(totalSliceTokens)}</span>
                 </div>
               </>
             )}
@@ -721,15 +722,15 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
           <div className="p-3 bg-ey-black/40 border border-ey-border rounded-xl space-y-0.5">
             <span className="text-[10px] text-ey-muted">BILLABLE REVENUE SHARE</span>
             <p className="text-base font-bold text-emerald-400">
-              ${billableSliceCost.toFixed(2)}{' '}
+              {fmtCost(billableSliceCost)}{' '}
               <span className="text-[10px] text-emerald-300/80">
                 ({targetRows.length > 0 ? ((billableSliceRows / targetRows.length) * 100).toFixed(1) : 0}%)
               </span>
             </p>
             {!selectedSubEntity && (ctSeg || nonCtSeg) && (
               <p className="text-[10px] text-ey-muted">
-                <span className="text-cyan-300 font-semibold">CT</span> ${(ctSeg?.billableCost ?? 0).toFixed(2)} ·{' '}
-                <span className="text-cyan-400/70 font-semibold">Non-CT</span> ${(nonCtSeg?.billableCost ?? 0).toFixed(2)}
+                <span className="text-cyan-300 font-semibold">CT</span> {fmtCost(ctSeg?.billableCost ?? 0)} ·{' '}
+                <span className="text-cyan-400/70 font-semibold">Non-CT</span> {fmtCost(nonCtSeg?.billableCost ?? 0)}
               </p>
             )}
           </div>
@@ -788,7 +789,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                           <span className="text-xs text-cyan-300 font-bold">{userPct}% of slice</span>
                         </div>
                         <p className="text-[11px] text-ey-muted mt-0.5">
-                          ${c.cost.toFixed(2)} spend · {c.tokens.toLocaleString()} tokens
+                          {fmtCost(c.cost)} spend · {formatCompactNumber(c.tokens)} tokens
                         </p>
                       </>
                     ) : isRoiCentric ? (
@@ -800,43 +801,43 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                           <span className="text-xs text-cyan-300 font-bold">License ROI</span>
                         </div>
                         <p className="text-[11px] text-ey-muted mt-0.5">
-                          ${c.cost.toFixed(2)} actual ÷ ${c.licenseCost.toFixed(2)} license cost
+                          {fmtCost(c.cost)} actual ÷ {fmtCost(c.licenseCost)} license cost
                         </p>
                       </>
                     ) : isWasteCentric ? (
                       <>
                         <div className="flex items-baseline gap-2 mt-1">
                           <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
-                            ${c.wasteCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {fmtCost(c.wasteCost)}
                           </span>
                           <span className="text-xs text-cyan-300 font-bold">{wastePct}% of waste</span>
                         </div>
                         <p className="text-[11px] text-ey-muted mt-0.5">
-                          ${c.cost.toFixed(2)} actual spend · {c.userCount} users
+                          {fmtCost(c.cost)} actual spend · {c.userCount} users
                         </p>
                       </>
                     ) : isOverageCentric ? (
                       <>
                         <div className="flex items-baseline gap-2 mt-1">
                           <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
-                            ${c.overageCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {fmtCost(c.overageCost)}
                           </span>
                           <span className="text-xs text-cyan-300 font-bold">{overagePct}% of overage</span>
                         </div>
                         <p className="text-[11px] text-ey-muted mt-0.5">
-                          ${c.cost.toFixed(2)} actual spend · {c.userCount} users
+                          {fmtCost(c.cost)} actual spend · {c.userCount} users
                         </p>
                       </>
                     ) : (
                       <>
                         <div className="flex items-baseline gap-2 mt-1">
                           <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
-                            ${c.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {fmtCost(c.cost)}
                           </span>
                           <span className="text-xs text-cyan-300 font-bold">{pct}% of slice</span>
                         </div>
                         <p className="text-[11px] text-ey-muted mt-0.5">
-                          {c.tokens.toLocaleString()} tokens · {c.userCount} users
+                          {formatCompactNumber(c.tokens)} tokens · {c.userCount} users
                         </p>
                       </>
                     )}
@@ -887,10 +888,10 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                           <span>{ssl.subServiceLine}</span>
                           <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow shrink-0" />
                         </p>
-                        <p className="text-[10px] text-ey-muted truncate">{ssl.tokens.toLocaleString()} tokens</p>
+                        <p className="text-[10px] text-ey-muted truncate">{formatCompactNumber(ssl.tokens)} tokens</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-bold text-ey-yellow">${ssl.cost.toFixed(2)}</p>
+                        <p className="font-bold text-ey-yellow">{fmtCost(ssl.cost)}</p>
                         <p className="text-[10px] text-ey-muted">{ssl.count} logs</p>
                       </div>
                     </div>
@@ -934,8 +935,8 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                         </span>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-bold text-ey-light">${p.cost.toFixed(2)}</p>
-                        <p className="text-[10px] text-ey-muted">{p.tokens.toLocaleString()} tok</p>
+                        <p className="font-bold text-ey-light">{fmtCost(p.cost)}</p>
+                        <p className="text-[10px] text-ey-muted">{formatCompactNumber(p.tokens)} tok</p>
                       </div>
                     </div>
                   ))}
@@ -969,10 +970,10 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                           <span>{c.country}</span>
                           <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-purple-300 shrink-0" />
                         </p>
-                        <p className="text-[10px] text-ey-muted truncate">{c.tokens.toLocaleString()} tokens</p>
+                        <p className="text-[10px] text-ey-muted truncate">{formatCompactNumber(c.tokens)} tokens</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-bold text-purple-400">${c.cost.toFixed(2)}</p>
+                        <p className="font-bold text-purple-400">{fmtCost(c.cost)}</p>
                         <p className="text-[10px] text-ey-muted">{c.count} logs</p>
                       </div>
                     </div>
@@ -1009,10 +1010,10 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                           <span>{sl.serviceLine}</span>
                           <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow shrink-0" />
                         </p>
-                        <p className="text-[10px] text-ey-muted truncate">{sl.tokens.toLocaleString()} tokens</p>
+                        <p className="text-[10px] text-ey-muted truncate">{formatCompactNumber(sl.tokens)} tokens</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-bold text-ey-yellow">${sl.cost.toFixed(2)}</p>
+                        <p className="font-bold text-ey-yellow">{fmtCost(sl.cost)}</p>
                         <p className="text-[10px] text-ey-muted">{sl.count} logs</p>
                       </div>
                     </div>
@@ -1048,10 +1049,10 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                             <span>{c.country}</span>
                             <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-purple-300 shrink-0" />
                           </p>
-                          <p className="text-[10px] text-ey-muted truncate">{c.tokens.toLocaleString()} tokens</p>
+                          <p className="text-[10px] text-ey-muted truncate">{formatCompactNumber(c.tokens)} tokens</p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="font-bold text-purple-400">${c.cost.toFixed(2)}</p>
+                          <p className="font-bold text-purple-400">{fmtCost(c.cost)}</p>
                           <p className="text-[10px] text-ey-muted">{c.count} logs</p>
                         </div>
                       </div>
@@ -1085,10 +1086,10 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                             <span>{ssl.subServiceLine}</span>
                             <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-cyan-300 shrink-0" />
                           </p>
-                          <p className="text-[10px] text-ey-muted truncate">{ssl.tokens.toLocaleString()} tokens</p>
+                          <p className="text-[10px] text-ey-muted truncate">{formatCompactNumber(ssl.tokens)} tokens</p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="font-bold text-cyan-400">${ssl.cost.toFixed(2)}</p>
+                          <p className="font-bold text-cyan-400">{fmtCost(ssl.cost)}</p>
                           <p className="text-[10px] text-ey-muted">{ssl.count} logs</p>
                         </div>
                       </div>
@@ -1126,7 +1127,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                         <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow" />
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-ey-yellow text-xs">${t.cost.toFixed(2)}</p>
+                        <p className="font-bold text-ey-yellow text-xs">{fmtCost(t.cost)}</p>
                         <p className="text-[10px] text-ey-muted">{t.count} logs</p>
                       </div>
                     </div>
@@ -1175,8 +1176,8 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                           </span>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="font-bold text-ey-light">${p.cost.toFixed(2)}</p>
-                          <p className="text-[10px] text-ey-muted">{p.tokens.toLocaleString()} tok</p>
+                          <p className="font-bold text-ey-light">{fmtCost(p.cost)}</p>
+                          <p className="text-[10px] text-ey-muted">{formatCompactNumber(p.tokens)} tok</p>
                         </div>
                       </div>
                     ))}
@@ -1214,7 +1215,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                         <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-300" />
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-emerald-400">${t.cost.toFixed(2)}</p>
+                        <p className="font-bold text-emerald-400">{fmtCost(t.cost)}</p>
                         <p className="text-[10px] text-ey-muted">{t.count} log events</p>
                       </div>
                     </div>
@@ -1383,7 +1384,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                         {r.billableFlag}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-ey-light">{r.tokenConsumption.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right text-ey-light">{formatCompactNumber(r.tokenConsumption)}</td>
                     <td className="px-4 py-3 text-right font-bold text-ey-yellow">${r.cost.toFixed(4)}</td>
                     <td className="px-4 py-3 text-center">
                       <button
@@ -1535,7 +1536,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
               </div>
               <div>
                 <span className="text-ey-muted text-[10px] block">TOKEN CONSUMPTION</span>
-                <span className="text-ey-light font-bold">{inspectingRecord.tokenConsumption.toLocaleString()} tokens</span>
+                <span className="text-ey-light font-bold">{formatCompactNumber(inspectingRecord.tokenConsumption)} tokens</span>
               </div>
               <div>
                 <span className="text-ey-muted text-[10px] block">COST IN USD</span>

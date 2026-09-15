@@ -26,6 +26,7 @@ import { MetricChart } from '@/components/ui/MetricChart';
 import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
 import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
 import { HierarchyDrilldownPanel, PathEntry } from './HierarchyDrilldownPanel';
+import { formatCompactCurrency, formatCompactNumber } from '@/lib/format';
 
 interface SubDrilldownState {
   type: 'tool' | 'service_line' | 'region' | 'project_code' | 'user';
@@ -39,8 +40,8 @@ interface ExecutiveMetricDrilldownViewProps {
   onBack: () => void;
 }
 
-const fmtMoney = (v: number) => `$${(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const fmtTokens = (v: number) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(v || 0);
+const fmtMoney = formatCompactCurrency;
+const fmtTokens = formatCompactNumber;
 
 const TOOL_LABELS: Record<string, string> = {
   chatgpt: 'ChatGPT',
@@ -63,7 +64,7 @@ function ctNonCtSegmentDisplay(metricId: string, segment: { cost: number; tokens
     const days = segment.uniqueDays || 0;
     const perDay = days > 0 ? segment.cost / days : 0;
     return {
-      primary: `$${perDay.toFixed(2)} / day`,
+      primary: `${fmtMoney(perDay)} / day`,
       footnote: `${fmtMoney(segment.cost)} total across ${days} active day${days === 1 ? '' : 's'}`,
     };
   }
@@ -71,7 +72,7 @@ function ctNonCtSegmentDisplay(metricId: string, segment: { cost: number; tokens
     const months = segment.uniqueMonths || 0;
     const perMonth = months > 0 ? segment.cost / months : 0;
     return {
-      primary: `$${perMonth.toFixed(2)} / month`,
+      primary: `${fmtMoney(perMonth)} / month`,
       footnote: `${fmtMoney(segment.cost)} total across ${months} active month${months === 1 ? '' : 's'}`,
     };
   }
@@ -79,7 +80,7 @@ function ctNonCtSegmentDisplay(metricId: string, segment: { cost: number; tokens
     const users = segment.userCount || 0;
     const perUser = users > 0 ? segment.cost / users : 0;
     return {
-      primary: `$${perUser.toFixed(2)} / user`,
+      primary: `${fmtMoney(perUser)} / user`,
       footnote: `${fmtMoney(segment.cost)} across ${users} user${users === 1 ? '' : 's'}`,
     };
   }
@@ -308,7 +309,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
             <h1 className="text-xl font-bold text-ey-light tracking-tight flex items-center gap-3">
               <span>{subDrilldown ? `End-Level Telemetry: ${subDrilldown.name}` : title}</span>
               <span className="text-xl font-extrabold text-ey-yellow font-mono">
-                {subDrilldown ? `$${level3TotalCost.toFixed(2)}` : currentValue}
+                {subDrilldown ? fmtMoney(level3TotalCost) : currentValue}
               </span>
             </h1>
             <p className="text-xs text-ey-muted mt-0.5">
@@ -372,13 +373,13 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
             <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
               <span className="text-ey-muted text-[10px] uppercase font-bold">Total Billed Spend</span>
-              <p className="text-xl font-bold text-ey-yellow">${level3TotalCost.toFixed(4)}</p>
+              <p className="text-xl font-bold text-ey-yellow">{fmtMoney(level3TotalCost)}</p>
               <p className="text-[10px] text-ey-muted">{granularRows.length} usage events</p>
             </div>
 
             <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
               <span className="text-ey-muted text-[10px] uppercase font-bold">Total Token Volume</span>
-              <p className="text-xl font-bold text-ey-light">{level3TotalTokens.toLocaleString()}</p>
+              <p className="text-xl font-bold text-ey-light">{fmtTokens(level3TotalTokens)}</p>
               <p className="text-[10px] text-ey-muted">Prompt + Completion</p>
             </div>
 
@@ -466,8 +467,8 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                             {r.billableFlag}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right text-ey-light">{r.tokenConsumption.toLocaleString()}</td>
-                        <td className="px-4 py-3 text-right font-bold text-ey-yellow">${r.cost.toFixed(4)}</td>
+                        <td className="px-4 py-3 text-right text-ey-light">{fmtTokens(r.tokenConsumption)}</td>
+                        <td className="px-4 py-3 text-right font-bold text-ey-yellow">{fmtMoney(r.cost)}</td>
                       </tr>
                     ))
                   ) : (
@@ -618,7 +619,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                     </span>
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                   </div>
-                  <p className="text-2xl font-extrabold text-emerald-400">${(summaryData?.billableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-2xl font-extrabold text-emerald-400">{fmtMoney(summaryData?.billableSpend || 0)}</p>
                   <p className="text-xs text-emerald-300">{summaryData?.billableSpendPercent}% of total AI investment</p>
                 </div>
 
@@ -633,7 +634,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                     </span>
                     <AlertCircle className="w-4 h-4 text-amber-400" />
                   </div>
-                  <p className="text-2xl font-extrabold text-amber-400">${(summaryData?.nonBillableSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  <p className="text-2xl font-extrabold text-amber-400">{fmtMoney(summaryData?.nonBillableSpend || 0)}</p>
                   <p className="text-xs text-amber-300">{(100 - (summaryData?.billableSpendPercent || 0)).toFixed(1)}% operational cost</p>
                 </div>
               </div>
@@ -658,7 +659,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                         <span>{r.region} Region</span>
                         <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow" />
                       </span>
-                      <p className="text-xl font-bold text-ey-yellow">${r.cost.toFixed(2)}</p>
+                      <p className="text-xl font-bold text-ey-yellow">{fmtMoney(r.cost)}</p>
                       <p className="text-ey-muted text-[11px]">{fmtTokens(r.tokens)} tokens</p>
                     </div>
                   ))}
@@ -696,7 +697,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
                       </span>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-ey-yellow">${p.cost.toFixed(2)}</p>
+                      <p className="font-bold text-ey-yellow">{fmtMoney(p.cost)}</p>
                       <p className="text-[10px] text-ey-muted">{fmtTokens(p.tokens)} tok</p>
                     </div>
                   </div>

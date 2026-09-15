@@ -14,7 +14,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   BookOpen,
-  Database,
   Sun,
   Moon,
   LayoutGrid,
@@ -33,7 +32,6 @@ const INSIGHTS_NAV_ITEMS = [
 const TOOLS_NAV_ITEMS = [
   { name: 'Data Playground', href: '/dashboard/explore', icon: LayoutGrid },
   { name: 'Metrics Derivation Guide', href: '/dashboard/metrics-derivation', icon: BookOpen },
-  { name: 'Admin & Data Upload', href: '/dashboard/admin', icon: Database },
 ];
 
 interface SidebarProps {
@@ -162,7 +160,7 @@ export function Sidebar({
 
           {(!isDesktopCollapsed || isMobileOpen) && (
             <div className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-wider text-ey-muted">
-              Tools &amp; Administration
+              Tools
             </div>
           )}
 

@@ -37,6 +37,7 @@ import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
 import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
 import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
+import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
 // Visual style per known AI tool (full literal Tailwind class strings so the JIT compiler
 // can statically detect them even though they're picked dynamically at runtime). Any tool
@@ -704,10 +705,10 @@ export function ExecutiveInferenceDrilldownView({
       tagColor: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
       icon: UserCheck,
       stat: `${activeSeatPercent}% Active Utilization`,
-      statSub: `${activeUserCount} Active vs ${inactiveUserCount} Inactive Licenses ($${inactiveLeakageCost}/mo Leakage)`,
+      statSub: `${activeUserCount} Active vs ${inactiveUserCount} Inactive Licenses (${fmtCost(inactiveLeakageCost)}/mo Leakage)`,
       finding:
         inactiveUserCount > 0
-          ? `Out of ${totalRosterSeats} provisioned enterprise licenses, ${activeUserCount} users (${activeSeatPercent}%) recorded prompt activity, while ${inactiveUserCount} licenses remain completely dormant, incurring $${inactiveLeakageCost}/mo in unutilized fixed license costs.`
+          ? `Out of ${totalRosterSeats} provisioned enterprise licenses, ${activeUserCount} users (${activeSeatPercent}%) recorded prompt activity, while ${inactiveUserCount} licenses remain completely dormant, incurring ${fmtCost(inactiveLeakageCost)}/mo in unutilized fixed license costs.`
           : `All ${totalRosterSeats} provisioned enterprise licenses recorded active prompt consumption during this window.`,
       actionableInsight:
         inactiveUserCount > 0
@@ -721,8 +722,8 @@ export function ExecutiveInferenceDrilldownView({
       tagColor: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
       icon: ShieldAlert,
       stat: `${top20SpendPercent}% Spend in Top 20%`,
-      statSub: `${top20PercentCount} power users drive majority cost ($${top20Spend.toFixed(2)})`,
-      finding: `Spend is heavily concentrated: the top 10% of users (${top10PercentCount} people) account for $${top10Spend.toFixed(2)} (${((top10Spend / totalOrgSpend) * 100).toFixed(1)}%), and the top 20% (${top20PercentCount} people) drive $${top20Spend.toFixed(2)} (${top20SpendPercent}%).`,
+      statSub: `${top20PercentCount} power users drive majority cost (${fmtCost(top20Spend)})`,
+      finding: `Spend is heavily concentrated: the top 10% of users (${top10PercentCount} people) account for ${fmtCost(top10Spend)} (${((top10Spend / totalOrgSpend) * 100).toFixed(1)}%), and the top 20% (${top20PercentCount} people) drive ${fmtCost(top20Spend)} (${top20SpendPercent}%).`,
       actionableInsight:
         'Avoid broad, org-wide cuts. Conduct targeted usage reviews for top power users and negotiate tier-based volume plans.',
     },
@@ -763,7 +764,7 @@ export function ExecutiveInferenceDrilldownView({
         icon: Layers,
         stat: `${priceMultiple.toFixed(1)}x Price Gap ($${(cheapest?.costPerM || 0).toFixed(2)} - $${(priciest?.costPerM || 0).toFixed(2)}/M)`,
         statSub: rateLine,
-        finding: `${cheapest?.label} unit cost is $${(cheapest?.costPerM || 0).toFixed(2)}/M tokens, and ${priciest?.label} is the highest at $${(priciest?.costPerM || 0).toFixed(2)}/M. ${topSpend?.label} accounts for ${(topSpend?.spendShare || 0).toFixed(1)}% of spend ($${(topSpend?.cost || 0).toFixed(2)}) across ${sorted.length} active tools. Multi-platform license overlap was identified across dual-tool users with redundant license overhead.`,
+        finding: `${cheapest?.label} unit cost is $${(cheapest?.costPerM || 0).toFixed(2)}/M tokens, and ${priciest?.label} is the highest at $${(priciest?.costPerM || 0).toFixed(2)}/M. ${topSpend?.label} accounts for ${(topSpend?.spendShare || 0).toFixed(1)}% of spend (${fmtCost(topSpend?.cost || 0)}) across ${sorted.length} active tools. Multi-platform license overlap was identified across dual-tool users with redundant license overhead.`,
         actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens) to reduce token spend.`,
       };
     })(),
@@ -778,7 +779,7 @@ export function ExecutiveInferenceDrilldownView({
         icon: Layers,
         stat: `${billableSpendPercent.toFixed(1)}% Billable AI Spend`,
         statSub: `${billableSpendPercent.toFixed(1)}% Billable vs ${nonBillablePct.toFixed(1)}% Non-Billable`,
-        finding: `${billableSpendPercent.toFixed(1)}% of total AI spend ($${(summary?.billableSpend || 0).toFixed(2)}) is flagged Billable, derived from Engagement Codes starting with E-, and directly assigned to revenue-generating client engagements. Non-billable internal spend ($${(summary?.nonBillableSpend || 0).toFixed(2)}) accounts for ${nonBillablePct.toFixed(1)}%.`,
+        finding: `${billableSpendPercent.toFixed(1)}% of total AI spend (${fmtCost(summary?.billableSpend || 0)}) is flagged Billable, derived from Engagement Codes starting with E-, and directly assigned to revenue-generating client engagements. Non-billable internal spend (${fmtCost(summary?.nonBillableSpend || 0)}) accounts for ${nonBillablePct.toFixed(1)}%.`,
         actionableInsight:
           'Audit the largest non-billable cost centers to ensure internal AI investment yields reusable intellectual property or client delivery templates.',
       };
@@ -1089,8 +1090,8 @@ export function ExecutiveInferenceDrilldownView({
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Annualized License Leakage</span>
-                  <p className="text-2xl font-bold text-ey-yellow">${(inactiveLeakageCost * 12).toLocaleString()}/yr</p>
-                  <p className="text-[10px] text-ey-yellow/80">${inactiveLeakageCost}/mo Direct Waste</p>
+                  <p className="text-2xl font-bold text-ey-yellow">{fmtCost(inactiveLeakageCost * 12)}/yr</p>
+                  <p className="text-[10px] text-ey-yellow/80">{fmtCost(inactiveLeakageCost)}/mo Direct Waste</p>
                 </div>
               </div>
 
@@ -1146,7 +1147,7 @@ export function ExecutiveInferenceDrilldownView({
                               {sl.count} license{sl.count === 1 ? '' : 's'}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right font-bold text-rose-400">${sl.monthlyCost.toFixed(2)} / mo</td>
+                          <td className="px-4 py-3 text-right font-bold text-rose-400">{fmtCost(sl.monthlyCost)} / mo</td>
                           <td className="px-4 py-3 text-center">
                             <button
                               onClick={(e) => {
@@ -1181,7 +1182,7 @@ export function ExecutiveInferenceDrilldownView({
                                       </td>
                                       <td className="px-4 py-2.5 text-ey-muted">{u.region}</td>
                                       <td className="px-4 py-2.5 text-center text-[10px] text-ey-muted">{u.lastActivityDate}</td>
-                                      <td className="px-4 py-2.5 text-right font-bold text-rose-400">${u.licenseCost.toFixed(2)} / mo</td>
+                                      <td className="px-4 py-2.5 text-right font-bold text-rose-400">{fmtCost(u.licenseCost)} / mo</td>
                                       <td className="px-4 py-2.5 text-center">
                                         <button
                                           onClick={() => handleTriggerAction(`License for ${u.name} reclaimed and returned to pool.`)}
@@ -1221,22 +1222,22 @@ export function ExecutiveInferenceDrilldownView({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Total Organization Spend</span>
-                  <p className="text-2xl font-bold text-ey-light">${totalOrgSpend.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-ey-light">{fmtCost(totalOrgSpend)}</p>
                   <p className="text-[10px] text-ey-muted">Across {activeUserList.length} Active Employees</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Top 10% Spend Share</span>
-                  <p className="text-2xl font-bold text-rose-400">${top10Spend.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-rose-400">{fmtCost(top10Spend)}</p>
                   <p className="text-[10px] text-rose-300/80">{top10PercentCount} Users ({((top10Spend / totalOrgSpend) * 100).toFixed(1)}% of Budget)</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Top 20% Spend Share</span>
-                  <p className="text-2xl font-bold text-amber-400">${top20Spend.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-amber-400">{fmtCost(top20Spend)}</p>
                   <p className="text-[10px] text-amber-300/80">{top20PercentCount} Users ({top20SpendPercent}% of Budget)</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Remaining 80% Pool</span>
-                  <p className="text-2xl font-bold text-emerald-400">${(totalOrgSpend - top20Spend).toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-emerald-400">{fmtCost(totalOrgSpend - top20Spend)}</p>
                   <p className="text-[10px] text-emerald-300/80">{activeUserList.length - top20PercentCount} Users ({(100 - parseFloat(top20SpendPercent)).toFixed(1)}%)</p>
                 </div>
               </div>
@@ -1261,7 +1262,7 @@ export function ExecutiveInferenceDrilldownView({
                       )}
                     </div>
                     <p className={`text-2xl font-bold ${t.color}`}>${t.costPerM.toFixed(2)} / M</p>
-                    <p className="text-[10px] text-ey-muted">{t.label} • {(t.tokens / 1000000).toFixed(1)}M Tokens</p>
+                    <p className="text-[10px] text-ey-muted">{t.label} • {formatCompactNumber(t.tokens)} Tokens</p>
                     <div className={`pt-2 border-t border-ey-border/40 text-[10px] font-bold flex items-center justify-between ${t.color}`}>
                       <span>Inspect {t.shortLabel}</span>
                       <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
@@ -1275,7 +1276,7 @@ export function ExecutiveInferenceDrilldownView({
                     <span className="text-[10px] text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30">License Waste</span>
                   </div>
                   <p className="text-2xl font-bold text-ey-yellow">{multiToolData.dualToolUsers.length} Users</p>
-                  <p className="text-[10px] text-rose-300/80">${multiToolData.dualToolSpend.toFixed(2)} Dual-Platform Spend</p>
+                  <p className="text-[10px] text-rose-300/80">{fmtCost(multiToolData.dualToolSpend)} Dual-Platform Spend</p>
                   <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
                     <span>Scroll to Overlap Roster</span>
                     <ChevronRight className="w-3 h-3" />
@@ -1309,12 +1310,12 @@ export function ExecutiveInferenceDrilldownView({
                       <div className="grid grid-cols-2 gap-3 mt-4">
                         <div className="bg-ey-black/60 p-3 rounded-xl border border-ey-border/60">
                           <span className="text-[10px] font-mono text-ey-muted uppercase">Total Spend</span>
-                          <p className={`text-xl font-black font-mono ${t.color}`}>${t.cost.toFixed(2)}</p>
+                          <p className={`text-xl font-black font-mono ${t.color}`}>{fmtCost(t.cost)}</p>
                           <span className="text-[10px] text-ey-muted font-mono">{t.spendShare.toFixed(1)}% of company</span>
                         </div>
                         <div className="bg-ey-black/60 p-3 rounded-xl border border-ey-border/60">
                           <span className="text-[10px] font-mono text-ey-muted uppercase">Volume Consumed</span>
-                          <p className="text-xl font-black font-mono text-ey-light">{(t.tokens / 1000000).toFixed(2)}M</p>
+                          <p className="text-xl font-black font-mono text-ey-light">{formatCompactNumber(t.tokens)}</p>
                           <span className="text-[10px] text-ey-muted font-mono">{t.tokenShare.toFixed(1)}% token share</span>
                         </div>
                       </div>
@@ -1343,7 +1344,7 @@ export function ExecutiveInferenceDrilldownView({
                           <span className="text-ey-muted text-[11px] flex items-center gap-1.5">
                             <DollarSign className="w-3.5 h-3.5 text-emerald-400" /> Avg Spend / Developer
                           </span>
-                          <span className="font-bold text-emerald-400">${t.avgCostPerUser.toFixed(2)}</span>
+                          <span className="font-bold text-emerald-400">{fmtCost(t.avgCostPerUser)}</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-ey-muted text-[11px] flex items-center gap-1.5">
@@ -1420,10 +1421,10 @@ export function ExecutiveInferenceDrilldownView({
                             ${t.costPerM.toFixed(2)} / M
                           </td>
                           <td className="px-4 py-3 text-right text-ey-light">
-                            {(t.tokens / 1000000).toFixed(2)}M
+                            {formatCompactNumber(t.tokens)}
                           </td>
                           <td className="px-4 py-3 text-right font-bold text-ey-yellow">
-                            ${t.cost.toFixed(2)}
+                            {fmtCost(t.cost)}
                           </td>
                           <td className="px-4 py-3 text-right text-ey-muted">
                             {t.spendShare.toFixed(1)}%
@@ -1432,7 +1433,7 @@ export function ExecutiveInferenceDrilldownView({
                             {t.userCount}
                           </td>
                           <td className="px-4 py-3 text-right text-emerald-400 font-bold">
-                            ${t.avgCostPerUser.toFixed(2)}
+                            {fmtCost(t.avgCostPerUser)}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
@@ -1511,7 +1512,7 @@ export function ExecutiveInferenceDrilldownView({
                           <span className="font-bold text-sm text-ey-light group-hover:text-cyan-400 transition-colors">
                             {sl.name}
                           </span>
-                          <span className="text-xs font-mono font-bold text-ey-yellow">${sl.cost.toFixed(2)}</span>
+                          <span className="text-xs font-mono font-bold text-ey-yellow">{fmtCost(sl.cost)}</span>
                         </div>
 
                         {/* Multi-Tool Share Mini Bar */}
@@ -1521,7 +1522,7 @@ export function ExecutiveInferenceDrilldownView({
                               key={tool}
                               className={`${barBg} h-full rounded-full`}
                               style={{ width: `${(cost / totalSpend) * 100}%` }}
-                              title={`${shortLabel}: $${cost.toFixed(2)} (${((cost / totalSpend) * 100).toFixed(0)}%)`}
+                              title={`${shortLabel}: ${fmtCost(cost)} (${((cost / totalSpend) * 100).toFixed(0)}%)`}
                             />
                           ))}
                         </div>
@@ -1717,14 +1718,14 @@ export function ExecutiveInferenceDrilldownView({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
             <div className="bg-ey-black/60 p-3 rounded-xl border border-ey-border/60">
               <span className="text-[10px] text-ey-muted uppercase">Total Spend</span>
-              <p className="text-xl font-bold text-ey-yellow">${sliceTotalCost.toFixed(2)}</p>
+              <p className="text-xl font-bold text-ey-yellow">{fmtCost(sliceTotalCost)}</p>
               <span className="text-[10px] text-ey-muted font-mono">
                 {totalOrgSpend > 0 ? ((sliceTotalCost / totalOrgSpend) * 100).toFixed(1) : 0}% of company spend
               </span>
             </div>
             <div className="bg-ey-black/60 p-3 rounded-xl border border-ey-border/60">
               <span className="text-[10px] text-ey-muted uppercase">Tokens Consumed</span>
-              <p className="text-xl font-bold text-ey-light">{(sliceTotalTokens / 1000000).toFixed(2)}M</p>
+              <p className="text-xl font-bold text-ey-light">{formatCompactNumber(sliceTotalTokens)}</p>
               <span className="text-[10px] text-ey-muted font-mono">{sliceTotalTokens.toLocaleString()} tokens</span>
             </div>
             <div className="bg-ey-black/60 p-3 rounded-xl border border-ey-border/60">
@@ -1809,11 +1810,11 @@ export function ExecutiveInferenceDrilldownView({
           </div>
           <div>
             <span className="text-[10px] text-ey-muted uppercase">Slice Total Spend</span>
-            <p className="text-base font-bold text-ey-yellow">${sliceTotalCost.toFixed(4)}</p>
+            <p className="text-base font-bold text-ey-yellow">{fmtCost(sliceTotalCost)}</p>
           </div>
           <div>
             <span className="text-[10px] text-ey-muted uppercase">Slice Total Tokens</span>
-            <p className="text-base font-bold text-ey-light">{sliceTotalTokens.toLocaleString()}</p>
+            <p className="text-base font-bold text-ey-light">{formatCompactNumber(sliceTotalTokens)}</p>
           </div>
           <div>
             <span className="text-[10px] text-ey-muted uppercase">Billable Status</span>
@@ -1878,8 +1879,8 @@ export function ExecutiveInferenceDrilldownView({
                         {r.billableFlag}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-ey-light">{r.tokenConsumption.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right font-bold text-ey-yellow">${r.cost.toFixed(4)}</td>
+                    <td className="px-4 py-3 text-right text-ey-light">{formatCompactNumber(r.tokenConsumption)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-ey-yellow">{fmtCost(r.cost)}</td>
                     <td className="px-4 py-3 text-center">
                       <button
                         onClick={(e) => {
@@ -2032,11 +2033,11 @@ export function ExecutiveInferenceDrilldownView({
               </div>
               <div>
                 <span className="text-ey-muted text-[10px] block">TOKEN CONSUMPTION</span>
-                <span className="text-ey-light font-bold">{inspectingRecord.tokenConsumption.toLocaleString()} tokens</span>
+                <span className="text-ey-light font-bold">{formatCompactNumber(inspectingRecord.tokenConsumption)} tokens</span>
               </div>
               <div>
                 <span className="text-ey-muted text-[10px] block">COST IN USD</span>
-                <span className="text-ey-yellow font-bold text-sm">${inspectingRecord.cost.toFixed(4)}</span>
+                <span className="text-ey-yellow font-bold text-sm">{fmtCost(inspectingRecord.cost)}</span>
               </div>
               <div>
                 <span className="text-ey-muted text-[10px] block">CALCULATION METHOD</span>

@@ -6,6 +6,7 @@ import { loadCsvData } from '@/lib/data/csvLoader';
 import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert } from 'lucide-react';
+import { formatCompactCurrency as fmtCost } from '@/lib/format';
 
 interface RoiCapacityPanelProps {
   userCapacityBreakdown: UserCapacityRow[];
@@ -131,7 +132,7 @@ export function RoiCapacityPanel({
             <div>
               <p className="text-amber-300 font-bold">Zone 1 — Waste Recovery Opportunity</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-amber-200">${totalWasteCost.toLocaleString()}</strong> of license quotas went unconsumed across {zone1List.length} users.
+                <strong className="text-amber-200">{fmtCost(totalWasteCost)}</strong> of license quotas went unconsumed across {zone1List.length} users.
               </p>
             </div>
           </div>
@@ -141,7 +142,7 @@ export function RoiCapacityPanel({
             <div>
               <p className="text-purple-300 font-bold">Zone 2 — Overage Spend Exposure</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-purple-200">${totalOverageCost.toLocaleString()}</strong> in additional usage billed beyond standard limits for {zone2List.length} users.
+                <strong className="text-purple-200">{fmtCost(totalOverageCost)}</strong> in additional usage billed beyond standard limits for {zone2List.length} users.
               </p>
             </div>
           </div>
@@ -151,7 +152,7 @@ export function RoiCapacityPanel({
             <div>
               <p className="text-red-300 font-bold">Hard Dollar Cap Warning</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-red-200">{ceilingRiskCount} users</strong> have reached or exceeded 90% of the platform hard spend ceiling (${Math.round(hardCeiling).toLocaleString()}).
+                <strong className="text-red-200">{ceilingRiskCount} users</strong> have reached or exceeded 90% of the platform hard spend ceiling ({fmtCost(hardCeiling)}).
               </p>
             </div>
           </div>
@@ -164,7 +165,7 @@ export function RoiCapacityPanel({
             <div>
               <p className="text-sky-300 font-bold">License Investment ROI</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-sky-200">{licenseRoiPercent}%</strong> of total per-license Cost in USD (${totalLicenseCost.toLocaleString()}) was actually consumed as usage.
+                <strong className="text-sky-200">{licenseRoiPercent}%</strong> of total per-license Cost in USD ({fmtCost(totalLicenseCost)}) was actually consumed as usage.
               </p>
             </div>
           </div>
@@ -174,7 +175,7 @@ export function RoiCapacityPanel({
             <div>
               <p className="text-amber-300 font-bold">Underutilized License Spend</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-amber-200">${licenseUnderutilizedCost.toLocaleString()}</strong> of purchased license cost went unconsumed by usage.
+                <strong className="text-amber-200">{fmtCost(licenseUnderutilizedCost)}</strong> of purchased license cost went unconsumed by usage.
               </p>
             </div>
           </div>
@@ -184,7 +185,7 @@ export function RoiCapacityPanel({
             <div>
               <p className="text-purple-300 font-bold">Usage Beyond License Cost</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-purple-200">${licenseOverutilizedValue.toLocaleString()}</strong> of usage cost exceeded what was paid in License Cost in USD.
+                <strong className="text-purple-200">{fmtCost(licenseOverutilizedValue)}</strong> of usage cost exceeded what was paid in License Cost in USD.
               </p>
             </div>
           </div>

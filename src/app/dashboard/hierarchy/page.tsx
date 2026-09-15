@@ -8,6 +8,7 @@ import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
 import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
 import { GitBranch, ChevronRight, RotateCcw, ArrowUpRight, TableProperties, Globe2 } from 'lucide-react';
 import { GeoHierarchyMap } from '@/components/ui/GeoHierarchyMap';
+import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
 interface LevelField {
   key: keyof CsvUsageRow;
@@ -61,8 +62,6 @@ function summarize(rows: CsvUsageRow[], field: keyof CsvUsageRow) {
     }))
     .sort((a, b) => b.cost - a.cost);
 }
-
-const fmtCost = (v: number) => `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function HierarchyDrilldownPage() {
   const { filters, setFilters, data } = useMetricsData();
@@ -132,7 +131,7 @@ export default function HierarchyDrilldownPage() {
     { header: 'Month', accessorKey: 'monthYear', cell: (r) => r.monthYear.replace(/_/g, ' ') },
     { header: 'User', accessorKey: 'displayName' },
     { header: 'AI Tool', accessorKey: 'aiTool' },
-    { header: 'Tokens', accessorKey: 'tokenConsumption', cell: (r) => r.tokenConsumption.toLocaleString() },
+    { header: 'Tokens', accessorKey: 'tokenConsumption', cell: (r) => formatCompactNumber(r.tokenConsumption) },
     { header: 'Cost ($)', accessorKey: 'cost', cell: (r) => fmtCost(r.cost) },
     { header: 'Engagement Competency', accessorKey: 'engagementCompetency' },
   ];
@@ -195,9 +194,9 @@ export default function HierarchyDrilldownPage() {
         {/* Live totals for current path */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Rows Matching Path', value: overallTotals.rowCount.toLocaleString() },
-            { label: 'Active Users', value: overallTotals.users.toLocaleString() },
-            { label: 'Token Consumption', value: overallTotals.tokens.toLocaleString() },
+            { label: 'Rows Matching Path', value: formatCompactNumber(overallTotals.rowCount) },
+            { label: 'Active Users', value: formatCompactNumber(overallTotals.users) },
+            { label: 'Token Consumption', value: formatCompactNumber(overallTotals.tokens) },
             { label: 'Total Cost', value: fmtCost(overallTotals.cost) },
           ].map((tile) => (
             <div key={tile.label} className="bg-ey-card border border-ey-border rounded-xl p-4">
@@ -295,7 +294,7 @@ export default function HierarchyDrilldownPage() {
                           <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 text-ey-yellow transition-opacity" />
                         </td>
                         <td className="px-4 py-2.5 text-right">{g.userCount}</td>
-                        <td className="px-4 py-2.5 text-right font-mono">{g.tokens.toLocaleString()}</td>
+                        <td className="px-4 py-2.5 text-right font-mono">{formatCompactNumber(g.tokens)}</td>
                         <td className="px-4 py-2.5 text-right font-mono font-bold">{fmtCost(g.cost)}</td>
                         <td className="px-4 py-2.5 text-right text-ey-muted">Drill Down</td>
                       </tr>
@@ -377,7 +376,7 @@ export default function HierarchyDrilldownPage() {
                                 <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 text-ey-yellow transition-opacity" />
                               </td>
                               <td className="px-4 py-2.5 text-right">{g.userCount}</td>
-                              <td className="px-4 py-2.5 text-right font-mono">{g.tokens.toLocaleString()}</td>
+                              <td className="px-4 py-2.5 text-right font-mono">{formatCompactNumber(g.tokens)}</td>
                               <td className="px-4 py-2.5 text-right font-mono font-bold">{fmtCost(g.cost)}</td>
                               <td className="px-4 py-2.5 text-right text-ey-muted">Drill Down</td>
                             </tr>

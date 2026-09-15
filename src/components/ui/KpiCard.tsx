@@ -1,5 +1,6 @@
 import { TrendingUp, TrendingDown, Minus, Info, ArrowUpRight } from 'lucide-react';
 import { MetricDelta } from '@/lib/metrics/types';
+import { formatCompactCurrency, formatCompactNumber } from '@/lib/format';
 
 interface KpiCardProps {
   title: string;
@@ -25,12 +26,19 @@ export function KpiCard({
   const { current, previous, absoluteDelta, percentageDelta, percentagePointDelta, trend, isRateMetric, previousDataAvailable = true } = delta;
 
   const formatVal = (val: number) => {
-    if (formatType === 'currency') return `$${val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+    if (formatType === 'currency') return formatCompactCurrency(val);
     if (formatType === 'percentage') return `${val.toFixed(1)}%`;
-    if (formatType === 'duration') return `${val.toLocaleString()} hrs`;
-    if (formatType === 'compact') return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(val);
-    return val.toLocaleString();
+    if (formatType === 'duration') return `${formatCompactNumber(val)} hrs`;
+    return formatCompactNumber(val);
   };
+
+  // Exact value shown on hover for any type that can compact (currency/number/duration/compact) —
+  // percentages never compact, so they don't need a tooltip to reveal a fuller figure.
+  const exactVal = (val: number) => (
+    formatType === 'currency'
+      ? `$${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : val.toLocaleString()
+  );
 
   const isPositiveTrend = trend === 'up';
   const isNegativeTrend = trend === 'down';
@@ -63,7 +71,7 @@ export function KpiCard({
       <div className="my-1 flex items-baseline justify-between">
         <span
           className="text-2xl lg:text-3xl font-extrabold text-ey-light tracking-tight group-hover:text-white transition-colors"
-          title={formatType === 'compact' ? current.toLocaleString() : undefined}
+          title={formatType === 'percentage' ? undefined : exactVal(current)}
         >
           {formatVal(current)} {unit && <span className="text-sm font-normal text-ey-muted">{unit}</span>}
         </span>

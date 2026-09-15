@@ -42,8 +42,8 @@ interface MetricDerivationItem {
 const CSV_SCHEMA = [
   { column: 'User Email', fieldName: 'userMail', description: 'Developer email identifier (e.g. aditya.malik@enterprise-corp.com)', dataType: 'String' },
   { column: 'User Name', fieldName: 'displayName', description: 'Developer display name (e.g. Aditya Malik)', dataType: 'String' },
-  { column: 'Year', fieldName: 'year', description: 'Calendar year of the row (e.g. 2026)', dataType: 'Numeric' },
-  { column: 'Month', fieldName: 'month', description: 'Calendar month 1-12, or a month name (e.g. "March") — combined with Year to derive monthYear/monthId', dataType: 'Numeric' },
+  { column: 'Year', fieldName: 'fiscalYear', description: 'Fiscal-year label (e.g. "FY26") — not a calendar year, and never used in date math; kept only as a raw passthrough label', dataType: 'String' },
+  { column: 'Month', fieldName: 'year / month', description: 'Full date-time in D/M/YYYY order (e.g. "1/6/2026 12:00:00 AM" = June 2026; time-of-day is always midnight and carries no meaning) — the sole source of the calendar year and month used everywhere below, including monthYear/monthId', dataType: 'Date' },
   { column: 'Product', fieldName: 'aiTool', description: 'AI Tool identity (e.g. github, chatgpt, claude, replit, factory, cursor)', dataType: 'String' },
   { column: 'Calculation Method', fieldName: 'calculationMethod', description: '"License" (flat seat fee, one row per held tool per month, tokenConsumption always 0) or "Usage" (metered consumption/cost, present only for active months)', dataType: 'String' },
   { column: 'GenAI Tool Consumption', fieldName: 'tokenConsumption', description: 'Metered consumption units for the month (0 on License rows) — the new unit of AI usage, replacing raw token counts', dataType: 'Numeric' },
@@ -70,7 +70,7 @@ const CSV_SCHEMA = [
   { column: 'SL/SF', fieldName: 'slSf', description: 'Parsed and retained but not used in any insight', dataType: 'String (passthrough)' },
   { column: 'RS', fieldName: 'rs', description: 'Parsed and retained but not used in any insight', dataType: 'String (passthrough)' },
   { column: 'GDS', fieldName: 'gds', description: 'Parsed and retained but not used in any insight', dataType: 'String (passthrough)' },
-  { column: '— (derived from Year + Month)', fieldName: 'monthYear / monthId', description: 'monthYear is a human-readable label (e.g. "March_2026") for chart axes; monthId is a sortable numeric key (e.g. 202603) used for date-range filtering and ordering — there is no day-level Activity Date in this schema', dataType: 'Derived' },
+  { column: '— (derived from Month)', fieldName: 'monthYear / monthId', description: 'monthYear is a human-readable label (e.g. "March_2026") for chart axes; monthId is a sortable numeric key (e.g. 202603) used for date-range filtering and ordering — both come from the Month column\'s own date, not from Year', dataType: 'Derived' },
   { column: '— (derived from Engagement Code)', fieldName: 'billableFlag / projectType', description: 'billableFlag ("True"/"False") and projectType ("External"/"Internal") are derived from the Engagement Code prefix: E-XXXXXX → billable/External, I-XXXXXX → non-billable/Internal', dataType: 'Derived' },
 ];
 

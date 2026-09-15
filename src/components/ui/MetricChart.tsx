@@ -16,6 +16,7 @@ import {
   Legend,
 } from 'recharts';
 import { LineChart as LineChartIcon, Table2 } from 'lucide-react';
+import { formatCompactCurrency, formatCompactNumber } from '@/lib/format';
 
 interface SeriesConfig {
   key: string;
@@ -37,10 +38,16 @@ interface MetricChartProps {
 
 function formatCellValue(value: any, seriesName: string): string {
   const n = Number(value) || 0;
-  if (seriesName.includes('$')) {
-    return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  }
-  return n.toLocaleString();
+  return seriesName.includes('$') ? formatCompactCurrency(n) : formatCompactNumber(n);
+}
+
+// Axis ticks need to stay short regardless of magnitude — always whole-number
+// compact, unlike the 2-decimal precision formatCellValue uses below 1,000.
+function formatAxisTick(value: number, isCurrency: boolean): string {
+  const n = Math.abs(value) >= 1000
+    ? new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value)
+    : value.toFixed(0);
+  return isCurrency ? `$${n}` : n;
 }
 
 export function MetricChart({
@@ -129,7 +136,7 @@ export function MetricChart({
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--ey-border)" vertical={false} />
               <XAxis dataKey={dataKeyX} stroke="var(--ey-muted)" fontSize={11} tickLine={false} />
-              <YAxis stroke="var(--ey-muted)" fontSize={11} tickLine={false} />
+              <YAxis stroke="var(--ey-muted)" fontSize={11} tickLine={false} tickFormatter={(v) => formatAxisTick(Number(v) || 0, series[0]?.name.includes('$') || false)} />
               <Tooltip
                 contentStyle={{ backgroundColor: 'var(--ey-card)', borderColor: 'var(--ey-border)', borderRadius: '0.5rem', color: 'var(--ey-light)' }}
                 itemStyle={{ fontSize: '12px' }}
@@ -153,7 +160,7 @@ export function MetricChart({
             <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--ey-border)" vertical={false} />
               <XAxis dataKey={dataKeyX} stroke="var(--ey-muted)" fontSize={11} tickLine={false} />
-              <YAxis stroke="var(--ey-muted)" fontSize={11} tickLine={false} />
+              <YAxis stroke="var(--ey-muted)" fontSize={11} tickLine={false} tickFormatter={(v) => formatAxisTick(Number(v) || 0, series[0]?.name.includes('$') || false)} />
               <Tooltip
                 contentStyle={{ backgroundColor: 'var(--ey-card)', borderColor: 'var(--ey-border)', borderRadius: '0.5rem', color: 'var(--ey-light)' }}
                 itemStyle={{ fontSize: '12px' }}
@@ -174,7 +181,7 @@ export function MetricChart({
             <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--ey-border)" vertical={false} />
               <XAxis dataKey={dataKeyX} stroke="var(--ey-muted)" fontSize={11} tickLine={false} />
-              <YAxis stroke="var(--ey-muted)" fontSize={11} tickLine={false} />
+              <YAxis stroke="var(--ey-muted)" fontSize={11} tickLine={false} tickFormatter={(v) => formatAxisTick(Number(v) || 0, series[0]?.name.includes('$') || false)} />
               <Tooltip
                 contentStyle={{ backgroundColor: 'var(--ey-card)', borderColor: 'var(--ey-border)', borderRadius: '0.5rem', color: 'var(--ey-light)' }}
                 itemStyle={{ fontSize: '12px' }}

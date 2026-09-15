@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
 import { loadCsvData } from '@/lib/data/csvLoader';
 import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
+import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 import {
   Layers,
@@ -201,7 +202,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
                   <div>
                     <p className="text-[10px] font-mono text-ey-muted uppercase">Total Spend</p>
                     <p className="text-xl font-extrabold text-ey-light font-mono">
-                      ${toolData.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {fmtCost(toolData.cost)}
                     </p>
                     <p className="text-[10px] text-ey-muted">
                       {toolData.spendSharePercent.toFixed(1)}% of total spend
@@ -211,7 +212,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
                   <div>
                     <p className="text-[10px] font-mono text-ey-muted uppercase">Tokens Consumed</p>
                     <p className="text-xl font-extrabold text-ey-light font-mono">
-                      {(toolData.tokens / 1000000).toFixed(2)}M
+                      {formatCompactNumber(toolData.tokens)}
                     </p>
                     <p className="text-[10px] text-ey-muted">
                       {toolData.tokenSharePercent.toFixed(1)}% token share
@@ -234,7 +235,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
                     <DollarSign className="w-3.5 h-3.5 text-emerald-400" /> Avg Cost / User
                   </span>
                   <span className="font-bold text-emerald-400 font-mono">
-                    ${toolData.avgCostPerUser.toFixed(2)}
+                    {fmtCost(toolData.avgCostPerUser)}
                   </span>
                 </div>
 
@@ -288,7 +289,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
           <div className="flex justify-between text-xs font-mono">
             <span className="text-ey-muted">Spend Distribution ($):</span>
             <span className="text-ey-light">
-              Total ${summary.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Total {fmtCost(summary.totalCost)}
             </span>
           </div>
           <div className="w-full bg-ey-card h-3.5 rounded-lg overflow-hidden flex p-0.5 gap-0.5">
@@ -299,7 +300,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
                   key={t.tool}
                   className={`${cfg.barBg} h-full first:rounded-l-md last:rounded-r-md transition-all duration-300 relative group`}
                   style={{ width: `${t.spendSharePercent}%` }}
-                  title={`${cfg.label}: ${t.spendSharePercent.toFixed(1)}% ($${t.cost.toFixed(2)})`}
+                  title={`${cfg.label}: ${t.spendSharePercent.toFixed(1)}% (${fmtCost(t.cost)})`}
                 />
               );
             })}
@@ -311,7 +312,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
                 <div key={t.tool} className="flex items-center space-x-1.5 font-mono">
                   <div className={`w-2.5 h-2.5 rounded-full ${cfg.text.replace('text-', 'bg-')}`} />
                   <span>{cfg.label}:</span>
-                  <strong className="text-ey-light">${t.cost.toFixed(2)} ({t.spendSharePercent.toFixed(1)}%)</strong>
+                  <strong className="text-ey-light">{fmtCost(t.cost)} ({t.spendSharePercent.toFixed(1)}%)</strong>
                 </div>
               );
             })}
@@ -346,7 +347,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
               </div>
               <div className="bg-ey-black border border-amber-500/30 px-3 py-1.5 rounded-lg text-right">
                 <span className="text-emerald-400 font-extrabold text-sm block">
-                  ${multiToolOverlap.totalDualToolSpend.toFixed(2)}
+                  {fmtCost(multiToolOverlap.totalDualToolSpend)}
                 </span>
                 <span className="text-[10px] text-ey-muted">Dual-License Spend</span>
               </div>
