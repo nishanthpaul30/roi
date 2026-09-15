@@ -77,6 +77,7 @@ export default function ExecutiveOverviewPage() {
           <ExecutiveMetricDrilldownView
             data={activeDrilldown}
             onBack={() => setActiveDrilldown(null)}
+            filters={filters}
           />
         ) : (
           /* Normal Executive Overview View */

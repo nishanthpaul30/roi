@@ -24,7 +24,9 @@ import {
 } from 'lucide-react';
 import { MetricChart } from '@/components/ui/MetricChart';
 import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
-import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
+import type { CsvUsageRow } from '@/lib/data/csvTypes';
+import { GlobalFilterState } from '@/lib/metrics/types';
+import { useRawRows } from '@/hooks/useRawRows';
 import { HierarchyDrilldownPanel, PathEntry } from './HierarchyDrilldownPanel';
 import { formatCompactCurrency, formatCompactNumber } from '@/lib/format';
 
@@ -38,6 +40,7 @@ interface SubDrilldownState {
 interface ExecutiveMetricDrilldownViewProps {
   data: DrilldownMetricData;
   onBack: () => void;
+  filters?: GlobalFilterState;
 }
 
 const fmtMoney = formatCompactCurrency;
@@ -97,7 +100,7 @@ function ctNonCtSegmentDisplay(metricId: string, segment: { cost: number; tokens
   };
 }
 
-export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDrilldownViewProps) {
+export function ExecutiveMetricDrilldownView({ data, onBack, filters }: ExecutiveMetricDrilldownViewProps) {
   const { id, title, subtitle, currentValue, deltaText, trend, series, summaryData } = data;
 
   // Level 3 Deep-Dive Sub-Drilldown State
@@ -147,14 +150,9 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [inspectingRow, subDrilldown, pendingFacet, onBack]);
 
-  // Load all CSV rows synchronously from memory for Level 3 filtering
-  const allRows = useMemo(() => {
-    try {
-      return loadCsvData();
-    } catch (_err) {
-      return [];
-    }
-  }, []);
+  // Raw CSV rows for Level 3 filtering, fetched server-side and scoped to the
+  // global filter bar (previously this view ignored the filters entirely).
+  const { rows: allRows, loading: rowsLoading } = useRawRows(filters);
 
   // Filter raw rows for Level 3 Granular Record View
   const granularRows = useMemo(() => {
@@ -251,6 +249,14 @@ export function ExecutiveMetricDrilldownView({ data, onBack }: ExecutiveMetricDr
       .sort(([a], [b]) => a - b)
       .map(([, { label, value }]) => ({ date: label, value: Number(value.toFixed(4)) }));
   }, [scopedRows, series, id]);
+
+  if (rowsLoading) {
+    return (
+      <div className="h-64 flex items-center justify-center text-ey-muted text-sm animate-pulse">
+        Loading telemetry rows...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">

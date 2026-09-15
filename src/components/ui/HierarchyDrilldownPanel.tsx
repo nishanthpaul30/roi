@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CsvUsageRow } from '@/lib/data/csvLoader';
+import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { ChevronRight, RotateCcw, ArrowUpRight, GitBranch } from 'lucide-react';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 

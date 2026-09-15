@@ -34,8 +34,8 @@ import {
   Briefcase,
 } from 'lucide-react';
 import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
-import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
-import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
+import type { CsvUsageRow } from '@/lib/data/csvTypes';
+import { useRawRows } from '@/hooks/useRawRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
@@ -182,15 +182,8 @@ export function ExecutiveInferenceDrilldownView({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [inspectingRecord, selectedEntity, onBack]);
 
-  // Load raw CSV data synchronously
-  const allRows = useMemo(() => {
-    try {
-      const rows = loadCsvData();
-      return filters ? filterRowsByGlobalFilters(rows, filters) : rows;
-    } catch (_err) {
-      return [];
-    }
-  }, [filters]);
+  // Raw CSV rows for the record-level views, fetched server-side
+  const { rows: allRows, loading: rowsLoading } = useRawRows(filters);
 
   // Every held tool gets a 'License' row every month regardless of activity
   // (flat seat fee, tokenConsumption always 0). Every cost/token aggregation
@@ -949,6 +942,14 @@ export function ExecutiveInferenceDrilldownView({
     document.body.removeChild(link);
     handleTriggerAction('Audit trail exported successfully as CSV!');
   };
+
+  if (rowsLoading) {
+    return (
+      <div className="h-64 flex items-center justify-center text-ey-muted text-sm animate-pulse">
+        Loading telemetry rows...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">

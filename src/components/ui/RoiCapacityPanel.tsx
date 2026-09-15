@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { UserCapacityRow, GlobalFilterState } from '@/lib/metrics/types';
-import { loadCsvData } from '@/lib/data/csvLoader';
-import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
+import { useRawRows } from '@/hooks/useRawRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert } from 'lucide-react';
 import { formatCompactCurrency as fmtCost } from '@/lib/format';
@@ -53,14 +52,7 @@ export function RoiCapacityPanel({
   };
 
   // Raw CSV rows, needed to walk the mandated hierarchy before any user is named.
-  const allRows = useMemo(() => {
-    try {
-      const rows = loadCsvData();
-      return filters ? filterRowsByGlobalFilters(rows, filters) : rows;
-    } catch (_err) {
-      return [];
-    }
-  }, [filters]);
+  const { rows: allRows } = useRawRows(filters);
 
   const capacityByEmail = useMemo(() => {
     const map = new Map<string, UserCapacityRow>();

@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react';
 import { useMetricsData } from '@/hooks/useMetricsData';
 import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { DataTable, Column } from '@/components/ui/DataTable';
-import { loadCsvData, CsvUsageRow } from '@/lib/data/csvLoader';
-import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
+import type { CsvUsageRow } from '@/lib/data/csvTypes';
+import { useRawRows } from '@/hooks/useRawRows';
 import { GitBranch, ChevronRight, RotateCcw, ArrowUpRight, TableProperties, Globe2 } from 'lucide-react';
 import { GeoHierarchyMap } from '@/components/ui/GeoHierarchyMap';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
@@ -69,15 +69,8 @@ export default function HierarchyDrilldownPage() {
   const [viewMode, setViewMode] = useState<'table' | 'map'>('map');
   const [combinedSegment, setCombinedSegment] = useState<string | null>(null);
 
-  const allRows = useMemo(() => {
-    try {
-      return loadCsvData();
-    } catch (_err) {
-      return [] as CsvUsageRow[];
-    }
-  }, []);
-
-  const baseRows = useMemo(() => filterRowsByGlobalFilters(allRows, filters), [allRows, filters]);
+  // The server already applies the global filters, so these rows arrive scoped.
+  const { rows: baseRows, loading: rowsLoading } = useRawRows(filters);
 
   // Every held tool gets a 'License' row every month regardless of activity
   // (flat seat fee, tokenConsumption always 0). Cost/token totals throughout
@@ -201,12 +194,18 @@ export default function HierarchyDrilldownPage() {
           ].map((tile) => (
             <div key={tile.label} className="bg-ey-card border border-ey-border rounded-xl p-4">
               <p className="text-[10px] uppercase font-semibold text-ey-muted mb-1">{tile.label}</p>
-              <p className="text-lg font-bold text-ey-light">{tile.value}</p>
+              <p className={`text-lg font-bold text-ey-light ${rowsLoading ? 'opacity-40 animate-pulse' : ''}`}>
+                {rowsLoading ? '—' : tile.value}
+              </p>
             </div>
           ))}
         </div>
 
-        {isComplete ? (
+        {rowsLoading ? (
+          <div className="h-64 flex items-center justify-center text-ey-muted text-sm animate-pulse">
+            Loading telemetry rows...
+          </div>
+        ) : isComplete ? (
           <DataTable
             title={`Raw Telemetry Rows Matching Full Hierarchy Path (${pathRows.length} rows)`}
             data={pathRows}

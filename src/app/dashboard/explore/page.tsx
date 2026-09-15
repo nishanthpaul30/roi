@@ -54,6 +54,7 @@ export default function DataExplorerPage() {
   const [result, setResult] = useState<PivotResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [insights, setInsights] = useState<DatasetInsights | null>(null);
 
   useEffect(() => {
@@ -227,6 +228,11 @@ export default function DataExplorerPage() {
       const rawSheet = XLSX.utils.json_to_sheet(rawRows);
       XLSX.utils.book_append_sheet(workbook, rawSheet, 'Raw Data');
       XLSX.writeFile(workbook, `data_playground_export_${filters.startDate}_to_${filters.endDate}.xlsx`);
+      setExportNotice(
+        json.truncated
+          ? `Raw Data sheet capped at ${rawRows.length.toLocaleString()} of ${(json.totalMatched || 0).toLocaleString()} matching rows. Narrow the filters to export the rest.`
+          : null
+      );
     } catch (err) {
       console.error('Failed to export Data Playground data:', err);
     } finally {
@@ -424,7 +430,11 @@ export default function DataExplorerPage() {
           <>
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs text-ey-muted">
-                Reflects the Rows, Columns, Metric, and Additional Filters selected above.
+                {exportNotice ? (
+                  <span className="text-amber-300">{exportNotice}</span>
+                ) : (
+                  'Reflects the Rows, Columns, Metric, and Additional Filters selected above.'
+                )}
               </p>
               <button
                 onClick={handleExportExcel}

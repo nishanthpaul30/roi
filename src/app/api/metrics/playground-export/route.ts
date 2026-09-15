@@ -7,6 +7,11 @@ export const dynamic = 'force-dynamic';
 const DEFAULT_START = '2026-03-01';
 const DEFAULT_END = '2026-08-31';
 
+// Backstop only — the whole response is held in memory, shipped as JSON, and
+// turned into a worksheet client-side, so an unfiltered export on a very large
+// dataset would otherwise have no ceiling. Well above any realistic slice.
+const MAX_EXPORT_ROWS = 100_000;
+
 /**
  * Raw rows matching every filter currently applied on the Data Playground
  * (global filter bar + the page's own extra dimension filters) — the source
@@ -43,7 +48,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    const rows = getFilteredPlaygroundRows(filters, extraFilters);
+    const matched = getFilteredPlaygroundRows(filters, extraFilters);
+    const truncated = matched.length > MAX_EXPORT_ROWS;
+    const rows = truncated ? matched.slice(0, MAX_EXPORT_ROWS) : matched;
     const data = rows.map((r) => ({
       Month: r.monthYear.replace(/_/g, ' '),
       'User Email': r.userMail,
@@ -70,7 +77,7 @@ export async function GET(request: Request) {
       'GDS Location': r.gdsLocation,
       'Cost Center': r.costCenter,
     }));
-    return NextResponse.json({ rows: data, rowCount: data.length });
+    return NextResponse.json({ rows: data, rowCount: data.length, totalMatched: matched.length, truncated });
   } catch (error: any) {
     console.error('Error building playground export:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });

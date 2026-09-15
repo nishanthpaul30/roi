@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
-import { loadCsvData } from '@/lib/data/csvLoader';
-import { filterRowsByGlobalFilters } from '@/lib/metrics/filterRows';
+import { useRawRows } from '@/hooks/useRawRows';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 import {
@@ -81,14 +80,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
   const [showOverlapUsers, setShowOverlapUsers] = useState(false);
 
   // Raw CSV rows, needed to walk the mandated hierarchy before any overlap user is named.
-  const allRows = useMemo(() => {
-    try {
-      const rows = loadCsvData();
-      return filters ? filterRowsByGlobalFilters(rows, filters) : rows;
-    } catch (_err) {
-      return [];
-    }
-  }, [filters]);
+  const { rows: allRows } = useRawRows(filters);
 
   const multiToolOverlap = summary?.multiToolOverlap;
   const overlapHierarchyRows = useMemo(() => {
