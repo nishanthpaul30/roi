@@ -109,10 +109,42 @@ function filterRows(rows: CsvUsageRow[], filters: GlobalFilterState, sDate: stri
   });
 }
 
+// Spend metrics answer "what did this cost us", so they count both cost pools:
+// metered Usage rows and the License rows that carry the seat fees. Everything
+// else stays usage-only — token counts have no licence equivalent, and
+// COST_PER_1K_TOKENS is a unit rate for metered consumption, so folding in a
+// fee with no token denominator would stop it being comparable to a vendor's
+// metered price.
+const SPEND_METRICS = new Set(['COST', 'AVG_DAILY_COST', 'AVG_MONTHLY_COST', 'COST_PER_ACTIVE_USER']);
+
+/**
+ * Calendar days covered by the given rows.
+ *
+ * The source is monthly — every row is dated the 1st — so there is no per-day
+ * detail to count. Days are derived from the distinct months actually present,
+ * which also keeps this correct for an arbitrary API date range: filtering
+ * happens on monthId, so asking for 15-20 March still returns the whole month,
+ * and dividing by the 6 requested days would overstate the daily rate sixfold.
+ */
+function daysCoveredBy(rows: CsvUsageRow[]): number {
+  const monthIds = new Set<number>();
+  for (const r of rows) {
+    if (r.monthYear && r.monthId > 0) monthIds.add(r.monthId);
+  }
+  let days = 0;
+  for (const id of monthIds) {
+    // Day 0 of the next month is the last day of this one.
+    days += new Date(Date.UTC(Math.floor(id / 100), id % 100, 0)).getUTCDate();
+  }
+  return days;
+}
+
 /**
  * Primary Metric Engine — reads from ai_usage_data.csv.
- * Every metric here is usage-only (Calculation Method = 'Usage'); License
- * rows are a separate cost pool handled by roi.ts's License ROI calculation.
+ *
+ * Two row pools: `currentRows` is usage-only (Calculation Method = 'Usage'),
+ * `currentSpendRows` adds the License rows. See SPEND_METRICS above for which
+ * metrics use which, and roi.ts for the separate License ROI calculation.
  */
 export async function getMetric(
   metricId: string,
@@ -123,8 +155,15 @@ export async function getMetric(
   const previousDataAvailable = hasPreviousPeriodData(prevStartDate, prevEndDate);
 
   const allRows = loadCsvData();
-  const currentRows = filterRows(allRows, filters, startDate, endDate).filter(r => r.calculationMethod === 'Usage');
-  const previousRows = filterRows(allRows, filters, prevStartDate, prevEndDate).filter(r => r.calculationMethod === 'Usage');
+  const currentSpendRows = filterRows(allRows, filters, startDate, endDate);
+  const previousSpendRows = filterRows(allRows, filters, prevStartDate, prevEndDate);
+  const currentRows = currentSpendRows.filter(r => r.calculationMethod === 'Usage');
+  const previousRows = previousSpendRows.filter(r => r.calculationMethod === 'Usage');
+
+  // The rows this particular metric sums over.
+  const includesLicense = SPEND_METRICS.has(metricId);
+  const currentCostRows = includesLicense ? currentSpendRows : currentRows;
+  const previousCostRows = includesLicense ? previousSpendRows : previousRows;
 
   let currentVal = 0;
   let prevVal = 0;
@@ -137,8 +176,9 @@ export async function getMetric(
       break;
 
     case 'COST':
-      currentVal = currentRows.reduce((s, r) => s + r.cost, 0);
-      prevVal = previousRows.reduce((s, r) => s + r.cost, 0);
+      // Total AI Investment — metered usage plus licence fees.
+      currentVal = currentCostRows.reduce((s, r) => s + r.cost, 0);
+      prevVal = previousCostRows.reduce((s, r) => s + r.cost, 0);
       break;
 
     case 'COST_PER_1K_TOKENS': {
@@ -158,14 +198,16 @@ export async function getMetric(
       // seat with 0 consumption/$0 usage cost must not inflate the denominator
       // here, or this "per active user" figure silently becomes a per-seat figure.
       isRate = true;
-      const cActiveRows = currentRows.filter(r => r.tokenConsumption > 0);
-      const cCost = cActiveRows.reduce((s, r) => s + r.cost, 0);
-      const cUsers = new Set(cActiveRows.map(r => r.userMail)).size || 1;
+      // Total outlay (usage + licence) spread over the people who actually used
+      // the tools. "Active" is still decided from Usage rows — a licence row
+      // records a seat, not activity — but the numerator is the full spend, so
+      // this reads as "what each active user costs us all-in".
+      const cCost = currentCostRows.reduce((s, r) => s + r.cost, 0);
+      const cUsers = new Set(currentRows.filter(r => r.tokenConsumption > 0).map(r => r.userMail)).size || 1;
       currentVal = cCost / cUsers;
 
-      const pActiveRows = previousRows.filter(r => r.tokenConsumption > 0);
-      const pCost = pActiveRows.reduce((s, r) => s + r.cost, 0);
-      const pUsers = new Set(pActiveRows.map(r => r.userMail)).size || 1;
+      const pCost = previousCostRows.reduce((s, r) => s + r.cost, 0);
+      const pUsers = new Set(previousRows.filter(r => r.tokenConsumption > 0).map(r => r.userMail)).size || 1;
       prevVal = pCost / pUsers;
       break;
     }
@@ -190,15 +232,28 @@ export async function getMetric(
       // this equals the month's total spend; it only differs from Total AI
       // Investment when the selected range spans multiple months.
       const monthMap = new Map<number, number>();
-      currentRows.forEach(r => {
+      currentCostRows.forEach(r => {
         monthMap.set(r.monthId, (monthMap.get(r.monthId) || 0) + r.cost);
       });
       const monthMapPrev = new Map<number, number>();
-      previousRows.forEach(r => {
+      previousCostRows.forEach(r => {
         monthMapPrev.set(r.monthId, (monthMapPrev.get(r.monthId) || 0) + r.cost);
       });
       currentVal = monthMap.size > 0 ? Array.from(monthMap.values()).reduce((a, b) => a + b, 0) / monthMap.size : 0;
       prevVal = monthMapPrev.size > 0 ? Array.from(monthMapPrev.values()).reduce((a, b) => a + b, 0) / monthMapPrev.size : 0;
+      break;
+    }
+
+    case 'AVG_DAILY_COST': {
+      // This previously fell through to the default branch, which sums cost and
+      // never divides — so "average daily cost" was reporting the period total.
+      const cDays = daysCoveredBy(currentCostRows);
+      const cTotal = currentCostRows.reduce((s, r) => s + r.cost, 0);
+      currentVal = cDays > 0 ? cTotal / cDays : 0;
+
+      const pDays = daysCoveredBy(previousCostRows);
+      const pTotal = previousCostRows.reduce((s, r) => s + r.cost, 0);
+      prevVal = pDays > 0 ? pTotal / pDays : 0;
       break;
     }
 
@@ -209,8 +264,10 @@ export async function getMetric(
 
   // Build the monthly time series — aggregate multiple rows per month, keyed
   // by monthId so it sorts chronologically, labeled with the monthYear string.
+  // Built from the same pool the headline figure used, so the chart under a
+  // card always sums to the number on it.
   const monthMap = new Map<number, { label: string; value: number }>();
-  currentRows.forEach((r) => {
+  currentCostRows.forEach((r) => {
     let val = 0;
     if (metricId === 'TOKEN_CONSUMPTION') val = r.tokenConsumption;
     else if (metricId === 'COST' || metricId === 'AVG_MONTHLY_COST') val = r.cost;
@@ -223,7 +280,15 @@ export async function getMetric(
 
   const series: TimeSeriesPoint[] = Array.from(monthMap.entries())
     .sort(([a], [b]) => a - b)
-    .map(([, { label, value }]) => ({ date: label, value: Number(value.toFixed(4)) }));
+    .map(([monthId, { label, value }]) => {
+      // Each point on a daily-average series is that month's spend spread over
+      // that month's own length, so the line matches the headline figure.
+      if (metricId === 'AVG_DAILY_COST') {
+        const daysInMonth = new Date(Date.UTC(Math.floor(monthId / 100), monthId % 100, 0)).getUTCDate();
+        return { date: label, value: Number((value / daysInMonth).toFixed(4)) };
+      }
+      return { date: label, value: Number(value.toFixed(4)) };
+    });
 
   const summary = calculateDelta(currentVal, prevVal, isRate, previousDataAvailable);
 

@@ -89,8 +89,8 @@ const FORMULA_CATEGORIES = [
     icon: DollarSign,
     color: 'text-emerald-400',
     formulas: [
-      { name: 'Total AI Investment ($)', formula: 'Total Spend = ∑ (cost) over Usage rows only', example: '$18.68 + $48.96 + $16.72 = $84.36' },
-      { name: 'Cost per Active User ($ / user)', formula: 'Cost per User = Total Spend / Unique Active Users', example: '$1,750.00 / 70 Users = $25.00 / user' },
+      { name: 'Total AI Investment ($)', formula: 'Total Spend = ∑ (cost) over Usage AND License rows', example: 'Usage $8,920.04 + License $228,000.00 = $236,920.04' },
+      { name: 'Cost per Active User ($ / user)', formula: 'Cost per User = Total Spend (usage + license) / Unique Active Users', example: '$236,920.04 / 399 Users = $593.79 / user' },
       { name: 'Per-Tool Free-Dollar Limit', formula: 'Limit(tool) = max(|Credits|) across that tool\'s Usage rows', example: 'GitHub Copilot: largest Credits ever applied is -70.00 → $70.00 free limit' },
       { name: 'Capacity Waste ($)', formula: 'Waste = ∑ max(0, Limit(tool) - costUsd), per Usage row, summed', example: '$70.00 limit - $42.31 gross cost = $27.69 wasted that month' },
       { name: 'Overage Cost ($)', formula: 'Overage = ∑ max(0, costUsd - Limit(tool)), per Usage row, summed', example: '$70.08 gross cost - $70.00 limit = $0.08 overage that month' },

@@ -39,6 +39,7 @@ interface DatasetInsights {
   distinctMonths: number;
   dateRangeLabel: string;
   totalCost: number;
+  totalUsageCost: number;
   totalTokens: number;
   totalLicenseCost: number;
 }
@@ -311,7 +312,9 @@ export default function DataExplorerPage() {
               <div className="bg-ey-black/40 border border-ey-border/70 rounded-lg px-3 py-2">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-ey-muted">Total AI Investment</p>
                 <p className="text-sm font-bold text-ey-light font-mono">{formatCompactCurrency(insights.totalCost)}</p>
-                <p className="text-[10px] text-ey-muted">{formatCompactNumber(insights.totalTokens)} tokens</p>
+                <p className="text-[10px] text-ey-muted">
+                  {formatCompactCurrency(insights.totalUsageCost)} usage · {formatCompactCurrency(insights.totalLicenseCost)} license
+                </p>
               </div>
             </div>
           )}

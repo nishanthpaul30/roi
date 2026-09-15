@@ -317,7 +317,10 @@ export function getDatasetInsights() {
     topCountry,
     distinctMonths: months.size,
     dateRangeLabel,
-    totalCost: Number(usageRows.reduce((sum, r) => sum + r.cost, 0).toFixed(2)),
+    // Total AI Investment — usage plus licence, matching the COST metric in
+    // engine.ts. The two pools stay available separately below.
+    totalCost: Number(rows.reduce((sum, r) => sum + r.cost, 0).toFixed(2)),
+    totalUsageCost: Number(usageRows.reduce((sum, r) => sum + r.cost, 0).toFixed(2)),
     totalTokens: Math.round(usageRows.reduce((sum, r) => sum + r.tokenConsumption, 0)),
     totalLicenseCost: Number(licenseRows.reduce((sum, r) => sum + r.cost, 0).toFixed(2)),
   };
