@@ -50,7 +50,7 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
   const top10Percent = totalCost > 0 ? (top10Spend / totalCost) * 100 : 0;
   const top20Percent = totalCost > 0 ? (top20Spend / totalCost) * 100 : 0;
 
-  // 4b. License Investment ROI Governance
+  // 4b. Usage vs License Cost Governance
   const licenseUnderutilizedCost = summary.licenseUnderutilizedCost || 0;
   const licenseRoiPercent = summary.licenseRoiPercent || 0;
 
@@ -89,7 +89,7 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
       tag: 'Financial Governance',
       tagColor: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
       icon: Wallet,
-      stat: `${fmtPct(licenseRoiPercent)} License ROI`,
+      stat: `${fmtPct(licenseRoiPercent)} usage vs license`,
       statSub: `${fmtCost(licenseUnderutilizedCost)} unconsumed${overlap && overlap.dualToolUserCount > 0 ? ` + ${fmtCost(overlap.totalDualToolSpend)} dual-license` : ''}`,
       finding: `Only ${fmtPct(licenseRoiPercent)} of the ${fmtCost(summary.totalLicenseCost)} in real per-license Cost in USD was actually consumed as usage, leaving ${fmtCost(licenseUnderutilizedCost)} unconsumed.${overlap && overlap.dualToolUserCount > 0 ? ` On top of that, ${overlap.dualToolUserCount} users run two or more AI platforms concurrently, adding ${fmtCost(overlap.totalDualToolSpend)} in consolidatable dual-license spend.` : ''}`,
       actionableInsight: 'Open the Token & Spend ROI page to reclaim or downgrade underutilized licenses, and standardize dual-platform users onto a single primary AI tool.',

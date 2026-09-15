@@ -95,7 +95,7 @@ export default function RoiPage() {
             {/* Financial ROI Governance KPI Cards with Drilldown Handlers */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <KpiCard
-                title="License Investment ROI"
+                title="Usage vs License Cost"
                 delta={{
                   current: summary.licenseRoiPercent,
                   previous: summary.prevLicenseRoiPercent,
@@ -107,14 +107,14 @@ export default function RoiPage() {
                   previousDataAvailable,
                 }}
                 unit="%"
-                description={`Total actual usage cost ÷ total per-license Cost in USD (${fmtCost(summary.totalLicenseCost)}). Click to inspect per-license ROI.`}
+                description={`How much of the ${fmtCost(summary.totalLicenseCost)} paid in license fees came back as metered usage. Not a return on investment — both sides are costs; a low figure means seats are going unconsumed. Click to inspect per-license detail.`}
                 onClick={() =>
                   openDrilldown({
                     type: 'metric',
                     id: 'efficiency',
-                    title: 'License Investment ROI Analysis',
+                    title: 'Usage vs License Cost Analysis',
                     subtitle: 'Actual telemetry spend vs real per-license Cost in USD.',
-                    badge: 'License ROI',
+                    badge: 'Usage vs License',
                   })
                 }
               />
@@ -320,7 +320,7 @@ export default function RoiPage() {
                   { label: 'Cost per 1K tokens', value: `$${summary.costPer1kTokens.toFixed(6)}`, sub: '/ 1K tokens', color: 'text-ey-yellow' },
                   { label: 'Near Dollar Cap Users', value: `${summary.ceilingRiskCount} users`, sub: `≥90% of ${fmtCost(summary.hardCeiling)}`, color: 'text-red-400' },
                   { label: 'Total License Cost', value: fmtCost(summary.totalLicenseCost), sub: 'sum of per-license Cost in USD', color: 'text-sky-400' },
-                  { label: 'License Investment ROI', value: `${summary.licenseRoiPercent}%`, sub: 'actual cost ÷ license cost', color: 'text-sky-400' },
+                  { label: 'Usage vs License Cost', value: `${summary.licenseRoiPercent}%`, sub: 'usage cost ÷ license cost', color: 'text-sky-400' },
                 ].map((item) => (
                   <div key={item.label} className="bg-ey-black border border-ey-border rounded-lg p-3">
                     <p className="text-ey-muted text-[10px] mb-1 font-mono">{item.label}</p>

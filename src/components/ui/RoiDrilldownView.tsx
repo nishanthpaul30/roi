@@ -323,7 +323,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
   // Total License Cost for this slice — License Cost lives on userCapacityMap
   // per user (it comes from separate 'License'-tagged rows, not the Usage rows
   // targetRows is built from), so sum each distinct user in the slice once.
-  // Used by the header pill when viewing the License Investment ROI drilldown.
+  // Used by the header pill when viewing the Usage vs License Cost drilldown.
   const sliceLicenseCost = useMemo(() => {
     const seen = new Set<string>();
     let total = 0;
@@ -755,7 +755,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
             {ctNonCtBreakdown.map((c) => {
               // 100K Cap Risk telemetry is fundamentally a headcount story (how many
               // users are near the ceiling), so lead with user count there instead of
-              // spend; License Investment ROI leads with each segment's own ROI %;
+              // spend; Usage vs License Cost leads with each segment's own ratio;
               // Zone 1/2 lead with the actual waste/overage $ amount (not raw spend,
               // which is a different number); every other drilldown is a plain
               // cost story, so spend leads.
@@ -799,7 +799,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                           <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
                             {c.roiPercent.toFixed(1)}%
                           </span>
-                          <span className="text-xs text-cyan-300 font-bold">License ROI</span>
+                          <span className="text-xs text-cyan-300 font-bold">Usage vs License</span>
                         </div>
                         <p className="text-[11px] text-ey-muted mt-0.5">
                           {fmtCost(c.cost)} actual ÷ {fmtCost(c.licenseCost)} license cost

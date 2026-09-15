@@ -155,7 +155,7 @@ export function RoiCapacityPanel({
           <div className="bg-sky-500/10 border border-sky-500/20 rounded-xl p-3.5 flex items-start space-x-3">
             <TrendingUp className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sky-300 font-bold">License Investment ROI</p>
+              <p className="text-sky-300 font-bold">Usage vs License Cost</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
                 <strong className="text-sky-200">{licenseRoiPercent}%</strong> of total per-license Cost in USD ({fmtCost(totalLicenseCost)}) was actually consumed as usage.
               </p>
