@@ -233,7 +233,7 @@ export function parseRawCsvText(raw: string): CsvUsageRow[] {
  * process.
  */
 export function loadCsvData(): CsvUsageRow[] {
-  if (_cache && process.env.NODE_ENV !== 'development') return _cache;
+  if (_cache) return _cache;
 
   let raw = '';
   try {
