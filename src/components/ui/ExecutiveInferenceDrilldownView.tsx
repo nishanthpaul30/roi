@@ -1557,11 +1557,11 @@ export function ExecutiveInferenceDrilldownView({
           {/* 6. CLIENT BILLABILITY & PROJECT TELEMETRY ALIGNMENT */}
           {inferenceId === 'project_billability' && (
             <div className="space-y-6">
-              {/* Mandated Hierarchy Navigator — always shown first, at the top (Engagement Code sits inside it at level 4) */}
+              {/* Mandated Hierarchy Navigator — always shown first, at the top */}
               <HierarchyDrilldownPanel
                 rows={allRows}
-                title="Level 3: Billability & Engagement Hierarchy"
-                subtitle="Billable and non-billable engagement codes appear at the Engagement Code step below."
+                title="Level 3: Billability & Org Hierarchy"
+                subtitle="Drill CT/Non-CT down to Sub-Service Line 2 to reach the users behind billable and non-billable spend. Engagement-code detail is in the table below."
                 onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
               />
 

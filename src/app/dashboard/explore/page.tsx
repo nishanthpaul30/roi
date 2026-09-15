@@ -262,7 +262,7 @@ export default function DataExplorerPage() {
                   </span>
                 </h1>
                 <p className="text-xs text-ey-muted mt-0.5">
-                  Cross-tabulate every field on demand &mdash; including the CT/Non-CT &rarr; Country &rarr; Service Line &rarr; Engagement hierarchy, GDS Location, and Cost Center, which have no dedicated panel elsewhere.
+                  Cross-tabulate every field on demand &mdash; including the Engagement chain, GDS Location, and Cost Center, which sit outside the CT/Non-CT &rarr; Country &rarr; Service Line &rarr; Sub-Service Line &rarr; Users drilldown and have no dedicated panel elsewhere.
                 </p>
               </div>
             </div>

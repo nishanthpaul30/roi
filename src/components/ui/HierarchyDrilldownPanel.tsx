@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
-import { ChevronRight, RotateCcw, ArrowUpRight, GitBranch } from 'lucide-react';
+import { ChevronRight, RotateCcw, ArrowUpRight, GitBranch, Briefcase } from 'lucide-react';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
 interface LevelField {
@@ -15,21 +16,19 @@ interface Level {
   fields: LevelField[];
 }
 
-// The required application-wide hierarchy — always followed before any user-level
-// detail is shown: CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1 ->
-// Sub-Service Line 2 -> Engagement Code -> Engagement Super Region -> Engagement
-// Service Line -> Engagement Sub Service Line -> Engagement Competency -> User.
+// The required application-wide hierarchy:
+// CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1 ->
+// Sub-Service Line 2 -> Users.
+//
+// The five org levels are listed here; Users is the sixth and final level,
+// rendered once these are exhausted (see `userRows` below) rather than being a
+// level you drill *into* — reaching it is the end of the path.
 const LEVELS: Level[] = [
   { id: 'ctNonCt', fields: [{ key: 'ctNonCt', label: 'CT / Non-CT' }] },
   { id: 'country', fields: [{ key: 'country', label: 'Country' }] },
   { id: 'serviceLine', fields: [{ key: 'orgServiceLine', label: 'Service Line' }] },
   { id: 'subServiceLine1', fields: [{ key: 'subServiceLine1', label: 'Sub-Service Line 1' }] },
   { id: 'subServiceLine2', fields: [{ key: 'subServiceLine2', label: 'Sub-Service Line 2' }] },
-  { id: 'engagementCode', fields: [{ key: 'projectCode', label: 'Engagement Code' }] },
-  { id: 'engagementSuperRegion', fields: [{ key: 'engagementSuperRegion', label: 'Engagement Super Region' }] },
-  { id: 'engagementServiceLine', fields: [{ key: 'engagementServiceLine', label: 'Engagement Service Line' }] },
-  { id: 'engagementSubServiceLine', fields: [{ key: 'engagementSubServiceLine', label: 'Engagement Sub Service Line' }] },
-  { id: 'engagementCompetency', fields: [{ key: 'engagementCompetency', label: 'Engagement Competency' }] },
 ];
 
 export interface PathEntry {
@@ -190,13 +189,14 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
                 <th className="px-4 py-3 text-right">Tokens</th>
                 <th className="px-4 py-3 text-right">Cost ($)</th>
                 <th className="px-4 py-3 text-center">Records</th>
+                <th className="px-4 py-3 text-center">Engagements</th>
                 <th className="px-4 py-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ey-border">
               {userRows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-ey-muted">No users match this path.</td>
+                  <td colSpan={6} className="px-4 py-8 text-center text-ey-muted">No users match this path.</td>
                 </tr>
               ) : (
                 userRows.map((u, i) => (
@@ -212,6 +212,18 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
                     <td className="px-4 py-3 text-right">{formatCompactNumber(u.tokens)}</td>
                     <td className="px-4 py-3 text-right font-bold text-ey-yellow">{fmtCost(u.cost)}</td>
                     <td className="px-4 py-3 text-center text-ey-muted">{u.rowCount}</td>
+                    <td className="px-4 py-3 text-center">
+                      {/* The org hierarchy ends here; this hands off to the
+                          engagement-side chain for the same person. */}
+                      <Link
+                        href={`/dashboard/engagements?user=${encodeURIComponent(u.email)}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200 hover:underline"
+                      >
+                        <Briefcase className="w-3 h-3" />
+                        <span>View</span>
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <span className="inline-flex items-center gap-1 text-[10px] text-ey-yellow font-bold group-hover:underline">
                         <span>Drill to Logs</span>

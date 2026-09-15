@@ -40,8 +40,8 @@ interface MetricDerivationItem {
 // 'License' row (flat seat fee, present every month regardless of usage)
 // and/or a 'Usage' row (metered consumption/cost, present only when active).
 const CSV_SCHEMA = [
-  { column: 'User Email', fieldName: 'userMail', description: 'Developer email identifier (e.g. aditya.malik@enterprise-corp.com)', dataType: 'String' },
-  { column: 'User Name', fieldName: 'displayName', description: 'Developer display name (e.g. Aditya Malik)', dataType: 'String' },
+  { column: 'User Email', fieldName: 'userMail', description: 'Developer email identifier (e.g. aditya.malik@enterprise-corp.com) — hierarchy level 6 (leaf); the hierarchy keys on email rather than name because some display names are shared by more than one person', dataType: 'String' },
+  { column: 'User Name', fieldName: 'displayName', description: 'Developer display name (e.g. Aditya Malik) — shown as a label only; not unique, so never used as a grouping key', dataType: 'String' },
   { column: 'Year', fieldName: 'fiscalYear', description: 'Fiscal-year label (e.g. "FY26") — not a calendar year, and never used in date math; kept only as a raw passthrough label', dataType: 'String' },
   { column: 'Month', fieldName: 'year / month', description: 'Full date-time in D/M/YYYY order (e.g. "1/6/2026 12:00:00 AM" = June 2026; time-of-day is always midnight and carries no meaning) — the sole source of the calendar year and month used everywhere below, including monthYear/monthId', dataType: 'Date' },
   { column: 'Product', fieldName: 'aiTool', description: 'AI Tool identity (e.g. github, chatgpt, claude, replit, factory, cursor)', dataType: 'String' },
@@ -56,11 +56,11 @@ const CSV_SCHEMA = [
   { column: 'Service Line', fieldName: 'orgServiceLine', description: 'Internal delivery Service Line (e.g. Tax, Assurance, S&T, CBS, Consulting) — hierarchy level 3', dataType: 'String' },
   { column: 'Sub-Service Line 1', fieldName: 'subServiceLine1', description: 'First-level delivery sub-practice classification, derived from Service Line — hierarchy level 4; replaces the old Org Sub Service Line', dataType: 'String' },
   { column: 'Sub-Service Line 2', fieldName: 'subServiceLine2', description: 'Second-level delivery sub-practice classification, derived from Sub-Service Line 1 — hierarchy level 5', dataType: 'String' },
-  { column: 'Engagement Code', fieldName: 'projectCode', description: 'Billing engagement code — E-XXXXXX for external/billable, I-XXXXXX for internal/non-billable. This prefix convention is the sole source of Billable/Non-Billable and ProjectType, both now derived rather than separate columns — hierarchy level 6', dataType: 'String' },
-  { column: 'Engagement - Super Region', fieldName: 'engagementSuperRegion', description: 'Client engagement-side region grouping (e.g. EMEIA, Asia-Pacific, Americas) — hierarchy level 7', dataType: 'String' },
-  { column: 'Engagement Service Line', fieldName: 'engagementServiceLine', description: 'Client engagement-side Global Service Line, derived from Engagement Super Region — hierarchy level 8', dataType: 'String' },
-  { column: 'Engagement Sub-Service Line', fieldName: 'engagementSubServiceLine', description: 'Client engagement-side sub-practice, derived from Engagement Service Line — hierarchy level 9', dataType: 'String' },
-  { column: 'Engagement Competency', fieldName: 'engagementCompetency', description: 'Skill/competency classification, derived from Engagement Sub-Service Line — hierarchy level 10 (leaf)', dataType: 'String' },
+  { column: 'Engagement Code', fieldName: 'projectCode', description: 'Billing engagement code — E-XXXXXX for external/billable, I-XXXXXX for internal/non-billable. This prefix convention is the sole source of Billable/Non-Billable and ProjectType, both now derived rather than separate columns — not part of the drilldown hierarchy', dataType: 'String' },
+  { column: 'Engagement - Super Region', fieldName: 'engagementSuperRegion', description: 'Client engagement-side region grouping (e.g. EMEIA, Asia-Pacific, Americas) — not part of the drilldown hierarchy', dataType: 'String' },
+  { column: 'Engagement Service Line', fieldName: 'engagementServiceLine', description: 'Client engagement-side Global Service Line, derived from Engagement Super Region — not part of the drilldown hierarchy', dataType: 'String' },
+  { column: 'Engagement Sub-Service Line', fieldName: 'engagementSubServiceLine', description: 'Client engagement-side sub-practice, derived from Engagement Service Line — not part of the drilldown hierarchy', dataType: 'String' },
+  { column: 'Engagement Competency', fieldName: 'engagementCompetency', description: 'Skill/competency classification, derived from Engagement Sub-Service Line — not part of the drilldown hierarchy', dataType: 'String' },
   { column: 'Engagement Invest Type', fieldName: 'engagementInvestType', description: 'Investment type classification — parsed and retained but not used in any insight', dataType: 'String (passthrough)' },
   { column: 'GDS Location', fieldName: 'gdsLocation', description: 'Global Delivery Services location fulfilling the work, or "Onshore" if not GDS-delivered — independent of the hierarchy chain', dataType: 'String' },
   { column: 'Cost Center', fieldName: 'costCenter', description: 'Internal accounting cost center code (e.g. CC-TAX-647) — independent of the hierarchy chain', dataType: 'String' },

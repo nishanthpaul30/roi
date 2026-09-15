@@ -6,7 +6,8 @@ import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { useRawRows } from '@/hooks/useRawRows';
-import { GitBranch, ChevronRight, RotateCcw, ArrowUpRight, TableProperties, Globe2 } from 'lucide-react';
+import Link from 'next/link';
+import { GitBranch, ChevronRight, RotateCcw, ArrowUpRight, TableProperties, Globe2, Briefcase } from 'lucide-react';
 import { GeoHierarchyMap } from '@/components/ui/GeoHierarchyMap';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
@@ -23,19 +24,18 @@ interface Level {
 
 // The required application-wide hierarchy — always followed while drilling down:
 // CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1 -> Sub-Service Line 2 ->
-// Engagement Code -> Engagement Super Region -> Engagement Service Line ->
-// Engagement Sub Service Line -> Engagement Competency.
+// Users.
+//
+// Users keys on userMail, not displayName: 27 names in the current dataset are
+// shared by more than one email address, and grouping by name would silently
+// merge those people into one row.
 const LEVELS: Level[] = [
   { id: 'ctNonCt', title: 'CT / Non-CT', fields: [{ key: 'ctNonCt', label: 'CT / Non-CT' }] },
   { id: 'country', title: 'Country', fields: [{ key: 'country', label: 'Country' }] },
   { id: 'serviceLine', title: 'Service Line', fields: [{ key: 'orgServiceLine', label: 'Service Line' }] },
   { id: 'subServiceLine1', title: 'Sub-Service Line 1', fields: [{ key: 'subServiceLine1', label: 'Sub-Service Line 1' }] },
   { id: 'subServiceLine2', title: 'Sub-Service Line 2', fields: [{ key: 'subServiceLine2', label: 'Sub-Service Line 2' }] },
-  { id: 'engagementCode', title: 'Engagement Code', fields: [{ key: 'projectCode', label: 'Engagement Code' }] },
-  { id: 'engagementSuperRegion', title: 'Engagement Super Region', fields: [{ key: 'engagementSuperRegion', label: 'Engagement Super Region' }] },
-  { id: 'engagementServiceLine', title: 'Engagement Service Line', fields: [{ key: 'engagementServiceLine', label: 'Engagement Service Line' }] },
-  { id: 'engagementSubServiceLine', title: 'Engagement Sub Service Line', fields: [{ key: 'engagementSubServiceLine', label: 'Engagement Sub Service Line' }] },
-  { id: 'engagementCompetency', title: 'Engagement Competency', fields: [{ key: 'engagementCompetency', label: 'Engagement Competency' }] },
+  { id: 'user', title: 'Users', fields: [{ key: 'userMail', label: 'User' }] },
 ];
 
 interface PathEntry {
@@ -377,7 +377,22 @@ export default function HierarchyDrilldownPage() {
                               <td className="px-4 py-2.5 text-right">{g.userCount}</td>
                               <td className="px-4 py-2.5 text-right font-mono">{formatCompactNumber(g.tokens)}</td>
                               <td className="px-4 py-2.5 text-right font-mono font-bold">{fmtCost(g.cost)}</td>
-                              <td className="px-4 py-2.5 text-right text-ey-muted">Drill Down</td>
+                              <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                                {currentLevel.id === 'user' ? (
+                                  // The org hierarchy ends at the user; this hands off to the
+                                  // engagement-side chain for that same person.
+                                  <Link
+                                    href={`/dashboard/engagements?user=${encodeURIComponent(g.value)}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center gap-1 text-ey-yellow hover:underline font-semibold"
+                                  >
+                                    <Briefcase className="w-3 h-3" />
+                                    Engagements
+                                  </Link>
+                                ) : (
+                                  <span className="text-ey-muted">Drill Down</span>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>

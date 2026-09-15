@@ -18,6 +18,7 @@ import {
   Moon,
   LayoutGrid,
   GitBranch,
+  Briefcase,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -26,6 +27,7 @@ const INSIGHTS_NAV_ITEMS = [
   { name: 'Executive Overview', href: '/', icon: LayoutDashboard },
   { name: 'Token & Spend ROI', href: '/dashboard/roi', icon: DollarSign },
   { name: 'Service Line Analytics', href: '/dashboard/teams', icon: Building2 },
+  { name: 'Engagement Analytics', href: '/dashboard/engagements', icon: Briefcase },
   { name: 'Geo Pulse', href: '/dashboard/hierarchy', icon: GitBranch },
 ];
 
