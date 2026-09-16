@@ -1312,12 +1312,12 @@ export function ExecutiveInferenceDrilldownView({
                         <div className="bg-ey-black/60 p-3 rounded-xl border border-ey-border/60">
                           <span className="text-[10px] font-mono text-ey-muted uppercase">Total Spend</span>
                           <p className={`text-xl font-black font-mono ${t.color}`}>{fmtCost(t.cost)}</p>
-                          <span className="text-[10px] text-ey-muted font-mono">{t.spendShare.toFixed(1)}% of company</span>
+                          <span className="text-[10px] text-ey-muted font-mono">{t.spendShare.toFixed(4)}% of company</span>
                         </div>
                         <div className="bg-ey-black/60 p-3 rounded-xl border border-ey-border/60">
                           <span className="text-[10px] font-mono text-ey-muted uppercase">Volume Consumed</span>
                           <p className="text-xl font-black font-mono text-ey-light">{formatCompactNumber(t.tokens)}</p>
-                          <span className="text-[10px] text-ey-muted font-mono">{t.tokenShare.toFixed(1)}% token share</span>
+                          <span className="text-[10px] text-ey-muted font-mono">{t.tokenShare.toFixed(4)}% token share</span>
                         </div>
                       </div>
 

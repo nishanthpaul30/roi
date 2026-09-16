@@ -282,7 +282,7 @@ export default function RoiPage() {
                   tool: TOOL_LABELS[t.tool] || t.tool,
                   tokens: formatCompactNumber(t.tokens),
                   cost: fmtCost(t.cost),
-                  share: `${((t.tokens / summary.totalTokenConsumption) * 100).toFixed(1)}%`,
+                  share: `${((t.tokens / summary.totalTokenConsumption) * 100).toFixed(4)}%`,
                   costPer1k: `$${t.costPer1kTokens.toFixed(6)}`,
                 }))}
                 columns={[

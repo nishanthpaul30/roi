@@ -559,7 +559,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters }: Executiv
                 </div>
                 <div className="space-y-3 text-xs font-mono">
                   {byTool.map((t: any) => {
-                    const pct = summaryData?.totalTokenConsumption ? ((t.tokens / summaryData.totalTokenConsumption) * 100).toFixed(1) : 0;
+                    const pct = summaryData?.totalTokenConsumption ? ((t.tokens / summaryData.totalTokenConsumption) * 100).toFixed(4) : 0;
                     return (
                       <div
                         key={t.tool}

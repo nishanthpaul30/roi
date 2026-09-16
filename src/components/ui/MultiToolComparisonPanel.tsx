@@ -197,7 +197,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
                       {fmtCost(toolData.cost)}
                     </p>
                     <p className="text-[10px] text-ey-muted">
-                      {toolData.spendSharePercent.toFixed(1)}% of total spend
+                      {toolData.spendSharePercent.toFixed(4)}% of total spend
                     </p>
                   </div>
 
@@ -207,7 +207,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
                       {formatCompactNumber(toolData.tokens)}
                     </p>
                     <p className="text-[10px] text-ey-muted">
-                      {toolData.tokenSharePercent.toFixed(1)}% token share
+                      {toolData.tokenSharePercent.toFixed(4)}% token share
                     </p>
                   </div>
                 </div>
@@ -249,7 +249,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
               <div className="space-y-1 pt-1">
                 <div className="flex justify-between text-[10px] text-ey-muted">
                   <span>Spend Share</span>
-                  <span>{toolData.spendSharePercent.toFixed(1)}%</span>
+                  <span>{toolData.spendSharePercent.toFixed(4)}%</span>
                 </div>
                 <div className="w-full bg-ey-card h-1.5 rounded-full overflow-hidden">
                   <div
@@ -292,7 +292,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
                   key={t.tool}
                   className={`${cfg.barBg} h-full first:rounded-l-md last:rounded-r-md transition-all duration-300 relative group`}
                   style={{ width: `${t.spendSharePercent}%` }}
-                  title={`${cfg.label}: ${t.spendSharePercent.toFixed(1)}% (${fmtCost(t.cost)})`}
+                  title={`${cfg.label}: ${t.spendSharePercent.toFixed(4)}% (${fmtCost(t.cost)})`}
                 />
               );
             })}
@@ -304,7 +304,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
                 <div key={t.tool} className="flex items-center space-x-1.5 font-mono">
                   <div className={`w-2.5 h-2.5 rounded-full ${cfg.text.replace('text-', 'bg-')}`} />
                   <span>{cfg.label}:</span>
-                  <strong className="text-ey-light">{fmtCost(t.cost)} ({t.spendSharePercent.toFixed(1)}%)</strong>
+                  <strong className="text-ey-light">{fmtCost(t.cost)} ({t.spendSharePercent.toFixed(4)}%)</strong>
                 </div>
               );
             })}

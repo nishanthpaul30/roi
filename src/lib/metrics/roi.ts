@@ -258,8 +258,8 @@ export async function calculateTokenCostSummary(
       // Unit economics stay metered: dividing the licence-inclusive cost by
       // tokens would stop this being comparable to a vendor's per-token price.
       const toolCostPer1k = tokens > 0 ? Number((usageCostOf(rows) / (tokens / 1000)).toFixed(6)) : 0;
-      const spendSharePercent = totalSpend > 0 ? Number(((cost / totalSpend) * 100).toFixed(1)) : 0;
-      const tokenSharePercent = totalTokenConsumption > 0 ? Number(((tokens / totalTokenConsumption) * 100).toFixed(1)) : 0;
+      const spendSharePercent = totalSpend > 0 ? Number(((cost / totalSpend) * 100).toFixed(4)) : 0;
+      const tokenSharePercent = totalTokenConsumption > 0 ? Number(((tokens / totalTokenConsumption) * 100).toFixed(4)) : 0;
 
       return {
         tool,
