@@ -90,7 +90,7 @@ const FORMULA_CATEGORIES = [
     color: 'text-emerald-400',
     formulas: [
       { name: 'Total AI Investment ($)', formula: 'Total Spend = ∑ (cost) over Usage AND License rows', example: 'Usage $8,920.04 + License $228,000.00 = $236,920.04' },
-      { name: 'Cost per Active User ($ / user)', formula: 'Cost per User = Total Spend (usage + license) / Unique Active Users', example: '$236,920.04 / 399 Users = $593.79 / user' },
+      { name: 'Cost per Active User ($ / user)', formula: 'Cost per User = Total Spend (usage + license) / Unique Active Users', example: '$236,920.04 / 399 Users = $593.78 / user' },
       { name: 'Average Daily Cost ($ / day)', formula: 'Avg Daily = Total Spend / calendar days in the months present', example: '$236,920.04 / 184 days (Mar-Aug 2026) = $1,287.61' },
       { name: 'Average Monthly Cost ($ / month)', formula: 'Avg Monthly = Total Spend / distinct months present', example: '$236,920.04 / 6 months = $39,486.67' },
       { name: 'Per-Tool Free-Dollar Limit', formula: 'Limit(tool) = max(|Credits|) across that tool\'s Usage rows', example: 'ChatGPT $3.00 · GitHub Copilot $2.50 · Cursor AI $2.00' },
@@ -104,8 +104,8 @@ const FORMULA_CATEGORIES = [
     icon: Building2,
     color: 'text-cyan-400',
     formulas: [
-      { name: 'Billable AI Spend Share (%)', formula: 'Billable Spend % = (Billable Usage Spend / Total Usage Spend) × 100', example: '($5,609.35 / $8,920.04) × 100 = 62.9%' },
-      { name: 'Engagement Code Consumption Ranking', formula: 'Engagement Cost = ∑ (cost) grouped by Engagement Code', example: 'Top of 399 codes — I-733960: 134,683 units | $198.06' },
+      { name: 'Billable AI Spend Share (%)', formula: 'Billable Spend % = (Billable Spend / Total AI Investment) × 100', example: '($146,519.35 / $236,920.04) × 100 = 61.8%' },
+      { name: 'Engagement Code Consumption Ranking', formula: 'Engagement Cost = ∑ (cost) grouped by Engagement Code', example: 'Top of 496 codes — E-157049: 43,520 units | $1,350.58' },
     ],
   },
   {
@@ -116,7 +116,7 @@ const FORMULA_CATEGORIES = [
       { name: 'Usage vs License Cost (%)', formula: 'Usage vs License % = (Total Usage Cost / Total License Cost) × 100', example: '($8,920.04 / $228,000.00) × 100 = 3.9%' },
       { name: 'License Cost (per user, per tool)', formula: 'License Cost = ∑ (cost) where calculationMethod = "License", grouped by user + tool', example: 'aditya.malik: $210.00 across the period (seat fees run $10–$60/mo per tool)' },
       { name: 'License Underutilized Spend ($)', formula: 'Underutilized = ∑ max(0, licenseCost - actualUsageCost) per seat', example: '$228,000.00 license − $8,920.04 usage = $219,079.96 unconsumed' },
-      { name: 'Monthly Spend Trend ($)', formula: 'Monthly Usage Cost = ∑ (cost) grouped by monthId, sorted ascending', example: 'March 2026: $1,601.00 → August 2026: $1,383.44' },
+      { name: 'Monthly Spend Trend ($)', formula: 'Monthly Cost = ∑ (cost) grouped by monthId, sorted ascending', example: 'March 2026: $39,601.00 → August 2026: $39,383.44' },
       { name: 'Habitual Retention Cohort', formula: 'Active Month Ratio = distinct(monthId with activity) / distinct(monthId in window), per user', example: '238 Embedded (59.6%) · 110 Regular (27.6%) · 51 Occasional (12.8%)' },
     ],
   },
@@ -208,8 +208,8 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     csvField: 'group_by(aiTool) -> sum(cost)',
     formula: 'Sum of cost grouped by AI Tool Flag',
     sampleInput: 'Usage rows grouped by Product across 6 tools',
-    workedCalculation: 'Claude: $2,158.55 from 1,439,032 units across 161 users',
-    derivedOutput: 'Claude leads at 24.2% of usage spend ($1.50 / 1k units)',
+    workedCalculation: 'Cursor AI: $60,350.35 from 1,526,274 units across 154 active users',
+    derivedOutput: 'Cursor AI leads at 25.5% of Total AI Investment ($0.62 / 1k units metered)',
     notes: 'Distribution of spend across all six AI platforms: Copilot, ChatGPT, Claude, Replit, Factory AI, Cursor AI',
     category: 'Breakdowns',
   },
@@ -218,7 +218,7 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     csvField: 'group_by(orgServiceLine) -> sum(token_consumption)',
     formula: 'Sum of token_consumption grouped by Service Line',
     sampleInput: 'Usage rows grouped by Service Line (6 distinct)',
-    workedCalculation: 'Tax: 2,074,268 units | $2,066.84 | 65 users',
+    workedCalculation: 'Tax: 2,074,268 units | $39,146.84 | 65 active users',
     derivedOutput: 'Tax leads the six service lines by consumption',
     notes: 'Organizational usage distribution across Service Lines (Tax, Assurance, S&T, CBS, Consulting)',
     category: 'Breakdowns',
@@ -227,9 +227,9 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     name: 'Billable AI Spend Share (%)',
     csvField: 'group_by(billableFlag) -> sum(cost)',
     formula: '(Sum of cost where billableFlag == True / Total Cost) × 100',
-    sampleInput: 'Billable Usage Spend = $5,609.35, Total Usage Spend = $8,920.04',
-    workedCalculation: '($5,609.35 ÷ $8,920.04) × 100',
-    derivedOutput: '62.9% Billable ($3,310.69 non-billable)',
+    sampleInput: 'Billable Spend = $146,519.35, Total AI Investment = $236,920.04',
+    workedCalculation: '($146,519.35 ÷ $236,920.04) × 100',
+    derivedOutput: '61.8% Billable ($90,400.69 non-billable)',
     notes: 'Measures proportion of AI investment tied directly to billable client work',
     category: 'Projects',
   },
@@ -237,9 +237,9 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     name: 'Engagement Code Spend & Token Rankings',
     csvField: 'group_by(projectCode) -> sum(token_consumption), sum(cost)',
     formula: 'Aggregate token consumption and cost per unique Engagement Code',
-    sampleInput: 'Engagement Code: I-733960 (top of 399 codes)',
-    workedCalculation: 'Tokens: 134,683 | Cost: $198.06 | Users: 1',
-    derivedOutput: 'Ranked list of all 399 engagement codes',
+    sampleInput: 'Engagement Code: E-157049 (top of 496 codes by cost)',
+    workedCalculation: 'Tokens: 43,520 | Cost: $1,350.58 | Active users: 1',
+    derivedOutput: 'Ranked list of all 496 engagement codes',
     notes: 'Ranks all engagement codes by AI consumption, billable and non-billable alike. This chain — Engagement Code → Super Region → Service Line → Sub-Service Line → Competency — is the Engagement Analytics page, reached from any user row',
     category: 'Projects',
   },
@@ -250,7 +250,7 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     sampleInput: 'Top user of 399: Isla Fischer',
     workedCalculation: 'Tokens: 134,683 | Cost: $198.06',
     derivedOutput: 'Ranked list of all 399 active users',
-    notes: 'Ranks all enterprise users in the dataset by total token consumption and spend',
+    notes: 'Ranks all enterprise users by metered consumption and usage spend. Deliberately Usage-only, unlike the dimension breakdowns above: this powers "Top Power Spenders", and a licence-inclusive ranking would put dormant seats — which consumed nothing — at the top',
     category: 'Breakdowns',
   },
   {
@@ -278,7 +278,7 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     csvField: 'group_by(monthId) -> sum(cost), sum(tokenConsumption), Usage rows only',
     formula: 'Aggregate cost and consumption per monthId, sorted ascending, split further by AI Tool',
     sampleInput: 'monthYear: March_2026 through August_2026 (Usage rows)',
-    workedCalculation: 'March: $1,601.00 (1,695,194 units) | August: $1,383.44 (1,536,098 units)',
+    workedCalculation: 'March: $39,601.00 (1,695,194 units) | August: $39,383.44 (1,536,098 units)',
     derivedOutput: 'Monthly Cost Trend chart, Monthly Spend by AI Tool chart',
     notes: 'Powers the ROI page monthly trend charts',
     category: 'License & Adoption',
@@ -387,7 +387,7 @@ export default function MetricsDerivationPage() {
             </h2>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-[11px] text-ey-muted font-mono">{CSV_SCHEMA.length} Columns Mapped • Single Source of Truth</span>
+            <span className="text-[11px] text-ey-muted font-mono">{CSV_SCHEMA.filter((c) => !c.column.startsWith('—')).length} CSV Columns + {CSV_SCHEMA.filter((c) => c.column.startsWith('—')).length} Derived Fields • Single Source of Truth</span>
             <button
               onClick={handleExportSchemaToExcel}
               className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-black bg-ey-yellow hover:bg-ey-yellow-hover px-2.5 py-1.5 rounded-lg transition shrink-0"
