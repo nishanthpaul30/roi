@@ -54,7 +54,7 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
   const licenseUnderutilizedCost = summary.licenseUnderutilizedCost || 0;
   const licenseRoiPercent = summary.licenseRoiPercent || 0;
 
-  // 4c. Multi-Tool License Consolidation (dual-platform seat overlap)
+  // 4c. Multi-Tool License Consolidation (multi-platform seat overlap)
   const overlap = summary.multiToolOverlap;
 
   // 5. Client Billability (real Billable/Non-Billable CSV flag)
@@ -85,26 +85,26 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
     {
       id: 'license_roi_governance',
       drilldownId: '__navigate_roi__',
-      title: 'License Waste & Consolidation',
+      title: 'Unused License & Consolidation',
       tag: 'Financial Governance',
       tagColor: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
       icon: Wallet,
       stat: `${fmtPct(licenseRoiPercent)} usage vs license`,
-      statSub: `${fmtCost(licenseUnderutilizedCost)} unconsumed${overlap && overlap.dualToolUserCount > 0 ? ` + ${fmtCost(overlap.totalDualToolSpend)} dual-license` : ''}`,
-      finding: `${fmtPct(licenseRoiPercent)} of the ${fmtCost(summary.totalLicenseCost)} in real per-license Cost in USD was actually consumed as usage, leaving ${fmtCost(licenseUnderutilizedCost)} unconsumed.${overlap && overlap.dualToolUserCount > 0 ? ` On top of that, ${overlap.dualToolUserCount} users run two or more AI platforms concurrently, adding ${fmtCost(overlap.totalDualToolSpend)} in consolidatable dual-license spend.` : ''}`,
-      actionableInsight: 'Open the Token & Spend ROI page to reclaim or downgrade underutilized licenses, and standardize dual-platform users onto a single primary AI tool.',
+      statSub: `${fmtCost(licenseUnderutilizedCost)} unconsumed${overlap && overlap.dualToolUserCount > 0 ? ` + ${fmtCost(overlap.totalDualToolSpend)} multi-license` : ''}`,
+      finding: `${fmtPct(licenseRoiPercent)} of the ${fmtCost(summary.totalLicenseCost)} in real per-license Cost in USD was actually consumed as usage, leaving ${fmtCost(licenseUnderutilizedCost)} unconsumed.${overlap && overlap.dualToolUserCount > 0 ? ` On top of that, ${overlap.dualToolUserCount} users run two or more AI platforms concurrently, adding ${fmtCost(overlap.totalDualToolSpend)} in consolidatable multi-license spend.` : ''}`,
+      actionableInsight: 'Open the Token & Spend ROI page to reclaim or downgrade underutilized licenses, and standardize multi-platform users onto a single primary AI tool.',
     },
     {
       id: 'capacity_waste_overage',
       drilldownId: '__navigate_roi__',
-      title: 'Capacity Waste & Overage Risk',
+      title: 'Unused Capacity & Overage Risk',
       tag: 'Capacity Governance',
       tagColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
       icon: Gauge,
       stat: `${fmtCost(summary.totalWasteCost)} Unconsumed Capacity`,
       statSub: `${fmtCost(summary.totalOverageCost)} overage · ${summary.ceilingRiskCount} users near cap`,
       finding: `On average, ${fmtPct(summary.licenseEfficiencyRate || 0)} of each user's per-tool free-dollar limit is actually consumed, leaving ${fmtCost(summary.totalWasteCost)} in unconsumed capacity (Zone 1). Separately, ${fmtCost(summary.totalOverageCost)} was billed beyond those free-dollar limits (Zone 2), and ${summary.ceilingRiskCount} users have reached or exceeded 90% of the ${fmtCost(summary.hardCeiling)} hard spend ceiling.`,
-      actionableInsight: 'Open the Token & Spend ROI page to review the Zone 1 waste and Zone 2 overage breakdown, and flag users nearing the spend ceiling before they hit hard limits.',
+      actionableInsight: 'Open the Token & Spend ROI page to review the Zone 1 unused capacity and Zone 2 overage breakdown, and flag users nearing the spend ceiling before they hit hard limits.',
     },
     {
       id: 'project_billability',

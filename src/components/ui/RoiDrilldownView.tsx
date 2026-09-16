@@ -338,9 +338,9 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
   }, [targetRows, userCapacityMap]);
   const sliceLicenseRoiPercent = sliceLicenseCost > 0 ? (totalSliceCost / sliceLicenseCost) * 100 : 0;
 
-  // Total Zone 1 waste / Zone 2 overage for this slice — summed once per distinct
+  // Total Zone 1 unused capacity / Zone 2 overage for this slice — summed once per distinct
   // user (wasteCost/overageCost live on userCapacityMap per user, not per row).
-  // Used by the header pill on the Wasted Capacity / Overage drilldowns.
+  // Used by the header pill on the Unused Capacity / Overage drilldowns.
   const sliceWasteAndOverage = useMemo(() => {
     const seen = new Set<string>();
     let wasteCost = 0;
@@ -662,14 +662,14 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
             ) : id === 'waste' || id === 'zone1_under' ? (
               <>
                 <div>
-                  <span className="text-[10px] text-ey-muted block">TOTAL WASTED CAPACITY</span>
+                  <span className="text-[10px] text-ey-muted block">TOTAL UNUSED CAPACITY</span>
                   <span className="text-base font-bold text-amber-400">
                     {fmtCost(sliceWasteAndOverage.wasteCost)}
                   </span>
                 </div>
                 <div className="w-px h-8 bg-ey-border" />
                 <div>
-                  <span className="text-[10px] text-ey-muted block">AVG WASTE / USER</span>
+                  <span className="text-[10px] text-ey-muted block">AVG UNUSED / USER</span>
                   <span className="text-base font-bold text-ey-light">
                     {fmtCost(sliceWasteAndOverage.userCount > 0 ? sliceWasteAndOverage.wasteCost / sliceWasteAndOverage.userCount : 0)}
                   </span>
@@ -756,7 +756,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
               // 100K Cap Risk telemetry is fundamentally a headcount story (how many
               // users are near the ceiling), so lead with user count there instead of
               // spend; Usage vs License Cost leads with each segment's own ratio;
-              // Zone 1/2 lead with the actual waste/overage $ amount (not raw spend,
+              // Zone 1/2 lead with the actual unused/overage $ amount (not raw spend,
               // which is a different number); every other drilldown is a plain
               // cost story, so spend leads.
               const isUserCentric = id === 'ceiling';
@@ -811,7 +811,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                           <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
                             {fmtCost(c.wasteCost)}
                           </span>
-                          <span className="text-xs text-cyan-300 font-bold">{wastePct}% of waste</span>
+                          <span className="text-xs text-cyan-300 font-bold">{wastePct}% of unused</span>
                         </div>
                         <p className="text-[11px] text-ey-muted mt-0.5">
                           {fmtCost(c.cost)} actual spend · {c.userCount} users

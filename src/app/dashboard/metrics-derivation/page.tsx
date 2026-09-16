@@ -47,7 +47,7 @@ const CSV_SCHEMA = [
   { column: 'Product', fieldName: 'aiTool', description: 'AI Tool identity (e.g. github, chatgpt, claude, replit, factory, cursor)', dataType: 'String' },
   { column: 'Calculation Method', fieldName: 'calculationMethod', description: '"License" (flat seat fee, one row per held tool per month, tokenConsumption always 0) or "Usage" (metered consumption/cost, present only for active months)', dataType: 'String' },
   { column: 'GenAI Tool Consumption', fieldName: 'tokenConsumption', description: 'Metered consumption units for the month (0 on License rows) — the new unit of AI usage, replacing raw token counts', dataType: 'Numeric' },
-  { column: 'Credits', fieldName: 'creditsLimit', description: 'Dollar-denominated free-tier credit actually applied this row — null, 0, or negative. Fully covers Cost USD while under the tool\'s free-dollar limit (Credits = -Cost USD), then pins at that limit once Cost USD exceeds it. The limit itself is derived per tool as max(|Credits|) across a tool\'s Usage rows — see Capacity Waste/Overage below', dataType: 'Numeric ($)' },
+  { column: 'Credits', fieldName: 'creditsLimit', description: 'Dollar-denominated free-tier credit actually applied this row — null, 0, or negative. Fully covers Cost USD while under the tool\'s free-dollar limit (Credits = -Cost USD), then pins at that limit once Cost USD exceeds it. The limit itself is derived per tool as max(|Credits|) across a tool\'s Usage rows — see Capacity Unused/Overage below', dataType: 'Numeric ($)' },
   { column: 'Cost USD', fieldName: 'costUsd', description: 'Gross metered cost before the Credits adjustment — Cost (in $) = Cost USD + Credits always holds exactly', dataType: 'Numeric ($)' },
   { column: 'Cost (in $)', fieldName: 'cost', description: 'Direct monetary amount in USD ($) for the row — a License row\'s flat seat fee, or a Usage row\'s net metered cost (Cost USD + Credits), depending on Calculation Method', dataType: 'Numeric ($)' },
   { column: 'CT/Non-CT', fieldName: 'ctNonCt', description: 'Chargeable Time flag distinguishing CT (client-chargeable) from Non-CT work — hierarchy level 1', dataType: 'String' },
@@ -85,7 +85,7 @@ const FORMULA_CATEGORIES = [
     ],
   },
   {
-    title: 'Financial & Capacity Waste Formulas',
+    title: 'Financial & Capacity Unused Formulas',
     icon: DollarSign,
     color: 'text-emerald-400',
     formulas: [
@@ -94,7 +94,7 @@ const FORMULA_CATEGORIES = [
       { name: 'Average Daily Cost ($ / day)', formula: 'Avg Daily = Total Spend / calendar days in the months present', example: '$236,920.04 / 184 days (Mar-Aug 2026) = $1,287.61' },
       { name: 'Average Monthly Cost ($ / month)', formula: 'Avg Monthly = Total Spend / distinct months present', example: '$236,920.04 / 6 months = $39,486.67' },
       { name: 'Per-Tool Free-Dollar Limit', formula: 'Limit(tool) = max(|Credits|) across that tool\'s Usage rows', example: 'ChatGPT $3.00 · GitHub Copilot $2.50 · Cursor AI $2.00' },
-      { name: 'Capacity Waste ($)', formula: 'Waste = ∑ max(0, Limit(tool) - costUsd), per Usage row, summed', example: '$1,802.95 of free-dollar capacity left unconsumed' },
+      { name: 'Capacity Unused ($)', formula: 'Unused = ∑ max(0, Limit(tool) - costUsd), per Usage row, summed', example: '$1,802.95 of free-dollar capacity left unconsumed' },
       { name: 'Overage Cost ($)', formula: 'Overage = ∑ max(0, costUsd - Limit(tool)), per Usage row, summed', example: '$8,641.64 billed beyond the free-dollar limits' },
       { name: 'Hard Ceiling (dynamic)', formula: 'Ceiling = 3 × average per-user free-dollar limit (summed across held tools) in the current period', example: '$7.82 ceiling — 226 users sit at ≥90% of it' },
     ],
@@ -270,7 +270,7 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     sampleInput: 'Seat aditya.malik: licenseCost $210.00, actualUsageCost $3.04',
     workedCalculation: '$210.00 − $3.04 = $206.96 unconsumed on that seat',
     derivedOutput: '$219,079.96 unconsumed across all seats ($0 overutilized)',
-    notes: 'A seat can be simultaneously "under license ROI" and "over its Credits limit" — the two waste metrics measure different baselines (License Cost vs Credits)',
+    notes: 'A seat can be simultaneously "under license ROI" and "over its Credits limit" — the two unused-capacity metrics measure different baselines (License Cost vs Credits)',
     category: 'License & Adoption',
   },
   {

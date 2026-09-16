@@ -38,7 +38,7 @@ export default function RoiPage() {
   const pctDeltaFor = (current: number, previous: number): number =>
     previous === 0 ? (current > 0 ? 100 : 0) : ((current - previous) / previous) * 100;
 
-  const licenseRoiDelta = Number(((summary?.licenseRoiPercent || 0) - (summary?.prevLicenseRoiPercent || 0)).toFixed(2));
+  const usageCostDelta = Number(((summary?.totalCost || 0) - (summary?.prevTotalCost || 0)).toFixed(2));
   const wasteDelta = Number(((summary?.totalWasteCost || 0) - (summary?.prevTotalWasteCost || 0)).toFixed(2));
   const overageDelta = Number(((summary?.totalOverageCost || 0) - (summary?.prevTotalOverageCost || 0)).toFixed(2));
   const ceilingRiskDelta = (summary?.ceilingRiskCount || 0) - (summary?.prevCeilingRiskCount || 0);
@@ -70,10 +70,10 @@ export default function RoiPage() {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-ey-light tracking-wide flex items-center gap-2.5">
-                    <span>Financial Governance &amp; Capacity Waste ROI</span>
+                    <span>Financial Governance &amp; Unused Capacity ROI</span>
                   </h1>
                   <p className="text-xs text-ey-muted mt-0.5">
-                    Bifurcated capacity waste, overage risk, and hard dollar-ceiling governance across your organization.
+                    Bifurcated unused capacity, overage risk, and hard dollar-ceiling governance across your organization.
                   </p>
                 </div>
               </div>
@@ -97,17 +97,15 @@ export default function RoiPage() {
               <KpiCard
                 title="Usage vs License Cost"
                 delta={{
-                  current: summary.licenseRoiPercent,
-                  previous: summary.prevLicenseRoiPercent,
-                  absoluteDelta: licenseRoiDelta,
-                  percentageDelta: 0,
-                  percentagePointDelta: licenseRoiDelta,
-                  trend: trendFor(licenseRoiDelta),
-                  isRateMetric: true,
+                  current: summary.totalCost,
+                  previous: summary.prevTotalCost,
+                  absoluteDelta: usageCostDelta,
+                  percentageDelta: Number(pctDeltaFor(summary.totalCost, summary.prevTotalCost).toFixed(2)),
+                  trend: trendFor(usageCostDelta),
                   previousDataAvailable,
                 }}
-                unit="%"
-                description={`How much of the ${fmtCost(summary.totalLicenseCost)} paid in license fees came back as metered usage. Not a return on investment — both sides are costs; a low figure means seats are going unconsumed. Click to inspect per-license detail.`}
+                formatType="currency"
+                description={`You paid ${fmtCost(summary.totalLicenseCost)} in license fees, but only ${fmtCost(summary.totalCost)} (${summary.licenseRoiPercent}%) turned into actual usage. A low percentage means many licensed seats are sitting unused. Click to see the breakdown by license.`}
                 onClick={() =>
                   openDrilldown({
                     type: 'metric',
@@ -130,14 +128,14 @@ export default function RoiPage() {
                   previousDataAvailable,
                 }}
                 formatType="currency"
-                description="Zone 1: Unused free-dollar limit across under-utilized licenses (limit - gross cost, per month). Click to drill down to raw usage logs."
+                description="The free-dollar allowance that went unused across under-utilized licenses this month (limit minus gross cost). Click to drill down to raw usage logs."
                 onClick={() =>
                   openDrilldown({
                     type: 'zone',
                     id: 'waste',
-                    title: 'Zone 1: Unconsumed Capacity Waste',
+                    title: 'Zone 1: Unused Capacity',
                     subtitle: 'Under-utilized employee licenses with unconsumed free-dollar limit (per-tool free limit - gross usage cost).',
-                    badge: 'Zone 1 Waste',
+                    badge: 'Zone 1 Unused',
                   })
                 }
               />
@@ -153,7 +151,7 @@ export default function RoiPage() {
                   previousDataAvailable,
                 }}
                 formatType="currency"
-                description="Zone 2: Billed usage exceeding each tool's free-dollar limit. Click to drill down to raw usage logs."
+                description="Usage that was billed because it went over each tool's free-dollar limit. Click to drill down to raw usage logs."
                 onClick={() =>
                   openDrilldown({
                     type: 'zone',
@@ -313,7 +311,7 @@ export default function RoiPage() {
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
                 {[
-                  { label: 'Wasted Capacity (total)', value: fmtCost(summary.totalWasteCost), sub: 'unconsumed free-dollar limit', color: 'text-amber-400' },
+                  { label: 'Unused Capacity (total)', value: fmtCost(summary.totalWasteCost), sub: 'unconsumed free-dollar limit', color: 'text-amber-400' },
                   { label: 'Overage Spend (total)', value: fmtCost(summary.totalOverageCost), sub: 'billed beyond per-tool free-dollar limit', color: 'text-purple-400' },
                   { label: 'Quota Efficiency Rate', value: `${summary.licenseEfficiencyRate}%`, sub: 'actual ÷ limit', color: 'text-emerald-400' },
                   { label: 'Total API Cost', value: fmtCost(summary.totalCost), sub: 'actual billed USD', color: 'text-ey-light' },

@@ -77,7 +77,7 @@ export function RoiCapacityPanel({
               <span>Financial Governance &amp; Capacity Optimization</span>
             </h2>
             <p className="text-xs text-ey-muted mt-0.5">
-              Bifurcated analysis of unconsumed license quotas (Zone 1 Waste) vs usage limit breaches (Zone 2 Overage).
+              Bifurcated analysis of unconsumed license quotas (Zone 1 Unused) vs usage limit breaches (Zone 2 Overage).
             </p>
           </div>
 
@@ -189,7 +189,7 @@ export function RoiCapacityPanel({
         rows={hierarchyRows}
         title={
           activeTab === 'zone1'
-            ? 'Zone 1: Unconsumed AI License Waste Hierarchy'
+            ? 'Zone 1: Unused AI License Hierarchy'
             : activeTab === 'zone2'
             ? 'Zone 2: Budget Breach & Overage Hierarchy'
             : 'All User Licenses — Capacity & Zone Hierarchy'

@@ -341,7 +341,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
                 <span className="text-emerald-400 font-extrabold text-sm block">
                   {fmtCost(multiToolOverlap.totalDualToolSpend)}
                 </span>
-                <span className="text-[10px] text-ey-muted">Dual-License Spend</span>
+                <span className="text-[10px] text-ey-muted">Multi-License Spend</span>
               </div>
             </div>
           </div>
@@ -364,12 +364,12 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
                   {showOverlapUsers ? (
                     <>
                       <ChevronUp className="w-4 h-4" />
-                      <span>Hide {multiToolOverlap.multiToolUserList.length} Dual-Platform Users</span>
+                      <span>Hide {multiToolOverlap.multiToolUserList.length} Multi-Platform Users</span>
                     </>
                   ) : (
                     <>
                       <ChevronDown className="w-4 h-4" />
-                      <span>View {multiToolOverlap.multiToolUserList.length} Dual-Platform Users &amp; Spend Breakdown</span>
+                      <span>View {multiToolOverlap.multiToolUserList.length} Multi-Platform Users &amp; Spend Breakdown</span>
                     </>
                   )}
                 </button>
@@ -378,7 +378,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
                   <div className="mt-3">
                     <HierarchyDrilldownPanel
                       rows={overlapHierarchyRows}
-                      title="Dual-Platform License Hierarchy"
+                      title="Multi-Platform License Hierarchy"
                       subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
                       onSelectUser={(email) => onDrilldown?.(undefined, email)}
                     />

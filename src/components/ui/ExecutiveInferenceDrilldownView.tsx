@@ -248,7 +248,7 @@ export function ExecutiveInferenceDrilldownView({
       }
       const u = map.get(email)!;
       // Tools reflects every tool the seat holds a License or Usage row for
-      // (dual-license overhead is about held seats, not just active usage).
+      // (multi-license overhead is about held seats, not just active usage).
       if (r.aiTool) u.tools.add(r.aiTool.toLowerCase());
       // Cost, consumption, active-months and billable consumption must only
       // come from genuine Usage rows — License rows exist every month for
@@ -597,7 +597,7 @@ export function ExecutiveInferenceDrilldownView({
         prjObj.cost += r.cost;
         prjObj.tokens += r.tokenConsumption;
 
-        // Dual-tool detection matches roi.ts's summary.multiToolOverlap: "used
+        // Multi-tool detection matches roi.ts's summary.multiToolOverlap: "used
         // 2+ tools" based on Usage rows only, not "holds 2+ licenses" —
         // otherwise this local total would double-count against a completely
         // different (much larger) population than the authoritative Overview figure.
@@ -682,7 +682,7 @@ export function ExecutiveInferenceDrilldownView({
     };
   }, [allRows, totalOrgSpend]);
 
-  // Raw rows for the dual-platform overlap cohort, scoped for the mandated hierarchy panel below.
+  // Raw rows for the multi-platform overlap cohort, scoped for the mandated hierarchy panel below.
   const dualToolHierarchyRows = useMemo(() => {
     if (multiToolData.dualToolUsers.length === 0) return [];
     const allowedEmails = new Set(multiToolData.dualToolUsers.map((u) => u.email.toLowerCase()));
@@ -757,7 +757,7 @@ export function ExecutiveInferenceDrilldownView({
         icon: Layers,
         stat: `${priceMultiple.toFixed(1)}x Price Gap ($${(cheapest?.costPerM || 0).toFixed(2)} - $${(priciest?.costPerM || 0).toFixed(2)}/M)`,
         statSub: rateLine,
-        finding: `${cheapest?.label} unit cost is $${(cheapest?.costPerM || 0).toFixed(2)}/M tokens, and ${priciest?.label} is the highest at $${(priciest?.costPerM || 0).toFixed(2)}/M. ${topSpend?.label} accounts for ${(topSpend?.spendShare || 0).toFixed(1)}% of spend (${fmtCost(topSpend?.cost || 0)}) across ${sorted.length} active tools. Multi-platform license overlap was identified across dual-tool users with redundant license overhead.`,
+        finding: `${cheapest?.label} unit cost is $${(cheapest?.costPerM || 0).toFixed(2)}/M tokens, and ${priciest?.label} is the highest at $${(priciest?.costPerM || 0).toFixed(2)}/M. ${topSpend?.label} accounts for ${(topSpend?.spendShare || 0).toFixed(1)}% of spend (${fmtCost(topSpend?.cost || 0)}) across ${sorted.length} active tools. Multi-platform license overlap was identified across multi-tool users with redundant license overhead.`,
         actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens) to reduce token spend.`,
       };
     })(),
@@ -1092,7 +1092,7 @@ export function ExecutiveInferenceDrilldownView({
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Annualized License Leakage</span>
                   <p className="text-2xl font-bold text-ey-yellow">{fmtCost(inactiveLeakageCost * 12)}/yr</p>
-                  <p className="text-[10px] text-ey-yellow/80">{fmtCost(inactiveLeakageCost)}/mo Direct Waste</p>
+                  <p className="text-[10px] text-ey-yellow/80">{fmtCost(inactiveLeakageCost)}/mo Direct Unused Spend</p>
                 </div>
               </div>
 
@@ -1273,11 +1273,11 @@ export function ExecutiveInferenceDrilldownView({
 
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-ey-muted text-[10px] uppercase font-bold">Dual-License Overlap</span>
-                    <span className="text-[10px] text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30">License Waste</span>
+                    <span className="text-ey-muted text-[10px] uppercase font-bold">Multi-License Overlap</span>
+                    <span className="text-[10px] text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30">Redundant License</span>
                   </div>
                   <p className="text-2xl font-bold text-ey-yellow">{multiToolData.dualToolUsers.length} Users</p>
-                  <p className="text-[10px] text-rose-300/80">{fmtCost(multiToolData.dualToolSpend)} Dual-Platform Spend</p>
+                  <p className="text-[10px] text-rose-300/80">{fmtCost(multiToolData.dualToolSpend)} Multi-Platform Spend</p>
                   <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
                     <span>Scroll to Overlap Roster</span>
                     <ChevronRight className="w-3 h-3" />
@@ -1475,7 +1475,7 @@ export function ExecutiveInferenceDrilldownView({
 
                   <HierarchyDrilldownPanel
                     rows={dualToolHierarchyRows}
-                    title="Level 3: Dual-Platform License Hierarchy"
+                    title="Level 3: Multi-Platform License Hierarchy"
                     subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
                     onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
                   />
