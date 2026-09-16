@@ -27,25 +27,21 @@ function groupBy<T>(rows: T[], key: (r: T) => string): Map<string, T[]> {
 }
 
 /**
- * Per-tool free-dollar-limit, derived from real data rather than hardcoded.
- * Confirmed against a real example set: Credits is the free-tier dollar
- * amount actually applied that row, capped at a fixed per-tool ceiling —
- * below the cap, Credits = -CostUSD exactly (Cost (in $) nets to 0); at or
- * above the cap, Credits pins at that ceiling (e.g. -70 for GitHub Copilot in
- * one real sample) and Cost (in $) = CostUSD - ceiling is the overage billed.
- * So the ceiling itself is recoverable as max(|Credits|) across a tool's
- * Usage rows — the largest credit ever applied is the cap being hit.
+ * Per-tool free-dollar limit (the monthly free-tier allowance each AI tool
+ * grants), hardcoded per explicit product guidance rather than derived from
+ * Credits in the data. A tool with no entry here has no defined free limit
+ * and must be excluded entirely from waste/overage/quota math wherever this
+ * map is consulted — not defaulted to a $0 limit, which would instead count
+ * that tool's whole cost as overage against a limit that doesn't exist.
  */
-function computeToolFreeLimits(usageRows: CsvUsageRow[]): Map<string, number> {
-  const limits = new Map<string, number>();
-  for (const r of usageRows) {
-    const credit = Math.abs(r.creditsLimit || 0);
-    if (credit > (limits.get(r.aiTool) || 0)) {
-      limits.set(r.aiTool, credit);
-    }
-  }
-  return limits;
-}
+const TOOL_FREE_LIMITS = new Map<string, number>([
+  ['github', 70],
+  ['replit', 38],
+  ['factory', 0],
+  ['cursor', 20],
+  ['chatgpt', 0],
+  ['claude', 0],
+]);
 
 /**
  * Per-user capacity waste / overage / ceiling-risk / License ROI aggregates.
@@ -55,8 +51,8 @@ function computeToolFreeLimits(usageRows: CsvUsageRow[]): Map<string, number> {
  * `rows` must be every row (License + Usage) for the period being aggregated,
  * already scoped to the users/filters in question — each user's Usage-type
  * rows drive actual cost/consumption, their License-type rows drive license
- * cost. `toolFreeLimits` is shared across current/previous-period calls (see
- * computeToolFreeLimits) so both periods measure against the same ceiling.
+ * cost. `toolFreeLimits` is the shared hardcoded TOOL_FREE_LIMITS constant, so
+ * both periods measure against the exact same limits.
  *
  * Each tool's free limit resets every month (License rows recur monthly too),
  * so waste/overage is computed per Usage row against Cost USD (gross, before
@@ -92,9 +88,10 @@ function computeCapacityAggregates(rows: CsvUsageRow[], hardCeiling: number, too
     let wasteCost = 0;
     let overageCost = 0;
     for (const r of usageRows) {
-      const limit = toolFreeLimits.get(r.aiTool) || 0;
-      if (r.costUsd < limit) wasteCost += limit - r.costUsd;
-      else if (r.costUsd > limit) overageCost += r.costUsd - limit;
+      const limit = toolFreeLimits.get(r.aiTool);
+      if (limit === undefined) continue; // no defined free limit for this tool -- excluded, not treated as $0
+      wasteCost += Math.max(limit - r.costUsd, 0);
+      overageCost += Math.max(r.costUsd - limit, 0);
     }
     wasteCost = Number(wasteCost.toFixed(4));
     overageCost = Number(overageCost.toFixed(4));
@@ -108,7 +105,7 @@ function computeCapacityAggregates(rows: CsvUsageRow[], hardCeiling: number, too
     // Credits itself which varies row to row) — the monthly free-dollar
     // capacity this user's toolset provides.
     const usageFreeTokenLimit = Number(
-      Array.from(toolsSet).reduce((s, t) => s + (toolFreeLimits.get(t) || 0), 0).toFixed(4)
+      Array.from(toolsSet).reduce((s, t) => s + (toolFreeLimits.get(t) ?? 0), 0).toFixed(4)
     );
     const usageLimit = usageFreeTokenLimit;
     totalUsageLimitsSum += usageLimit;
@@ -393,11 +390,10 @@ export async function calculateTokenCostSummary(
   // Users capacity & waste breakdown — current period, plus the same
   // computation over the previous period so waste/overage/cap-risk/license
   // ROI KPI cards can show a real "vs last period" comparison instead of a
-  // fixed reference baseline. Per-tool free limits are derived once from the
-  // current period's Usage rows and shared across both period computations
-  // (see computeToolFreeLimits) so current and previous periods are measured
-  // against the same ceiling.
-  const toolFreeLimits = computeToolFreeLimits(usageRows);
+  // fixed reference baseline. Per-tool free limits are the hardcoded
+  // TOOL_FREE_LIMITS constant, shared across both period computations so
+  // current and previous periods are measured against the same limits.
+  const toolFreeLimits = TOOL_FREE_LIMITS;
 
   // Hard ceiling: the old schema had a fixed, dataset-calibrated 100,000
   // Token hard cap. This derives a scale-appropriate replacement instead of
@@ -409,7 +405,7 @@ export async function calculateTokenCostSummary(
   const avgFreeLimitPerUser = allCurrentUsers.size > 0
     ? Array.from(allCurrentUsers.values()).reduce((sum, userRows) => {
         const toolsSet = new Set(userRows.map(r => r.aiTool).filter(Boolean));
-        const userLimit = Array.from(toolsSet).reduce((s, t) => s + (toolFreeLimits.get(t) || 0), 0);
+        const userLimit = Array.from(toolsSet).reduce((s, t) => s + (toolFreeLimits.get(t) ?? 0), 0);
         return sum + userLimit;
       }, 0) / allCurrentUsers.size
     : 0;
