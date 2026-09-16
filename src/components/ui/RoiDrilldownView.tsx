@@ -306,6 +306,9 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
 
   // Telemetry Aggregates for current slice
   const totalSliceCost = useMemo(() => targetRows.reduce((sum, r) => sum + r.cost, 0), [targetRows]);
+  // Gross-cost counterpart (Cost USD, before Credits) -- Overall Utilization
+  // is defined on Cost USD, not the net Cost (in $) totalSliceCost uses.
+  const totalSliceCostUsd = useMemo(() => targetRows.reduce((sum, r) => sum + r.costUsd, 0), [targetRows]);
   const totalSliceTokens = useMemo(() => targetRows.reduce((sum, r) => sum + r.tokenConsumption, 0), [targetRows]);
   const billableSliceRows = useMemo(
     () => targetRows.filter((r) => r.billableFlag === 'True' || r.billableFlag === 'true').length,
@@ -336,7 +339,11 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
     }
     return total;
   }, [targetRows, userCapacityMap]);
-  const sliceLicenseRoiPercent = sliceLicenseCost > 0 ? (totalSliceCost / sliceLicenseCost) * 100 : 0;
+  // Overall Utilization for this slice: gross Usage Cost USD over License
+  // Cost. sliceLicenseCost needs no gross-cost counterpart -- License rows
+  // never carry a nonzero Credit, so it's already numerically identical
+  // whichever basis is used.
+  const sliceOverallUtilizationPercent = sliceLicenseCost > 0 ? (totalSliceCostUsd / sliceLicenseCost) * 100 : 0;
 
   // Total Zone 1 unused capacity / Zone 2 overage for this slice — summed once per distinct
   // user (wasteCost/overageCost live on userCapacityMap per user, not per row).
@@ -365,6 +372,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
     const map = new Map<string, {
       ctNonCt: string;
       cost: number;
+      costUsd: number;
       tokens: number;
       billableCost: number;
       rowCount: number;
@@ -374,10 +382,11 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
     for (const r of targetRows) {
       const key = r.ctNonCt || 'Unclassified';
       if (!map.has(key)) {
-        map.set(key, { ctNonCt: key, cost: 0, tokens: 0, billableCost: 0, rowCount: 0, users: new Set(), projects: new Set() });
+        map.set(key, { ctNonCt: key, cost: 0, costUsd: 0, tokens: 0, billableCost: 0, rowCount: 0, users: new Set(), projects: new Set() });
       }
       const bucket = map.get(key)!;
       bucket.cost += r.cost;
+      bucket.costUsd += r.costUsd;
       bucket.tokens += r.tokenConsumption;
       bucket.rowCount += 1;
       if (r.billableFlag === 'True' || r.billableFlag === 'true') bucket.billableCost += r.cost;
@@ -405,12 +414,14 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
         return {
           ctNonCt: b.ctNonCt,
           cost: b.cost,
+          costUsd: b.costUsd,
           tokens: b.tokens,
           billableCost: b.billableCost,
           userCount: b.users.size,
           projectCount: b.projects.size,
           licenseCost,
-          roiPercent: licenseCost > 0 ? (b.cost / licenseCost) * 100 : 0,
+          // Gross-cost basis (Cost USD) -- see totalSliceCostUsd above.
+          overallUtilizationPercent: licenseCost > 0 ? (b.costUsd / licenseCost) * 100 : 0,
           wasteCost,
           overageCost,
         };
@@ -655,8 +666,8 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                 </div>
                 <div className="w-px h-8 bg-ey-border" />
                 <div>
-                  <span className="text-[10px] text-ey-muted block">LICENSE ROI</span>
-                  <span className="text-base font-bold text-emerald-400">{sliceLicenseRoiPercent.toFixed(1)}%</span>
+                  <span className="text-[10px] text-ey-muted block">OVERALL UTILIZATION</span>
+                  <span className="text-base font-bold text-emerald-400">{sliceOverallUtilizationPercent.toFixed(1)}%</span>
                 </div>
               </>
             ) : id === 'waste' || id === 'zone1_under' ? (
@@ -797,12 +808,12 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                       <>
                         <div className="flex items-baseline gap-2 mt-1">
                           <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
-                            {c.roiPercent.toFixed(1)}%
+                            {c.overallUtilizationPercent.toFixed(1)}%
                           </span>
-                          <span className="text-xs text-cyan-300 font-bold">Usage vs License</span>
+                          <span className="text-xs text-cyan-300 font-bold">Overall Utilization</span>
                         </div>
                         <p className="text-[11px] text-ey-muted mt-0.5">
-                          {fmtCost(c.cost)} actual ÷ {fmtCost(c.licenseCost)} license cost
+                          {fmtCost(c.costUsd)} actual ÷ {fmtCost(c.licenseCost)} license cost
                         </p>
                       </>
                     ) : isWasteCentric ? (

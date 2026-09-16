@@ -38,7 +38,7 @@ export default function RoiPage() {
   const pctDeltaFor = (current: number, previous: number): number =>
     previous === 0 ? (current > 0 ? 100 : 0) : ((current - previous) / previous) * 100;
 
-  const usageCostDelta = Number(((summary?.totalCost || 0) - (summary?.prevTotalCost || 0)).toFixed(2));
+  const overallUtilizationDelta = Number(((summary?.overallUtilizationPercent || 0) - (summary?.prevOverallUtilizationPercent || 0)).toFixed(2));
   const wasteDelta = Number(((summary?.totalWasteCost || 0) - (summary?.prevTotalWasteCost || 0)).toFixed(2));
   const overageDelta = Number(((summary?.totalOverageCost || 0) - (summary?.prevTotalOverageCost || 0)).toFixed(2));
   const ceilingRiskDelta = (summary?.ceilingRiskCount || 0) - (summary?.prevCeilingRiskCount || 0);
@@ -95,17 +95,19 @@ export default function RoiPage() {
             {/* Financial ROI Governance KPI Cards with Drilldown Handlers */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <KpiCard
-                title="Usage vs License Cost"
+                title="Overall Utilization"
                 delta={{
-                  current: summary.totalCost,
-                  previous: summary.prevTotalCost,
-                  absoluteDelta: usageCostDelta,
-                  percentageDelta: Number(pctDeltaFor(summary.totalCost, summary.prevTotalCost).toFixed(2)),
-                  trend: trendFor(usageCostDelta),
+                  current: summary.overallUtilizationPercent,
+                  previous: summary.prevOverallUtilizationPercent,
+                  absoluteDelta: overallUtilizationDelta,
+                  percentageDelta: 0,
+                  percentagePointDelta: overallUtilizationDelta,
+                  trend: trendFor(overallUtilizationDelta),
+                  isRateMetric: true,
                   previousDataAvailable,
                 }}
-                formatType="currency"
-                description={`You paid ${fmtCost(summary.totalLicenseCost)} in license fees, but only ${fmtCost(summary.totalCost)} (${summary.licenseRoiPercent}%) turned into actual usage. A low percentage means many licensed seats are sitting unused. Click to see the breakdown by license.`}
+                unit="%"
+                description={`You paid ${fmtCost(summary.totalLicenseCost)} in license fees, but only ${summary.overallUtilizationPercent}% of that shows up as actual usage. A low percentage means many licensed seats aren't being used enough to justify the cost. Click to see the breakdown by license.`}
                 onClick={() =>
                   openDrilldown({
                     type: 'metric',
@@ -164,7 +166,7 @@ export default function RoiPage() {
               />
 
               <KpiCard
-                title="Dollar Cap Risk Count"
+                title="Top Users at Usage Ceiling"
                 delta={{
                   current: summary.ceilingRiskCount,
                   previous: summary.prevCeilingRiskCount,

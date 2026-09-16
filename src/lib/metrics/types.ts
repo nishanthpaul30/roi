@@ -112,11 +112,16 @@ export interface TokenCostSummary {
   licenseRoiPercent: number;
   licenseUnderutilizedCost: number;
   licenseOverutilizedValue: number;
+  // Overall Utilization: SUM(Cost USD) on Usage rows / SUM(Cost USD) on License
+  // rows -- gross-cost basis, distinct from licenseRoiPercent above (which uses
+  // net Cost (in $)).
+  overallUtilizationPercent: number;
   // Previous period (for delta comparisons on the Zone 1/Zone 2/License ROI KPI cards)
   prevTotalWasteCost: number;
   prevTotalOverageCost: number;
   prevCeilingRiskCount: number;
   prevLicenseRoiPercent: number;
+  prevOverallUtilizationPercent: number;
   // Previous-period cost by Service Line / Management Region / Sub-Service
   // Line, and previous distinct sub-practice count — for the Service Line
   // Analytics KPI cards
@@ -171,6 +176,9 @@ export interface UserCapacityRow {
   displayName: string;
   aiTools: string[];
   actualCost: number;
+  // Gross-cost counterpart to actualCost (before Credits) -- used for Overall
+  // Utilization, which is defined on Cost USD rather than net Cost (in $).
+  usageCostUsd: number;
   usageFreeTokenLimit: number;
   usageLimit: number;
   wasteCost: number;
