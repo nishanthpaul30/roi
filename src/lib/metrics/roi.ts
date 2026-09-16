@@ -429,8 +429,15 @@ export async function calculateTokenCostSummary(
   const prevCapacity = computeCapacityAggregates(previousRows, hardCeiling, toolFreeLimits);
   const prevTotalCostForCapacity = previousUsageRows.reduce((s, r) => s + r.cost, 0);
 
+  // totalUsageLimitsSum is a per-user MONTHLY free-dollar capacity figure
+  // (see the comment on usageFreeTokenLimit above), while totalCost spans
+  // every month in the selected range — so the capacity side must be scaled
+  // by the number of distinct months in range, or this rate inflates in
+  // direct proportion to the date range selected (e.g. 690% over 6 months
+  // vs ~124% for a single month, for the same underlying utilization).
+  const monthsInRange = new Set(currentRows.map(r => r.monthId)).size || 1;
   const licenseEfficiencyRate = totalUsageLimitsSum > 0
-    ? Number(((totalCost / totalUsageLimitsSum) * 100).toFixed(1))
+    ? Number(((totalCost / (totalUsageLimitsSum * monthsInRange)) * 100).toFixed(1))
     : 0;
 
   const licenseRoiPercent = totalLicenseCost > 0

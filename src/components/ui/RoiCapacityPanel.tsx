@@ -122,7 +122,7 @@ export function RoiCapacityPanel({
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 flex items-start space-x-3">
             <TrendingDown className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-amber-300 font-bold">Zone 1 — Waste Recovery Opportunity</p>
+              <p className="text-amber-300 font-bold">Zone 1 — AI Cost Optimization Opportunity</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
                 <strong className="text-amber-200">{fmtCost(totalWasteCost)}</strong> of license quotas went unconsumed across {zone1List.length} users.
               </p>

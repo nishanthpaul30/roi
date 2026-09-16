@@ -120,7 +120,7 @@ export default function RoiPage() {
               />
 
               <KpiCard
-                title="Wasted AI Capacity"
+                title="Unutilized AI Capacity"
                 delta={{
                   current: summary.totalWasteCost,
                   previous: summary.prevTotalWasteCost,

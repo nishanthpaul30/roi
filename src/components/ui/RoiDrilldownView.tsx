@@ -90,7 +90,7 @@ interface RoiDrilldownViewProps {
 export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI Dashboard', filters }: RoiDrilldownViewProps) {
   const { type, id, title, subtitle, badge, filterCriteria } = target;
 
-  // Selected sub-entity within the drilldown (e.g. drilling down from "Wasted AI Capacity" or a Service Line into a specific sub-practice or employee)
+  // Selected sub-entity within the drilldown (e.g. drilling down from "Unutilized AI Capacity" or a Service Line into a specific sub-practice or employee)
   const [selectedSubEntity, setSelectedSubEntity] = useState<{
     type: 'user' | 'project' | 'tool' | 'service_line' | 'sub_service_line' | 'country' | 'region' | 'ct_non_ct';
     id: string;
