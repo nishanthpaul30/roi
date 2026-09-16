@@ -662,7 +662,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters }: Executiv
                       className="bg-ey-black/60 border border-ey-border hover:border-ey-yellow/60 p-4 rounded-xl space-y-1 cursor-pointer transition group"
                     >
                       <span className="text-ey-muted text-[10px] uppercase font-bold group-hover:text-ey-yellow flex items-center justify-between">
-                        <span>{r.region} Region</span>
+                        <span>{r.region}</span>
                         <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-ey-yellow" />
                       </span>
                       <p className="text-xl font-bold text-ey-yellow">{fmtMoney(r.cost)}</p>
