@@ -306,18 +306,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
 
   // Telemetry Aggregates for current slice
   const totalSliceCost = useMemo(() => targetRows.reduce((sum, r) => sum + r.cost, 0), [targetRows]);
-  // Gross-cost counterpart (Cost USD, before Credits) -- Overall Utilization
-  // is defined on Cost USD, not the net Cost (in $) totalSliceCost uses.
-  const totalSliceCostUsd = useMemo(() => targetRows.reduce((sum, r) => sum + r.costUsd, 0), [targetRows]);
   const totalSliceTokens = useMemo(() => targetRows.reduce((sum, r) => sum + r.tokenConsumption, 0), [targetRows]);
-  const billableSliceRows = useMemo(
-    () => targetRows.filter((r) => r.billableFlag === 'True' || r.billableFlag === 'true').length,
-    [targetRows]
-  );
-  const billableSliceCost = useMemo(
-    () => targetRows.filter((r) => r.billableFlag === 'True' || r.billableFlag === 'true').reduce((sum, r) => sum + r.cost, 0),
-    [targetRows]
-  );
   const uniqueUsers = useMemo(
     () => new Set(targetRows.map((r) => (r.userMail || '').toLowerCase())).size,
     [targetRows]
@@ -339,11 +328,8 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
     }
     return total;
   }, [targetRows, userCapacityMap]);
-  // Overall Utilization for this slice: gross Usage Cost USD over License
-  // Cost. sliceLicenseCost needs no gross-cost counterpart -- License rows
-  // never carry a nonzero Credit, so it's already numerically identical
-  // whichever basis is used.
-  const sliceOverallUtilizationPercent = sliceLicenseCost > 0 ? (totalSliceCostUsd / sliceLicenseCost) * 100 : 0;
+  // Overall Utilization for this slice: net Usage Cost (in $) over License Cost.
+  const sliceOverallUtilizationPercent = sliceLicenseCost > 0 ? (totalSliceCost / sliceLicenseCost) * 100 : 0;
 
   // Total Zone 1 unused capacity / Zone 2 overage for this slice — summed once per distinct
   // user (wasteCost/overageCost live on userCapacityMap per user, not per row).
@@ -372,9 +358,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
     const map = new Map<string, {
       ctNonCt: string;
       cost: number;
-      costUsd: number;
       tokens: number;
-      billableCost: number;
       rowCount: number;
       users: Set<string>;
       projects: Set<string>;
@@ -382,14 +366,12 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
     for (const r of targetRows) {
       const key = r.ctNonCt || 'Unclassified';
       if (!map.has(key)) {
-        map.set(key, { ctNonCt: key, cost: 0, costUsd: 0, tokens: 0, billableCost: 0, rowCount: 0, users: new Set(), projects: new Set() });
+        map.set(key, { ctNonCt: key, cost: 0, tokens: 0, rowCount: 0, users: new Set(), projects: new Set() });
       }
       const bucket = map.get(key)!;
       bucket.cost += r.cost;
-      bucket.costUsd += r.costUsd;
       bucket.tokens += r.tokenConsumption;
       bucket.rowCount += 1;
-      if (r.billableFlag === 'True' || r.billableFlag === 'true') bucket.billableCost += r.cost;
       const email = (r.userMail || '').toLowerCase();
       if (email) bucket.users.add(email);
       if (r.projectCode) bucket.projects.add(r.projectCode);
@@ -414,14 +396,11 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
         return {
           ctNonCt: b.ctNonCt,
           cost: b.cost,
-          costUsd: b.costUsd,
           tokens: b.tokens,
-          billableCost: b.billableCost,
           userCount: b.users.size,
           projectCount: b.projects.size,
           licenseCost,
-          // Gross-cost basis (Cost USD) -- see totalSliceCostUsd above.
-          overallUtilizationPercent: licenseCost > 0 ? (b.costUsd / licenseCost) * 100 : 0,
+          overallUtilizationPercent: licenseCost > 0 ? (b.cost / licenseCost) * 100 : 0,
           wasteCost,
           overageCost,
         };
@@ -718,8 +697,8 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
           </div>
         </div>
 
-        {/* 3 Slice Summary KPI Metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
+        {/* Slice Summary KPI Metrics */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
           <div className="p-3 bg-ey-black/40 border border-ey-border rounded-xl space-y-0.5">
             <span className="text-[10px] text-ey-muted">UNIQUE ACTIVE USERS</span>
             <p className="text-base font-bold text-ey-light">{uniqueUsers} employees</p>
@@ -727,22 +706,6 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
               <p className="text-[10px] text-ey-muted">
                 <span className="text-cyan-300 font-semibold">CT</span> {ctSeg?.userCount ?? 0} ·{' '}
                 <span className="text-cyan-400/70 font-semibold">Non-CT</span> {nonCtSeg?.userCount ?? 0}
-              </p>
-            )}
-          </div>
-
-          <div className="p-3 bg-ey-black/40 border border-ey-border rounded-xl space-y-0.5">
-            <span className="text-[10px] text-ey-muted">BILLABLE REVENUE SHARE</span>
-            <p className="text-base font-bold text-emerald-400">
-              {fmtCost(billableSliceCost)}{' '}
-              <span className="text-[10px] text-emerald-300/80">
-                ({targetRows.length > 0 ? ((billableSliceRows / targetRows.length) * 100).toFixed(1) : 0}%)
-              </span>
-            </p>
-            {!selectedSubEntity && (ctSeg || nonCtSeg) && (
-              <p className="text-[10px] text-ey-muted">
-                <span className="text-cyan-300 font-semibold">CT</span> {fmtCost(ctSeg?.billableCost ?? 0)} ·{' '}
-                <span className="text-cyan-400/70 font-semibold">Non-CT</span> {fmtCost(nonCtSeg?.billableCost ?? 0)}
               </p>
             )}
           </div>
@@ -813,7 +776,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                           <span className="text-xs text-cyan-300 font-bold">Overall Utilization</span>
                         </div>
                         <p className="text-[11px] text-ey-muted mt-0.5">
-                          {fmtCost(c.costUsd)} actual ÷ {fmtCost(c.licenseCost)} license cost
+                          {fmtCost(c.cost)} actual ÷ {fmtCost(c.licenseCost)} license cost
                         </p>
                       </>
                     ) : isWasteCentric ? (

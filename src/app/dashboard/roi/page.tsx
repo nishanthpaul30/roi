@@ -112,9 +112,9 @@ export default function RoiPage() {
                   openDrilldown({
                     type: 'metric',
                     id: 'efficiency',
-                    title: 'Usage vs License Cost Analysis',
-                    subtitle: 'Actual telemetry spend vs real per-license Cost in USD.',
-                    badge: 'Usage vs License',
+                    title: 'Overall Utilization Analysis',
+                    subtitle: 'Actual telemetry spend vs real per-license Cost in $.',
+                    badge: 'Overall Utilization',
                   })
                 }
               />
@@ -166,7 +166,7 @@ export default function RoiPage() {
               />
 
               <KpiCard
-                title="Top Users at Usage Ceiling"
+                title="Users at Usage Ceiling"
                 delta={{
                   current: summary.ceilingRiskCount,
                   previous: summary.prevCeilingRiskCount,

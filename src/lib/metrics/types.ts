@@ -176,9 +176,6 @@ export interface UserCapacityRow {
   displayName: string;
   aiTools: string[];
   actualCost: number;
-  // Gross-cost counterpart to actualCost (before Credits) -- used for Overall
-  // Utilization, which is defined on Cost USD rather than net Cost (in $).
-  usageCostUsd: number;
   usageFreeTokenLimit: number;
   usageLimit: number;
   wasteCost: number;

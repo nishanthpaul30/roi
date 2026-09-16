@@ -79,12 +79,6 @@ function computeCapacityAggregates(rows: CsvUsageRow[], hardCeiling: number, too
     const licenseRows = userRows.filter(r => r.calculationMethod === 'License');
 
     const actualCost = Number(usageRows.reduce((s, r) => s + r.cost, 0).toFixed(4));
-    // Gross-cost counterpart to actualCost (before the Credits discount) --
-    // needed for Overall Utilization, which is defined on Cost USD rather
-    // than net Cost (in $). License Cost doesn't need an equivalent field:
-    // License rows never carry a nonzero Credit, so licenseCost below is
-    // already numerically identical whichever basis is used.
-    const usageCostUsd = Number(usageRows.reduce((s, r) => s + r.costUsd, 0).toFixed(4));
     const tokenConsumption = Math.round(usageRows.reduce((s, r) => s + r.tokenConsumption, 0));
 
     // The free limit resets monthly, so waste/overage is computed row by row
@@ -146,7 +140,6 @@ function computeCapacityAggregates(rows: CsvUsageRow[], hardCeiling: number, too
       displayName,
       aiTools,
       actualCost,
-      usageCostUsd,
       usageFreeTokenLimit,
       usageLimit,
       wasteCost,
@@ -225,13 +218,10 @@ export async function calculateTokenCostSummary(
   const usageCostOf = (rows: CsvUsageRow[]) =>
     rows.filter(r => r.calculationMethod === 'Usage').reduce((s, r) => s + r.cost, 0);
 
-  // Overall Utilization: Usage Cost / License Cost, both summed from gross
-  // Cost USD (before the Credits adjustment) -- a distinct basis from Usage
-  // vs License Cost above, which uses net Cost (in $). License rows never
-  // carry a nonzero Credit, so License Cost is identical either way; Usage
-  // Cost is not, since Credits do apply to Usage rows.
+  // Overall Utilization: Usage Cost / License Cost, both summed from net
+  // Cost (in $).
   const costUsdOf = (rows: CsvUsageRow[], method: 'Usage' | 'License') =>
-    rows.filter(r => r.calculationMethod === method).reduce((s, r) => s + r.costUsd, 0);
+    rows.filter(r => r.calculationMethod === method).reduce((s, r) => s + r.cost, 0);
 
   const overallUtilizationLicenseCost = costUsdOf(currentRows, 'License');
   const overallUtilizationPercent = overallUtilizationLicenseCost > 0
