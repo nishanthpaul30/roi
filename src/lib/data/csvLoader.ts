@@ -243,6 +243,89 @@ export function getDatasetMonthIdBounds(): { minMonthId: number; maxMonthId: num
   return { minMonthId, maxMonthId };
 }
 
+export interface DatasetMonthOption {
+  value: string;   // "2026-03"
+  label: string;   // "March 2026"
+  start: string;   // "2026-03-01"
+  end: string;     // "2026-03-31"
+}
+
+export interface DatasetDateRange {
+  startDate: string;
+  endDate: string;
+  label: string;               // e.g. "All Months (Mar - Aug 2026)"
+  months: DatasetMonthOption[];
+  hasDates: boolean;           // false when nothing in the file parsed as a date
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const SHORT_MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * The period the loaded dataset actually covers, plus one option per month
+ * present — the source of truth for the date filter and for every route's
+ * default range.
+ *
+ * Previously those defaults were hardcoded to the demo file's March-August 2026
+ * span in nine places, so a CSV covering any other period parsed correctly and
+ * was then filtered away entirely: the dashboard rendered empty with no way to
+ * select a month outside that window.
+ *
+ * If nothing in the file parses as a date, this deliberately returns a range
+ * wide enough to exclude nothing. Showing unfiltered data is a far better
+ * failure mode than showing a blank dashboard.
+ */
+export function getDatasetDateRange(): DatasetDateRange {
+  const rows = loadCsvData();
+
+  // monthYear is only set when the month resolved to 1-12, so it marks the
+  // rows whose date we actually trust.
+  const monthIds = new Set<number>();
+  for (const r of rows) {
+    if (r.monthYear && r.monthId > 0) monthIds.add(r.monthId);
+  }
+
+  if (monthIds.size === 0) {
+    return {
+      startDate: '1970-01-01',
+      endDate: '2999-12-31',
+      label: 'All Months',
+      months: [],
+      hasDates: false,
+    };
+  }
+
+  const months = Array.from(monthIds)
+    .sort((a, b) => a - b)
+    .map((id) => {
+      const year = Math.floor(id / 100);
+      const month = id % 100;
+      // Day 0 of the next month is the last day of this one.
+      const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      return {
+        value: `${year}-${pad2(month)}`,
+        label: `${MONTH_NUMBER_TO_NAME[month - 1]} ${year}`,
+        start: `${year}-${pad2(month)}-01`,
+        end: `${year}-${pad2(month)}-${pad2(lastDay)}`,
+      };
+    });
+
+  const first = months[0];
+  const last = months[months.length - 1];
+  const firstYear = first.value.slice(0, 4);
+  const lastYear = last.value.slice(0, 4);
+  const shortFirst = SHORT_MONTH[Number(first.value.slice(5)) - 1];
+  const shortLast = SHORT_MONTH[Number(last.value.slice(5)) - 1];
+  const label =
+    months.length === 1
+      ? `All Months (${first.label})`
+      : firstYear === lastYear
+        ? `All Months (${shortFirst} - ${shortLast} ${lastYear})`
+        : `All Months (${shortFirst} ${firstYear} - ${shortLast} ${lastYear})`;
+
+  return { startDate: first.start, endDate: last.end, label, months, hasDates: true };
+}
+
 const INSIGHT_TOOL_LABELS: Record<string, string> = {
   github: 'GitHub Copilot',
   chatgpt: 'ChatGPT',

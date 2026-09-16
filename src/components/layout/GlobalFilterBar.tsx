@@ -5,11 +5,23 @@ import { Calendar, LogOut, Bot, Globe2, BarChart3, RotateCcw, SlidersHorizontal,
 import { GlobalFilterState } from '@/lib/metrics/types';
 import { useAuth } from '@/context/AuthContext';
 
+interface MonthOption {
+  value: string;   // "2026-03"
+  label: string;   // "March 2026"
+  start: string;   // "2026-03-01"
+  end: string;     // "2026-03-31"
+}
+
 interface FilterOptions {
   aiTools?: string[];
   managementRegions?: string[];
   serviceLines?: string[];
   countries?: string[];
+  // Derived from the loaded dataset by /api/metrics/overview — see below.
+  months?: MonthOption[];
+  allMonthsLabel?: string;
+  datasetStartDate?: string;
+  datasetEndDate?: string;
 }
 
 interface GlobalFilterBarProps {
@@ -31,16 +43,6 @@ const TOOL_LABELS: Record<string, string> = {
 const selectClass = 'h-9 w-full bg-ey-black border border-ey-border text-ey-light text-xs rounded-lg px-2.5 focus:outline-none focus:border-ey-yellow';
 const labelClass = 'flex items-center gap-1 text-[10px] text-ey-muted font-semibold uppercase mb-1';
 
-// The dataset only spans these 6 months — pick one, or "All" for the full range.
-const ALL_MONTHS = { value: 'all', label: 'All Months (Mar - Aug 2026)', start: '2026-03-01', end: '2026-08-31' };
-const MONTH_OPTIONS = [
-  { value: '2026-03', label: 'March 2026', start: '2026-03-01', end: '2026-03-31' },
-  { value: '2026-04', label: 'April 2026', start: '2026-04-01', end: '2026-04-30' },
-  { value: '2026-05', label: 'May 2026', start: '2026-05-01', end: '2026-05-31' },
-  { value: '2026-06', label: 'June 2026', start: '2026-06-01', end: '2026-06-30' },
-  { value: '2026-07', label: 'July 2026', start: '2026-07-01', end: '2026-07-31' },
-  { value: '2026-08', label: 'August 2026', start: '2026-08-01', end: '2026-08-31' },
-];
 export function GlobalFilterBar({
   filters,
   onFilterChange,
@@ -50,15 +52,27 @@ export function GlobalFilterBar({
   const { logout } = useAuth();
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
 
+  // Month options come from the loaded dataset, so any CSV period is
+  // selectable. This list used to be hardcoded to March-August 2026: a file
+  // covering any other span parsed fine, was filtered out entirely, and left
+  // the dashboard blank with no month the user could pick to see it.
+  const monthOptions = filterOptions?.months ?? [];
+  const allMonths = {
+    value: 'all',
+    label: filterOptions?.allMonthsLabel || 'All Months',
+    start: filterOptions?.datasetStartDate || monthOptions[0]?.start || '',
+    end: filterOptions?.datasetEndDate || monthOptions[monthOptions.length - 1]?.end || '',
+  };
+
   const handleChange = (key: keyof GlobalFilterState, value: string) => {
     onFilterChange({ ...filters, [key]: value });
   };
 
   const selectedMonth =
-    [ALL_MONTHS, ...MONTH_OPTIONS].find((m) => m.start === filters.startDate && m.end === filters.endDate)?.value || ALL_MONTHS.value;
+    [allMonths, ...monthOptions].find((m) => m.start === filters.startDate && m.end === filters.endDate)?.value || allMonths.value;
 
   const handleMonthChange = (value: string) => {
-    const month = [ALL_MONTHS, ...MONTH_OPTIONS].find((m) => m.value === value);
+    const month = [allMonths, ...monthOptions].find((m) => m.value === value);
     if (!month) return;
     onFilterChange({ ...filters, startDate: month.start, endDate: month.end });
   };
@@ -66,8 +80,8 @@ export function GlobalFilterBar({
   const resetToAll = () => {
     onFilterChange({
       ...filters,
-      startDate: ALL_MONTHS.start,
-      endDate: ALL_MONTHS.end,
+      startDate: allMonths.start,
+      endDate: allMonths.end,
       aiTool: 'all',
       managementRegion: 'all',
       serviceLine: 'all',
@@ -92,8 +106,8 @@ export function GlobalFilterBar({
       onChange={(e) => handleMonthChange(e.target.value)}
       className={selectClass}
     >
-      <option value={ALL_MONTHS.value}>{ALL_MONTHS.label}</option>
-      {MONTH_OPTIONS.map((m) => (
+      <option value={allMonths.value}>{allMonths.label}</option>
+      {monthOptions.map((m) => (
         <option key={m.value} value={m.value}>{m.label}</option>
       ))}
     </select>

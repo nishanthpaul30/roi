@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getFilteredPlaygroundRows, EXTRA_FILTER_DIMENSIONS, ExtraFilterKey, ExtraFilters } from '@/lib/metrics/pivot';
 import { GlobalFilterState } from '@/lib/metrics/types';
+import { resolveDateRange } from '@/lib/metrics/resolveDateRange';
 
 export const dynamic = 'force-dynamic';
-
-const DEFAULT_START = '2026-03-01';
-const DEFAULT_END = '2026-08-31';
 
 // Backstop only — the whole response is held in memory, shipped as JSON, and
 // turned into a worksheet client-side, so an unfiltered export on a very large
@@ -20,10 +18,11 @@ const MAX_EXPORT_ROWS = 100_000;
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const { startDate, endDate } = resolveDateRange(searchParams);
 
   const filters: GlobalFilterState = {
-    startDate: searchParams.get('startDate') || DEFAULT_START,
-    endDate: searchParams.get('endDate') || DEFAULT_END,
+    startDate,
+    endDate,
     comparisonPeriod: 'moM',
     aiTool: searchParams.get('aiTool') || 'all',
     managementRegion: searchParams.get('managementRegion') || 'all',

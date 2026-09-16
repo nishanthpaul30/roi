@@ -23,6 +23,11 @@ export function useRawRows(filters?: GlobalFilterState) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Filters start with empty dates until the dataset's range is resolved.
+    // Fetching now would send this multi-MB request with dates we're about to
+    // replace, only to abort it a moment later — so wait for the real range.
+    if (filters && !filters.startDate) return;
+
     let cancelled = false;
     const controller = new AbortController();
     setLoading(true);

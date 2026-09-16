@@ -97,6 +97,12 @@ export default function DataExplorerPage() {
   };
 
   const loadPivot = useCallback(async () => {
+    // Wait for the dataset's date range to resolve — see useMetricsData.
+    // Requesting now would just be re-requested with the real dates.
+    if (!filters.startDate) {
+      setLoading(true);
+      return;
+    }
     setLoading(true);
     try {
       const params = new URLSearchParams({

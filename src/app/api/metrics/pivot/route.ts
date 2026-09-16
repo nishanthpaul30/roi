@@ -11,23 +11,21 @@ import {
   getExtraFilterOptions,
 } from '@/lib/metrics/pivot';
 import { GlobalFilterState } from '@/lib/metrics/types';
+import { resolveDateRange } from '@/lib/metrics/resolveDateRange';
 
 export const dynamic = 'force-dynamic';
 
-// CSV data spans March–August 2026; use that as the default range
-const DEFAULT_START = '2026-03-01';
-const DEFAULT_END = '2026-08-31';
-
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const { startDate, endDate } = resolveDateRange(searchParams);
 
   const rowDim = (searchParams.get('rowDim') as DimensionKey) || 'aiTool';
   const colDim = (searchParams.get('colDim') as DimensionKey | 'none') || 'none';
   const metric = (searchParams.get('metric') as MetricKey) || 'cost';
 
   const filters: GlobalFilterState = {
-    startDate: searchParams.get('startDate') || DEFAULT_START,
-    endDate: searchParams.get('endDate') || DEFAULT_END,
+    startDate,
+    endDate,
     comparisonPeriod: 'moM',
     aiTool: searchParams.get('aiTool') || 'all',
     managementRegion: searchParams.get('managementRegion') || 'all',

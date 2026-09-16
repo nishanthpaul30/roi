@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { loadCsvData, dateStringToMonthId } from '@/lib/data/csvLoader';
+import { resolveDateRange } from '@/lib/metrics/resolveDateRange';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const startDate = searchParams.get('startDate') || '2026-03-01';
-  const endDate = searchParams.get('endDate') || '2026-08-31';
+  const { startDate, endDate } = resolveDateRange(searchParams);
   const aiTool = searchParams.get('aiTool') || 'all';
 
   try {
