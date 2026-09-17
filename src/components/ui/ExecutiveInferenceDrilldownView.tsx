@@ -1264,7 +1264,7 @@ export function ExecutiveInferenceDrilldownView({
                         <th className="px-4 py-3">Platform</th>
                         <th className="px-4 py-3 text-right">Volume (Tokens)</th>
                         <th className="px-4 py-3 text-right">Expenditure ($)</th>
-                        <th className="px-4 py-3 text-right">Share (%)</th>
+                        <th className="px-4 py-3 text-right">Usage Cost ($)</th>
                         <th className="px-4 py-3 text-right">Active Devs</th>
                         <th className="px-4 py-3 text-right">Avg / Dev</th>
                         <th className="px-4 py-3 text-center">Billable %</th>
@@ -1272,7 +1272,10 @@ export function ExecutiveInferenceDrilldownView({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-ey-border">
-                      {multiToolData.toolList.map((t) => (
+                      {multiToolData.toolList.map((t) => {
+                        const expenditure = summary?.byAiTool?.find((bt) => bt.tool === t.tool)?.cost || 0;
+                        const avgExpenditurePerDev = t.userCount > 0 ? expenditure / t.userCount : 0;
+                        return (
                         <tr
                           key={t.tool}
                           onClick={() => setSelectedEntity({ type: 'tool', name: t.tool, label: t.label })}
@@ -1287,17 +1290,17 @@ export function ExecutiveInferenceDrilldownView({
                           <td className="px-4 py-3 text-right text-ey-light">
                             {formatCompactNumber(t.tokens)}
                           </td>
+                          <td className="px-4 py-3 text-right font-bold text-ey-light">
+                            {fmtCost(expenditure)}
+                          </td>
                           <td className="px-4 py-3 text-right font-bold text-ey-yellow">
                             {fmtCost(t.cost)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-ey-muted">
-                            {t.spendShare.toFixed(1)}%
                           </td>
                           <td className="px-4 py-3 text-right text-ey-light font-bold">
                             {t.userCount}
                           </td>
                           <td className="px-4 py-3 text-right text-emerald-400 font-bold">
-                            {fmtCost(t.avgCostPerUser)}
+                            {fmtCost(avgExpenditurePerDev)}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
@@ -1311,7 +1314,8 @@ export function ExecutiveInferenceDrilldownView({
                             </span>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
