@@ -195,9 +195,8 @@ export default function HierarchyDrilldownPage() {
         </div>
 
         {/* Live totals for current path */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { label: 'Rows Matching Path', value: formatCompactNumber(overallTotals.rowCount), info: '' },
             { label: 'Active Users', value: formatCompactNumber(overallTotals.users), info: 'Users with at least one metered Usage row. Held licenses with no activity are excluded.' },
             { label: 'Token Consumption', value: formatCompactNumber(overallTotals.tokens), info: '' },
             {

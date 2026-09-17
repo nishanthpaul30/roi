@@ -727,15 +727,14 @@ export function ExecutiveInferenceDrilldownView({
       const priceMultiple = cheapest && priciest && cheapest.costPerM > 0
         ? priciest.costPerM / cheapest.costPerM
         : 0;
-      const rateLine = sorted.map((t) => `${t.shortLabel} $${t.costPerM.toFixed(2)}/M`).join(' vs ');
       return {
         id: 'multi_tool_comparison',
         title: 'Multi-Tool Spend & Efficiency Comparison',
         tag: 'Cross-Platform Unit Economics',
         tagColor: 'bg-ey-yellow/10 text-ey-yellow border-ey-yellow/30',
         icon: Layers,
-        stat: `${priceMultiple.toFixed(1)}x Price Gap ($${(cheapest?.costPerM || 0).toFixed(2)} - $${(priciest?.costPerM || 0).toFixed(2)}/M)`,
-        statSub: rateLine,
+        stat: `${multiToolData.dualToolUsers.length} Users Multi-License Overlap`,
+        statSub: `${fmtCost(multiToolData.dualToolSpend)} redundant spend`,
         finding: `${cheapest?.label} is the cheapest tool at $${(cheapest?.costPerM || 0).toFixed(2)} per million tokens. ${priciest?.label} is the most expensive at $${(priciest?.costPerM || 0).toFixed(2)} per million tokens — about ${priceMultiple.toFixed(1)}x more for the same volume of usage.`,
         actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens). Consolidate overlapping multi-tool licenses to eliminate redundant fixed license fees across ${multiToolData.dualToolUsers.length} users.`,
       };
@@ -748,15 +747,14 @@ export function ExecutiveInferenceDrilldownView({
         ? priciest.costPerM / cheapest.costPerM
         : 0;
       const topSpend = [...multiToolData.toolList].sort((a, b) => b.cost - a.cost)[0];
-      const rateLine = sorted.map((t) => `${t.shortLabel} $${t.costPerM.toFixed(2)}/M`).join(' vs ');
       return {
         id: 'vendor_spread',
         title: 'Multi-Tool Spend & Efficiency Comparison',
         tag: 'Vendor Optimization',
         tagColor: 'bg-ey-yellow/10 text-ey-yellow border-ey-yellow/30',
         icon: Layers,
-        stat: `${priceMultiple.toFixed(1)}x Price Gap ($${(cheapest?.costPerM || 0).toFixed(2)} - $${(priciest?.costPerM || 0).toFixed(2)}/M)`,
-        statSub: rateLine,
+        stat: `${multiToolData.dualToolUsers.length} Users Multi-License Overlap`,
+        statSub: `${fmtCost(multiToolData.dualToolSpend)} redundant spend`,
         finding: `${cheapest?.label} unit cost is $${(cheapest?.costPerM || 0).toFixed(2)}/M tokens, and ${priciest?.label} is the highest at $${(priciest?.costPerM || 0).toFixed(2)}/M. ${topSpend?.label} accounts for ${(topSpend?.spendShare || 0).toFixed(1)}% of spend (${fmtCost(topSpend?.cost || 0)}) across ${sorted.length} active tools. Multi-platform license overlap was identified across multi-tool users with redundant license overhead.`,
         actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens) to reduce token spend.`,
       };
@@ -1030,7 +1028,7 @@ export function ExecutiveInferenceDrilldownView({
           </div>
 
           <div className="bg-ey-black/80 border border-ey-border p-3.5 rounded-xl shrink-0 flex flex-col items-end justify-center min-w-[200px]">
-            <span className="text-[10px] font-mono text-ey-muted uppercase tracking-wider">Headline Ratio</span>
+            <span className="text-[10px] font-mono text-ey-muted uppercase tracking-wider">Key Metric</span>
             <div className="text-2xl font-black text-ey-yellow font-mono">{currentMeta.stat}</div>
             <div className="text-[11px] text-ey-muted font-mono">{currentMeta.statSub}</div>
           </div>
@@ -1245,134 +1243,6 @@ export function ExecutiveInferenceDrilldownView({
           {/* 4. MULTI-TOOL SPEND & EFFICIENCY COMPARISON */}
           {(inferenceId === 'vendor_spread' || inferenceId === 'multi_tool_comparison') && (
             <div className="space-y-6">
-              {/* Level 2 KPI Summary Tiles */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
-                {multiToolData.toolList.map((t) => (
-                  <div
-                    key={t.tool}
-                    onClick={() => setSelectedEntity({ type: 'tool', name: t.tool, label: t.label })}
-                    className={`bg-ey-card border border-ey-border ${t.hoverBorder} p-4 rounded-xl space-y-1 cursor-pointer transition group`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-ey-muted text-[10px] uppercase font-bold">{t.shortLabel}</span>
-                      {t.badge && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${t.badgeBg}`}>{t.badge}</span>
-                      )}
-                    </div>
-                    <p className={`text-2xl font-bold ${t.color}`}>${t.costPerM.toFixed(2)} / M</p>
-                    <p className="text-[10px] text-ey-muted">{t.label} • {formatCompactNumber(t.tokens)} Tokens</p>
-                    <div className={`pt-2 border-t border-ey-border/40 text-[10px] font-bold flex items-center justify-between ${t.color}`}>
-                      <span>Inspect {t.shortLabel}</span>
-                      <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                ))}
-
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-ey-muted text-[10px] uppercase font-bold">Multi-License Overlap</span>
-                    <span className="text-[10px] text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30">Redundant License</span>
-                  </div>
-                  <p className="text-2xl font-bold text-ey-yellow">{multiToolData.dualToolUsers.length} Users</p>
-                  <p className="text-[10px] text-rose-300/80">{fmtCost(multiToolData.dualToolSpend)} Multi-Platform Spend</p>
-                  <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
-                    <span>Scroll to Overlap Roster</span>
-                    <ChevronRight className="w-3 h-3" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Interactive 3-Platform Deep-Dive Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                {multiToolData.toolList.map((t) => (
-                  <div
-                    key={t.tool}
-                    onClick={() => setSelectedEntity({ type: 'tool', name: t.tool, label: t.label })}
-                    className="bg-ey-card border border-ey-border hover:border-ey-yellow/80 hover:shadow-xl rounded-2xl p-5 space-y-4 cursor-pointer transition-all duration-200 group flex flex-col justify-between"
-                    title={`Click to inspect all ${t.label} log records`}
-                  >
-                    <div>
-                      <div className="flex items-center mb-2">
-                        {t.badge && (
-                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md border ${t.badgeBg}`}>
-                            {t.badge}
-                          </span>
-                        )}
-                        <span className="text-xs font-mono text-ey-muted ml-auto">{t.rowCount} Logs</span>
-                      </div>
-                      <h4 className="text-base font-bold text-ey-light tracking-tight group-hover:text-ey-yellow transition-colors">
-                        {t.label}
-                      </h4>
-
-                      {/* Primary Metrics Grid */}
-                      <div className="grid grid-cols-2 gap-3 mt-4">
-                        <div className="bg-ey-black/60 p-3 rounded-xl border border-ey-border/60">
-                          <span className="text-[10px] font-mono text-ey-muted uppercase">Total Spend</span>
-                          <p className={`text-xl font-black font-mono ${t.color}`}>{fmtCost(t.cost)}</p>
-                          <span className="text-[10px] text-ey-muted font-mono">{t.spendShare.toFixed(4)}% of company</span>
-                        </div>
-                        <div className="bg-ey-black/60 p-3 rounded-xl border border-ey-border/60">
-                          <span className="text-[10px] font-mono text-ey-muted uppercase">Volume Consumed</span>
-                          <p className="text-xl font-black font-mono text-ey-light">{formatCompactNumber(t.tokens)}</p>
-                          <span className="text-[10px] text-ey-muted font-mono">{t.tokenShare.toFixed(4)}% token share</span>
-                        </div>
-                      </div>
-
-                      {/* Unit Economics Breakdown */}
-                      <div className="mt-4 border-t border-ey-border/60 pt-3 space-y-2 text-xs font-mono">
-                        <div className="flex justify-between items-center">
-                          <span className="text-ey-muted text-[11px] flex items-center gap-1.5">
-                            <Zap className="w-3.5 h-3.5 text-ey-yellow" /> Unit Cost / 1K Tokens
-                          </span>
-                          <span className="font-bold text-ey-light">${t.costPer1k.toFixed(4)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-ey-muted text-[11px] flex items-center gap-1.5">
-                            <TrendingUp className="w-3.5 h-3.5 text-cyan-400" /> Effective Rate / 1M
-                          </span>
-                          <span className={`font-bold ${t.color}`}>${t.costPerM.toFixed(2)} / M</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-ey-muted text-[11px] flex items-center gap-1.5">
-                            <Users className="w-3.5 h-3.5 text-indigo-400" /> Active Developers
-                          </span>
-                          <span className="font-bold text-ey-light">{t.userCount} developers</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-ey-muted text-[11px] flex items-center gap-1.5">
-                            <DollarSign className="w-3.5 h-3.5 text-emerald-400" /> Avg Spend / Developer
-                          </span>
-                          <span className="font-bold text-emerald-400">{fmtCost(t.avgCostPerUser)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-ey-muted text-[11px] flex items-center gap-1.5">
-                            <Layers className="w-3.5 h-3.5 text-purple-400" /> Client Billable Ratio
-                          </span>
-                          <span className="font-bold text-ey-yellow">{t.billableRatio.toFixed(1)}%</span>
-                        </div>
-                      </div>
-
-                      {/* Spend Share Bar */}
-                      <div className="mt-4 space-y-1">
-                        <div className="flex justify-between text-[10px] text-ey-muted font-mono">
-                          <span>Spend Share</span>
-                          <span>{t.spendShare.toFixed(1)}%</span>
-                        </div>
-                        <div className="w-full bg-ey-black h-1.5 rounded-full overflow-hidden">
-                          <div className={`h-full ${t.barBg} rounded-full`} style={{ width: `${t.spendShare}%` }} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Footer Drilldown CTA */}
-                    <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-mono font-bold flex items-center justify-between group-hover:text-ey-light">
-                      <span>Inspect {t.label} Telemetry Logs</span>
-                      <ChevronRight className="w-3.5 h-3.5 text-ey-yellow group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
               {/* Cross-Platform Unit Economics & Efficiency Benchmark Matrix */}
               <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-ey-border/60 pb-3">
@@ -1392,7 +1262,6 @@ export function ExecutiveInferenceDrilldownView({
                     <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
                       <tr>
                         <th className="px-4 py-3">Platform</th>
-                        <th className="px-4 py-3">Unit Rate (/1M)</th>
                         <th className="px-4 py-3 text-right">Volume (Tokens)</th>
                         <th className="px-4 py-3 text-right">Expenditure ($)</th>
                         <th className="px-4 py-3 text-right">Share (%)</th>
@@ -1414,9 +1283,6 @@ export function ExecutiveInferenceDrilldownView({
                               <span className={`w-2 h-2 rounded-full ${t.barBg}`} />
                               <span className="group-hover:text-ey-yellow transition-colors">{t.label}</span>
                             </div>
-                          </td>
-                          <td className={`px-4 py-3 font-bold ${t.color}`}>
-                            ${t.costPerM.toFixed(2)} / M
                           </td>
                           <td className="px-4 py-3 text-right text-ey-light">
                             {formatCompactNumber(t.tokens)}

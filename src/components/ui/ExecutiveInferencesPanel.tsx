@@ -85,7 +85,7 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
     {
       id: 'license_roi_governance',
       drilldownId: '__navigate_roi__',
-      title: 'Unused License & Consolidation',
+      title: 'License Spend Efficiency Analysis',
       tag: 'Financial Governance',
       tagColor: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
       icon: Wallet,
@@ -103,7 +103,7 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
       icon: Gauge,
       stat: `${fmtCost(summary.totalWasteCost)} Unconsumed Capacity`,
       statSub: `${fmtCost(summary.totalOverageCost)} overage · ${summary.ceilingRiskCount} users near cap`,
-      finding: `${fmtCost(summary.totalWasteCost)} of free-dollar capacity went unconsumed across the org — only ${fmtPct(summary.licenseEfficiencyRate || 0)} of each user's per-tool limit is actually used on average. Separately, ${fmtCost(summary.totalOverageCost)} was billed beyond those free-dollar limits, and ${summary.ceilingRiskCount} users have reached or exceeded 90% of the ${fmtCost(summary.hardCeiling)} hard spend ceiling.`,
+      finding: `${fmtCost(summary.totalWasteCost)} of free-dollar capacity went unconsumed across the org. Separately, ${fmtCost(summary.totalOverageCost)} was billed beyond those free-dollar limits, and ${summary.ceilingRiskCount} users have reached or exceeded 90% of the ${fmtCost(summary.hardCeiling)} hard spend ceiling.`,
       actionableInsight: 'Open the Token & Spend ROI page to review the Zone 1 unused capacity and Zone 2 overage breakdown, and flag users nearing the spend ceiling before they hit hard limits.',
     },
     {
