@@ -191,7 +191,10 @@ export async function calculateTokenCostSummary(
   const totalRosterUserCount = new Set(currentRows.map(r => r.userMail.toLowerCase())).size;
   const usageRows = currentRows.filter(r => r.calculationMethod === 'Usage' && r.tokenConsumption > 0);
   const activeUserCount = new Set(usageRows.map(r => r.userMail.toLowerCase())).size;
-  const inactiveUserCount = totalRosterUserCount - activeUserCount;
+  // Unutilized Licenses: distinct users who appear in a Usage row but with
+  // GenAI Tool Consumption = 0 (provisioned seat, zero recorded consumption).
+  const unutilizedUsageRows = currentRows.filter(r => r.calculationMethod === 'Usage' && r.tokenConsumption === 0);
+  const inactiveUserCount = new Set(unutilizedUsageRows.map(r => r.userMail.toLowerCase())).size;
 
   // Core aggregates
   const totalTokenConsumption = usageRows.reduce((s, r) => s + r.tokenConsumption, 0);

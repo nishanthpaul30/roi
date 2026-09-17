@@ -271,7 +271,17 @@ export function ExecutiveInferenceDrilldownView({
     () => allRows.filter((r) => periodActiveEmails.size === 0 || periodActiveEmails.has((r.userMail || '').toLowerCase().trim())),
     [allRows, periodActiveEmails]
   );
-  const inactiveUserCount = Math.max(0, totalRosterSeats - activeUserCount);
+  // Unutilized Licenses: distinct users who have a Usage row with GenAI Tool Consumption = 0
+  // in the current filtered period (provisioned seat, zero recorded consumption).
+  const inactiveUserCount = useMemo(() => {
+    const unutilizedEmails = new Set<string>();
+    for (const r of allRows) {
+      if (r.calculationMethod === 'Usage' && r.tokenConsumption === 0) {
+        unutilizedEmails.add((r.userMail || '').toLowerCase().trim());
+      }
+    }
+    return unutilizedEmails.size;
+  }, [allRows]);
   const activeSeatPercent = totalRosterSeats > 0 ? ((activeUserCount / totalRosterSeats) * 100).toFixed(1) : '0.0';
   const avgLicenseCostPerSeat = summary && activeUserCount > 0 ? summary.totalLicenseCost / activeUserCount : 100;
   const inactiveLeakageCost = Math.round(inactiveUserCount * avgLicenseCostPerSeat);
@@ -1069,23 +1079,62 @@ export function ExecutiveInferenceDrilldownView({
 
               {/* Level 2 KPI Tiles */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
+                {/* Card 1: Total Provisioned Licenses */}
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Total Provisioned Licenses</span>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-ey-muted text-[10px] uppercase font-bold">Total Provisioned Licenses</span>
+                    <div className="group/info relative cursor-pointer">
+                      <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
+                      <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50 font-sans normal-case">
+                        Count of distinct users across all rows (License + Usage) in the selected period — every provisioned seat regardless of activity.
+                      </div>
+                    </div>
+                  </div>
                   <p className="text-2xl font-bold text-ey-light">{totalRosterSeats} Licenses</p>
                   <p className="text-[10px] text-ey-muted">Real per-license Cost in USD</p>
                 </div>
+
+                {/* Card 2: Active Engaged Licenses */}
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Active Engaged Licenses</span>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-ey-muted text-[10px] uppercase font-bold">Active Engaged Licenses</span>
+                    <div className="group/info relative cursor-pointer">
+                      <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
+                      <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50 font-sans normal-case">
+                        Filter Calculation Method = &apos;Usage&apos; AND GenAI Tool Consumption &gt; 0. Count of distinct users — users with real prompt activity this period.
+                      </div>
+                    </div>
+                  </div>
                   <p className="text-2xl font-bold text-emerald-400">{activeUserCount} Users</p>
                   <p className="text-[10px] text-emerald-300/80">{activeSeatPercent}% of Provisioned Pool</p>
                 </div>
+
+                {/* Card 3: Unutilized Licenses */}
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Dormant Unutilized Licenses</span>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-ey-muted text-[10px] uppercase font-bold">Unutilized Licenses</span>
+                    <div className="group/info relative cursor-pointer">
+                      <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
+                      <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50 font-sans normal-case">
+                        Filter Calculation Method = &apos;Usage&apos; AND GenAI Tool Consumption = 0. Count of distinct users — provisioned seats with zero recorded consumption.
+                      </div>
+                    </div>
+                  </div>
                   <p className="text-2xl font-bold text-rose-400">{inactiveUserCount} Licenses</p>
                   <p className="text-[10px] text-rose-300/80">No Usage-row activity recorded</p>
                 </div>
+
+                {/* Card 4: Annualized License Leakage */}
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Annualized License Leakage</span>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-ey-muted text-[10px] uppercase font-bold">Annualized License Leakage</span>
+                    <div className="group/info relative cursor-pointer">
+                      <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
+                      <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50 font-sans normal-case">
+                        Unutilized Licenses × Avg License Cost/Seat × 12. Monthly leakage = unutilized count × (Total License Cost ÷ Active Users), annualized by ×12.
+                      </div>
+                    </div>
+                  </div>
                   <p className="text-2xl font-bold text-ey-yellow">{fmtCost(inactiveLeakageCost * 12)}/yr</p>
                   <p className="text-[10px] text-ey-yellow/80">{fmtCost(inactiveLeakageCost)}/mo Direct Unused Spend</p>
                 </div>
@@ -1097,7 +1146,7 @@ export function ExecutiveInferenceDrilldownView({
                   <div>
                     <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
                       <UserX className="w-4 h-4 text-rose-400" />
-                      <span>Level 3: Dormant Licenses Action Ledger (1-Click Reclamation)</span>
+                      <span>Level 3: Unutilized Licenses Action Ledger (1-Click Reclamation)</span>
                     </h3>
                     <p className="text-xs text-ey-muted mt-0.5">
                       Identified dormant provisioned licenses incurring real per-license fees without prompt telemetry in the selected period.
@@ -1108,7 +1157,7 @@ export function ExecutiveInferenceDrilldownView({
                     className="px-3 py-1.5 bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 self-start sm:self-center"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Reclaim All Dormant Licenses</span>
+                    <span>Reclaim All Unutilized Licenses</span>
                   </button>
                 </div>
 
@@ -1117,7 +1166,7 @@ export function ExecutiveInferenceDrilldownView({
                     <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
                       <tr>
                         <th className="px-4 py-3">Service Line</th>
-                        <th className="px-4 py-3 text-center">Dormant Licenses</th>
+                        <th className="px-4 py-3 text-center">Unutilized Licenses</th>
                         <th className="px-4 py-3 text-right">Fixed Monthly Cost</th>
                         <th className="px-4 py-3 text-center">Action Trigger</th>
                       </tr>

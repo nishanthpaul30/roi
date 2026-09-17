@@ -90,7 +90,7 @@ interface RoiDrilldownViewProps {
 export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI Dashboard', filters }: RoiDrilldownViewProps) {
   const { type, id, title, subtitle, badge, filterCriteria } = target;
 
-  // Selected sub-entity within the drilldown (e.g. drilling down from "Unutilized AI Capacity" or a Service Line into a specific sub-practice or employee)
+  // Selected sub-entity within the drilldown (e.g. drilling down from "Underutilized AI Capacity" or a Service Line into a specific sub-practice or employee)
   const [selectedSubEntity, setSelectedSubEntity] = useState<{
     type: 'user' | 'project' | 'tool' | 'service_line' | 'sub_service_line' | 'country' | 'region' | 'ct_non_ct';
     id: string;
@@ -135,7 +135,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
     return Array.from(new Set(allRows.map((r) => (r.aiTool || '').toLowerCase().trim()).filter(Boolean))).sort();
   }, [allRows]);
 
-  // Compute map of active user capacity breakdown (zone1 vs zone2 vs ceiling risk)
+  // Compute map of active user capacity breakdown (under-utilized vs overage vs ceiling risk)
   const userCapacityMap = useMemo(() => {
     const map = new Map<string, UserCapacityRow>();
     if (summary?.userCapacityBreakdown) {
@@ -331,7 +331,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
   // Overall Utilization for this slice: net Usage Cost (in $) over License Cost.
   const sliceOverallUtilizationPercent = sliceLicenseCost > 0 ? (totalSliceCost / sliceLicenseCost) * 100 : 0;
 
-  // Total Zone 1 unused capacity / Zone 2 overage for this slice — summed once per distinct
+  // Total unused capacity / overage for this slice — summed once per distinct
   // user (wasteCost/overageCost live on userCapacityMap per user, not per row).
   // Used by the header pill on the Unused Capacity / Overage drilldowns.
   const sliceWasteAndOverage = useMemo(() => {

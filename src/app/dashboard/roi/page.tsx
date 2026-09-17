@@ -147,7 +147,7 @@ export default function RoiPage() {
                   </span>
                 }
                 sideNote={`${summary.overallUtilizationPercent}%`}
-                description={`You paid ${fmtCost(summary.totalLicenseCost)} in license fees, but only ${summary.overallUtilizationPercent}% of that shows up as actual usage (${fmtCost(summary.totalCost)}). A low percentage means many licensed seats aren't being used enough to justify the cost. Click to see the breakdown by license.`}
+                description={`SUM(Cost where Calculation Method = 'Usage') ÷ SUM(Cost where Calculation Method = 'License') × 100. You paid ${fmtCost(summary.totalLicenseCost)} in license fees but only ${fmtCost(summary.totalCost)} (${summary.overallUtilizationPercent}%) shows as actual usage.`}
                 meta={`${summary.totalRosterUserCount} users`}
                 onClick={() =>
                   openDrilldown({
@@ -161,7 +161,7 @@ export default function RoiPage() {
               />
 
               <KpiCard
-                title="Unutilized AI Capacity"
+                title="Underutilized AI Capacity"
                 delta={{
                   current: summary.totalWasteCost,
                   previous: summary.prevTotalWasteCost,
@@ -172,14 +172,14 @@ export default function RoiPage() {
                 }}
                 formatType="currency"
                 description="The free-dollar allowance that went unused across under-utilized licenses this month (limit minus gross cost). Click to drill down to raw usage logs."
-                meta={`${(summary.userCapacityBreakdown || []).filter((u) => u.zone === 'zone1_under').length} users · Zone 1 Unused`}
+                meta={`${(summary.userCapacityBreakdown || []).filter((u) => u.zone === 'zone1_under').length} users · Under-Utilized`}
                 onClick={() =>
                   openDrilldown({
                     type: 'zone',
                     id: 'waste',
-                    title: 'Zone 1: Unused Capacity',
+                    title: 'Unused Capacity',
                     subtitle: 'Under-utilized employee licenses with unconsumed free-dollar limit (per-tool free limit - gross usage cost).',
-                    badge: 'Zone 1 Unused',
+                    badge: 'Under-Utilized',
                   })
                 }
               />
@@ -196,14 +196,14 @@ export default function RoiPage() {
                 }}
                 formatType="currency"
                 description="Usage that was billed because it went over each tool's free-dollar limit. Click to drill down to raw usage logs."
-                meta={`${(summary.userCapacityBreakdown || []).filter((u) => u.zone === 'zone2_over').length} users · Zone 2 Overage`}
+                meta={`${(summary.userCapacityBreakdown || []).filter((u) => u.zone === 'zone2_over').length} users · Overage`}
                 onClick={() =>
                   openDrilldown({
                     type: 'zone',
                     id: 'overage',
-                    title: 'Zone 2: Overage Spend Exposure',
-                    subtitle: 'Excess usage and fees billed beyond each tool\'s free allocation.',
-                    badge: 'Zone 2 Overage',
+                    title: 'Overage Spend Exposure',
+                    subtitle: "Excess usage and fees billed beyond each tool's free allocation.",
+                    badge: 'Overage',
                   })
                 }
               />
@@ -219,14 +219,14 @@ export default function RoiPage() {
                   previousDataAvailable,
                 }}
                 unit="users"
-                description={`Users who have reached or exceeded 90% of the ${fmtCost(summary.hardCeiling)} spend ceiling. Click to inspect power users.`}
-                meta={`${fmtCost(summary.hardCeiling)} hard ceiling · 90% threshold`}
+                description="Users who have reached or exceeded 90% of their per-tool spend ceiling. Click to inspect power users."
+                meta={`${summary.ceilingRiskCount} at risk · 90% threshold`}
                 onClick={() =>
                   openDrilldown({
                     type: 'zone',
                     id: 'ceiling',
                     title: 'Dollar Ceiling Risk Telemetry',
-                    subtitle: `High-volume power users who have reached or exceeded 90% (${fmtCost(summary.hardCeiling * 0.9)}+) of the spend cap.`,
+                    subtitle: 'High-volume power users who have reached or exceeded 90% of their per-tool spend ceiling.',
                     badge: 'Cap Risk Telemetry',
                   })
                 }
@@ -252,7 +252,7 @@ export default function RoiPage() {
                   id: u.userMail,
                   title: `Employee Usage: ${u.displayName}`,
                   subtitle: `Full raw telemetry records, license limits, and activity logs for ${u.displayName} (${u.userMail}).`,
-                  badge: u.zone === 'zone1_under' ? 'Zone 1: Under-Utilized' : 'Zone 2: Over-Utilized',
+                  badge: u.zone === 'zone1_under' ? 'Under-Utilized' : 'Over-Utilized',
                   filterCriteria: { userEmail: u.userMail },
                 })
               }
@@ -262,9 +262,9 @@ export default function RoiPage() {
                   id: zone === 'zone1_under' ? 'waste' : zone === 'zone2_over' ? 'overage' : 'ceiling',
                   title:
                     zone === 'zone1_under'
-                      ? 'Zone 1: Under-Utilized Capacity'
+                      ? 'Under-Utilized Capacity'
                       : zone === 'zone2_over'
-                      ? 'Zone 2: Over-Utilized Licenses'
+                      ? 'Over-Utilized Licenses'
                       : 'Dollar Ceiling Risk',
                   subtitle: 'Detailed employee breakdown and live CSV log telemetry.',
                   badge: zone.toUpperCase(),
@@ -312,7 +312,7 @@ export default function RoiPage() {
                   { label: 'Quota Efficiency Rate', value: `${summary.licenseEfficiencyRate}%`, sub: 'actual ÷ limit', color: 'text-emerald-400' },
                   { label: 'Total API Cost', value: fmtCost(summary.totalCost), sub: 'actual billed USD', color: 'text-ey-light' },
                   { label: 'Cost per 1K tokens', value: `$${summary.costPer1kTokens.toFixed(6)}`, sub: '/ 1K tokens', color: 'text-ey-yellow' },
-                  { label: 'Near Dollar Cap Users', value: `${summary.ceilingRiskCount} users`, sub: `≥90% of ${fmtCost(summary.hardCeiling)}`, color: 'text-red-400' },
+                  { label: 'Near Dollar Cap Users', value: `${summary.ceilingRiskCount} users`, sub: `≥90% of per-tool ceiling`, color: 'text-red-400' },
                   { label: 'Total License Cost', value: fmtCost(summary.totalLicenseCost), sub: 'sum of per-license Cost in USD', color: 'text-sky-400' },
                   { label: 'Usage vs License Cost', value: `${summary.licenseRoiPercent}%`, sub: 'usage cost ÷ license cost', color: 'text-sky-400' },
                 ].map((item) => (

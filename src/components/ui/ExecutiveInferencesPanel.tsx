@@ -103,8 +103,8 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
       icon: Gauge,
       stat: `${fmtCost(summary.totalWasteCost)} Unconsumed Capacity`,
       statSub: `${fmtCost(summary.totalOverageCost)} overage · ${summary.ceilingRiskCount} users near cap`,
-      finding: `${fmtCost(summary.totalWasteCost)} of free-dollar capacity went unconsumed across the org. Separately, ${fmtCost(summary.totalOverageCost)} was billed beyond those free-dollar limits, and ${summary.ceilingRiskCount} users have reached or exceeded 90% of the ${fmtCost(summary.hardCeiling)} hard spend ceiling.`,
-      actionableInsight: 'Open the Token & Spend ROI page to review the Zone 1 unused capacity and Zone 2 overage breakdown, and flag users nearing the spend ceiling before they hit hard limits.',
+      finding: `${fmtCost(summary.totalWasteCost)} of free-dollar capacity went unconsumed across the org. Separately, ${fmtCost(summary.totalOverageCost)} was billed beyond those free-dollar limits, and ${summary.ceilingRiskCount} users have reached or exceeded 90% of their per-tool spend ceiling.`,
+      actionableInsight: 'Open the Token & Spend ROI page to review the unused capacity and overage breakdown, and flag users nearing the spend ceiling before they hit hard limits.',
     },
     {
       id: 'project_billability',

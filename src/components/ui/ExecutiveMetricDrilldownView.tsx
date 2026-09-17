@@ -21,6 +21,7 @@ import {
   Database,
   Calendar,
   X,
+  Info,
 } from 'lucide-react';
 import { MetricChart } from '@/components/ui/MetricChart';
 import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
@@ -614,18 +615,47 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
             <div className="space-y-6">
               {/* Roster Summary */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
+                {/* Card: Active Users */}
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Active Users</span>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-ey-muted text-[10px] uppercase font-bold">Active Users</span>
+                    <div className="group/info relative cursor-pointer">
+                      <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
+                      <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50 font-sans normal-case">
+                        Filter Calculation Method = &apos;Usage&apos; AND GenAI Tool Consumption &gt; 0. Count of distinct users — users with real prompt activity this period.
+                      </div>
+                    </div>
+                  </div>
                   <p className="text-2xl font-extrabold text-emerald-400">{summaryData?.activeUserCount ?? 0}</p>
                   <p className="text-[10px] text-ey-muted">Recorded at least 1 token of usage</p>
                 </div>
+
+                {/* Card: Unutilized Licenses */}
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Dormant Licenses</span>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-ey-muted text-[10px] uppercase font-bold">Unutilized Licenses</span>
+                    <div className="group/info relative cursor-pointer">
+                      <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
+                      <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50 font-sans normal-case">
+                        Filter Calculation Method = &apos;Usage&apos; AND GenAI Tool Consumption = 0. Count of distinct users — provisioned seats with zero recorded consumption.
+                      </div>
+                    </div>
+                  </div>
                   <p className="text-2xl font-extrabold text-amber-400">{summaryData?.inactiveUserCount ?? 0}</p>
                   <p className="text-[10px] text-ey-muted">Provisioned, zero usage this period</p>
                 </div>
+
+                {/* Card: Total Roster */}
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Total Roster</span>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-ey-muted text-[10px] uppercase font-bold">Total Roster</span>
+                    <div className="group/info relative cursor-pointer">
+                      <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
+                      <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50 font-sans normal-case">
+                        Count of distinct users across all rows (License + Usage) in the selected period — every provisioned seat regardless of activity.
+                      </div>
+                    </div>
+                  </div>
                   <p className="text-2xl font-extrabold text-ey-light">{summaryData?.totalRosterUserCount ?? 0}</p>
                   <p className="text-[10px] text-ey-muted">Every provisioned user this period</p>
                 </div>
