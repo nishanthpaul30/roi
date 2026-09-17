@@ -231,7 +231,7 @@ export default function HierarchyDrilldownPage() {
           </div>
         ) : isComplete ? (
           <DataTable
-            title={`Raw Telemetry Rows Matching Full Hierarchy Path (${pathRows.length} rows)`}
+            title={`Raw Telemetry Rows Matching Full View Path (${pathRows.length} rows)`}
             data={pathRows}
             columns={rawColumns}
             pageSize={15}

@@ -50,6 +50,7 @@ export async function GET(request: Request) {
       billableUtilizationRate,
       avgDailyCost,
       avgMonthlyCost,
+      aiAdoptionRate,
       tokenCostSummary,
     ] = await Promise.all([
       getMetric('TOKEN_CONSUMPTION', filters),
@@ -60,6 +61,7 @@ export async function GET(request: Request) {
       getMetric('BILLABLE_UTILIZATION_RATE', filters),
       getMetric('AVG_DAILY_COST', filters),
       getMetric('AVG_MONTHLY_COST', filters),
+      getMetric('AI_ADOPTION_RATE', filters),
       calculateTokenCostSummary(filters),
     ]);
 
@@ -90,6 +92,7 @@ export async function GET(request: Request) {
         billableUtilizationRate,
         avgDailyCost,
         avgMonthlyCost,
+        aiAdoptionRate,
       },
       tokenCostSummary,
     }, { headers: CACHE_HEADERS });

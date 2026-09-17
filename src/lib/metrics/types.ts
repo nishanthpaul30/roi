@@ -82,6 +82,11 @@ export interface TokenCostSummary {
     costPer1kTokens: number;
     spendSharePercent: number;
     tokenSharePercent: number;
+    // AI Adoption drilldown: users holding a licence for this tool, and what
+    // share of them never actually use it.
+    licenseHolderCount: number;
+    wastagePercent: number;
+    adoptionSharePercent: number;
   }[];
   multiToolOverlap?: {
     dualToolUserCount: number;

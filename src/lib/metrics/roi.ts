@@ -261,6 +261,16 @@ export async function calculateTokenCostSummary(
       const spendSharePercent = totalSpend > 0 ? Number(((cost / totalSpend) * 100).toFixed(4)) : 0;
       const tokenSharePercent = totalTokenConsumption > 0 ? Number(((tokens / totalTokenConsumption) * 100).toFixed(4)) : 0;
 
+      // AI Adoption drilldown: how many people who hold a licence for this tool
+      // actually use it, vs how many hold one and never touch it (wastage).
+      const licenseHolderCount = new Set(
+        rows.filter(r => r.calculationMethod === 'License').map(r => r.userMail.toLowerCase())
+      ).size;
+      const wastagePercent = licenseHolderCount > 0
+        ? Number((((licenseHolderCount - userCount) / licenseHolderCount) * 100).toFixed(1))
+        : 0;
+      const adoptionSharePercent = activeUserCount > 0 ? Number(((userCount / activeUserCount) * 100).toFixed(1)) : 0;
+
       return {
         tool,
         tokens,
@@ -270,6 +280,9 @@ export async function calculateTokenCostSummary(
         costPer1kTokens: toolCostPer1k,
         spendSharePercent,
         tokenSharePercent,
+        licenseHolderCount,
+        wastagePercent,
+        adoptionSharePercent,
       };
     })
     .sort((a, b) => b.cost - a.cost);

@@ -9,8 +9,10 @@ import { DataTable } from '@/components/ui/DataTable';
 import { RoiCapacityPanel } from '@/components/ui/RoiCapacityPanel';
 import { ProjectBillabilityPanel } from '@/components/ui/ProjectBillabilityPanel';
 import { RoiDrilldownView, RoiDrilldownTarget } from '@/components/ui/RoiDrilldownView';
+import { ExecutiveMetricDrilldownView } from '@/components/ui/ExecutiveMetricDrilldownView';
+import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
 import { ExecutivePrintTemplate } from '@/components/reports/ExecutivePrintTemplate';
-import { Coins, ShieldCheck, Zap } from 'lucide-react';
+import { Coins, Zap } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
@@ -26,6 +28,10 @@ const TOOL_LABELS: Record<string, string> = {
 export default function RoiPage() {
   const { filters, setFilters, data, loading } = useMetricsData();
   const [activeDrilldown, setActiveDrilldown] = useState<RoiDrilldownTarget | null>(null);
+  // Total Token Consumption drilldown -- relocated here from the Executive
+  // Overview page (that KPI card was replaced with AI Adoption). Reuses the
+  // same ExecutiveMetricDrilldownView component and calculations as before.
+  const [tokenDrilldown, setTokenDrilldown] = useState<DrilldownMetricData | null>(null);
 
   const summary: TokenCostSummary | null = data?.tokenCostSummary ?? null;
 
@@ -48,12 +54,35 @@ export default function RoiPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const openTokenDrilldown = () => {
+    if (!data) return;
+    const tc = data.metrics.tokenConsumption.summary;
+    setTokenDrilldown({
+      id: 'token_consumption',
+      title: 'Total Token Consumption',
+      subtitle: 'Comprehensive volume breakdown across tools, regions, and service line',
+      currentValue: `${formatCompactNumber(tc.current || 0)} tokens`,
+      deltaText: tc?.percentageDelta ? `${tc.percentageDelta > 0 ? '+' : ''}${tc.percentageDelta}%` : '0%',
+      trend: tc?.trend || 'neutral',
+      series: data.metrics.tokenConsumption.series || [],
+      summaryData: summary,
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="flex-1 flex flex-col">
       <GlobalFilterBar filters={filters} onFilterChange={setFilters} filterOptions={data?.filterOptions} />
 
       <main className="p-6 space-y-6 max-w-7xl mx-auto w-full no-print">
-        {activeDrilldown ? (
+        {tokenDrilldown ? (
+          <ExecutiveMetricDrilldownView
+            data={tokenDrilldown}
+            onBack={() => setTokenDrilldown(null)}
+            filters={filters}
+            parentTitle="ROI Dashboard"
+          />
+        ) : activeDrilldown ? (
           <RoiDrilldownView
             target={activeDrilldown}
             summary={summary}
@@ -77,13 +106,6 @@ export default function RoiPage() {
                   </p>
                 </div>
               </div>
-
-              <div className="flex items-center space-x-3">
-                <div className="hidden md:flex items-center space-x-2 text-xs bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 text-amber-300 shrink-0">
-                  <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="font-mono text-[11px]">Free Limit: <strong>Per-Tool Credits ($)</strong> · Ceiling: <strong>{summary ? fmtCost(summary.hardCeiling) : '—'}</strong></span>
-                </div>
-              </div>
             </div>
 
         {loading || !summary ? (
@@ -92,8 +114,19 @@ export default function RoiPage() {
           </div>
         ) : (
           <>
-            {/* Financial ROI Governance KPI Cards with Drilldown Handlers */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Financial ROI Governance KPI Cards with Drilldown Handlers -- Total Token
+                Consumption relocated here from the Executive Overview page */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <KpiCard
+                title="Total Token Consumption"
+                delta={data.metrics.tokenConsumption.summary}
+                unit="tokens"
+                formatType="compact"
+                description="SUM(GenAI Tool Consumption) across all Usage rows in the period."
+                comparisonLabel="vs prev period"
+                meta={`${summary.byAiTool?.length ?? 0} AI tools · $${summary.costPer1kTokens.toFixed(4)} per 1K tokens`}
+                onClick={openTokenDrilldown}
+              />
               <KpiCard
                 title="Overall Utilization"
                 delta={{
@@ -107,7 +140,15 @@ export default function RoiPage() {
                   previousDataAvailable,
                 }}
                 unit="%"
-                description={`You paid ${fmtCost(summary.totalLicenseCost)} in license fees, but only ${summary.overallUtilizationPercent}% of that shows up as actual usage. A low percentage means many licensed seats aren't being used enough to justify the cost. Click to see the breakdown by license.`}
+                valueOverride={
+                  <span className="flex flex-col">
+                    <span>{fmtCost(summary.totalCost)}</span>
+                    <span className="text-xs font-normal text-ey-muted mt-0.5">of {fmtCost(summary.totalLicenseCost)} license</span>
+                  </span>
+                }
+                sideNote={`${summary.overallUtilizationPercent}%`}
+                description={`You paid ${fmtCost(summary.totalLicenseCost)} in license fees, but only ${summary.overallUtilizationPercent}% of that shows up as actual usage (${fmtCost(summary.totalCost)}). A low percentage means many licensed seats aren't being used enough to justify the cost. Click to see the breakdown by license.`}
+                meta={`${summary.totalRosterUserCount} users`}
                 onClick={() =>
                   openDrilldown({
                     type: 'metric',
@@ -131,6 +172,7 @@ export default function RoiPage() {
                 }}
                 formatType="currency"
                 description="The free-dollar allowance that went unused across under-utilized licenses this month (limit minus gross cost). Click to drill down to raw usage logs."
+                meta={`${(summary.userCapacityBreakdown || []).filter((u) => u.zone === 'zone1_under').length} users · Zone 1 Unused`}
                 onClick={() =>
                   openDrilldown({
                     type: 'zone',
@@ -154,6 +196,7 @@ export default function RoiPage() {
                 }}
                 formatType="currency"
                 description="Usage that was billed because it went over each tool's free-dollar limit. Click to drill down to raw usage logs."
+                meta={`${(summary.userCapacityBreakdown || []).filter((u) => u.zone === 'zone2_over').length} users · Zone 2 Overage`}
                 onClick={() =>
                   openDrilldown({
                     type: 'zone',
@@ -177,6 +220,7 @@ export default function RoiPage() {
                 }}
                 unit="users"
                 description={`Users who have reached or exceeded 90% of the ${fmtCost(summary.hardCeiling)} spend ceiling. Click to inspect power users.`}
+                meta={`${fmtCost(summary.hardCeiling)} hard ceiling · 90% threshold`}
                 onClick={() =>
                   openDrilldown({
                     type: 'zone',
@@ -255,6 +299,32 @@ export default function RoiPage() {
               }
             />
 
+            {/* Financial Summary panel */}
+            <div className="bg-ey-card border border-ey-border rounded-xl p-6 shadow-sm">
+              <h3 className="text-sm font-bold text-ey-light flex items-center gap-2 mb-4 border-b border-ey-border pb-3">
+                <Zap className="w-4 h-4 text-ey-yellow" />
+                Capacity &amp; Financial Governance Summary
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                {[
+                  { label: 'Unused Capacity (total)', value: fmtCost(summary.totalWasteCost), sub: 'unconsumed free-dollar limit', color: 'text-amber-400' },
+                  { label: 'Overage Spend (total)', value: fmtCost(summary.totalOverageCost), sub: 'billed beyond per-tool free-dollar limit', color: 'text-purple-400' },
+                  { label: 'Quota Efficiency Rate', value: `${summary.licenseEfficiencyRate}%`, sub: 'actual ÷ limit', color: 'text-emerald-400' },
+                  { label: 'Total API Cost', value: fmtCost(summary.totalCost), sub: 'actual billed USD', color: 'text-ey-light' },
+                  { label: 'Cost per 1K tokens', value: `$${summary.costPer1kTokens.toFixed(6)}`, sub: '/ 1K tokens', color: 'text-ey-yellow' },
+                  { label: 'Near Dollar Cap Users', value: `${summary.ceilingRiskCount} users`, sub: `≥90% of ${fmtCost(summary.hardCeiling)}`, color: 'text-red-400' },
+                  { label: 'Total License Cost', value: fmtCost(summary.totalLicenseCost), sub: 'sum of per-license Cost in USD', color: 'text-sky-400' },
+                  { label: 'Usage vs License Cost', value: `${summary.licenseRoiPercent}%`, sub: 'usage cost ÷ license cost', color: 'text-sky-400' },
+                ].map((item) => (
+                  <div key={item.label} className="bg-ey-black border border-ey-border rounded-lg p-3">
+                    <p className="text-ey-muted text-[10px] mb-1 font-mono">{item.label}</p>
+                    <p className={`text-base font-bold ${item.color}`}>{item.value}</p>
+                    <p className="text-ey-muted text-[10px]">{item.sub}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <MetricChart
@@ -304,32 +374,6 @@ export default function RoiPage() {
                 }
               />
             )}
-
-            {/* Financial Summary panel */}
-            <div className="bg-ey-card border border-ey-border rounded-xl p-6 shadow-sm">
-              <h3 className="text-sm font-bold text-ey-light flex items-center gap-2 mb-4 border-b border-ey-border pb-3">
-                <Zap className="w-4 h-4 text-ey-yellow" />
-                Capacity &amp; Financial Governance Summary
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
-                {[
-                  { label: 'Unused Capacity (total)', value: fmtCost(summary.totalWasteCost), sub: 'unconsumed free-dollar limit', color: 'text-amber-400' },
-                  { label: 'Overage Spend (total)', value: fmtCost(summary.totalOverageCost), sub: 'billed beyond per-tool free-dollar limit', color: 'text-purple-400' },
-                  { label: 'Quota Efficiency Rate', value: `${summary.licenseEfficiencyRate}%`, sub: 'actual ÷ limit', color: 'text-emerald-400' },
-                  { label: 'Total API Cost', value: fmtCost(summary.totalCost), sub: 'actual billed USD', color: 'text-ey-light' },
-                  { label: 'Cost per 1K tokens', value: `$${summary.costPer1kTokens.toFixed(6)}`, sub: '/ 1K tokens', color: 'text-ey-yellow' },
-                  { label: 'Near Dollar Cap Users', value: `${summary.ceilingRiskCount} users`, sub: `≥90% of ${fmtCost(summary.hardCeiling)}`, color: 'text-red-400' },
-                  { label: 'Total License Cost', value: fmtCost(summary.totalLicenseCost), sub: 'sum of per-license Cost in USD', color: 'text-sky-400' },
-                  { label: 'Usage vs License Cost', value: `${summary.licenseRoiPercent}%`, sub: 'usage cost ÷ license cost', color: 'text-sky-400' },
-                ].map((item) => (
-                  <div key={item.label} className="bg-ey-black border border-ey-border rounded-lg p-3">
-                    <p className="text-ey-muted text-[10px] mb-1 font-mono">{item.label}</p>
-                    <p className={`text-base font-bold ${item.color}`}>{item.value}</p>
-                    <p className="text-ey-muted text-[10px]">{item.sub}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
           </>
         )}
           </>

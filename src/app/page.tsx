@@ -12,6 +12,7 @@ import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
 import { ExecutivePrintTemplate } from '@/components/reports/ExecutivePrintTemplate';
 import { Sparkles, Printer } from 'lucide-react';
 import { formatCompactCurrency, formatCompactNumber } from '@/lib/format';
+import { UserCapacityRow } from '@/lib/metrics/types';
 
 export default function ExecutiveOverviewPage() {
   const { filters, setFilters, data, loading } = useMetricsData();
@@ -49,6 +50,22 @@ export default function ExecutiveOverviewPage() {
     // Smooth scroll to top of content area on drilldown
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Total AI Investment drilldown subtitle: license seat adoption in plain
+  // terms, matching the AI Adoption card's math -- "licenses" here means
+  // distinct user-tool pairs (aiTools per user), not raw License CSV rows,
+  // since a held tool recurs as a License row every month.
+  const licenseAdoptionSubtitle = (() => {
+    const s = data?.tokenCostSummary;
+    if (!s) return 'Financial spend distribution across billable projects, external clients, and regions';
+    const breakdown: UserCapacityRow[] = s.userCapacityBreakdown || [];
+    const totalLicenses = breakdown.reduce((sum: number, u: UserCapacityRow) => sum + (u.aiTools?.length || 0), 0);
+    const activeBreakdown = breakdown.filter((u: UserCapacityRow) => u.tokenConsumption > 0);
+    const usedLicenses = activeBreakdown.reduce((sum: number, u: UserCapacityRow) => sum + (u.aiTools?.length || 0), 0);
+    const dormantLicenses = totalLicenses - usedLicenses;
+    const avgLicensesPerActiveUser = activeBreakdown.length > 0 ? usedLicenses / activeBreakdown.length : 0;
+    return `Out of ${s.totalRosterUserCount} number of resources where ${totalLicenses} AI license of various sort are present, however only ${s.activeUserCount} members are actively using it each possess ${avgLicensesPerActiveUser.toFixed(1)} licenses and there are ${dormantLicenses} dormant licenses.`;
+  })();
 
   return (
     <div className="flex-1 flex flex-col">
@@ -119,16 +136,36 @@ export default function ExecutiveOverviewPage() {
                 {/* Clickable Interactive KPI Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <KpiCard
+                    title="AI Adoption"
+                    delta={data.metrics.aiAdoptionRate.summary}
+                    formatType="percentage"
+                    description="Active users ÷ total licensed roster × 100."
+                    comparisonLabel="vs prev period"
+                    meta={`${data.tokenCostSummary?.activeUserCount ?? 0} of ${data.tokenCostSummary?.totalRosterUserCount ?? 0} resources · ${data.tokenCostSummary?.byAiTool?.length ?? 0} tools`}
+                    onClick={() =>
+                      openDrilldown(
+                        'ai_adoption',
+                        'AI Adoption',
+                        'Active vs dormant licence adoption, and per-tool adoption share & wastage',
+                        `${(data.metrics.aiAdoptionRate.summary.current || 0).toFixed(1)}%`,
+                        data.metrics.aiAdoptionRate.summary,
+                        data.metrics.aiAdoptionRate.series
+                      )
+                    }
+                  />
+
+                  <KpiCard
                     title="Total AI Investment"
                     delta={data.metrics.cost.summary}
                     formatType="currency"
-                    description="Actual billed expenditure. Click to enter in-page breakdown of billable vs non-billable and regional spend."
+                    description="Usage Cost + License Cost, summed across all rows in the period."
                     comparisonLabel="vs prev period"
+                    meta={`${data.tokenCostSummary?.activeUserCount ?? 0} active users · ${data.tokenCostSummary?.inactiveUserCount ?? 0} inactive users`}
                     onClick={() =>
                       openDrilldown(
                         'total_investment',
                         'Total AI Investment',
-                        'Financial spend distribution across billable projects, external clients, and regions',
+                        licenseAdoptionSubtitle,
                         formatCompactCurrency(data.metrics.cost.summary.current || 0),
                         data.metrics.cost.summary,
                         data.metrics.cost.series
@@ -140,8 +177,9 @@ export default function ExecutiveOverviewPage() {
                     title="Avg Monthly AI Cost"
                     delta={data.metrics.avgMonthlyCost.summary}
                     formatType="currency"
-                    description="Average cost per active calendar month. Click to inspect monthly cost run-rate and peak usage days."
+                    description="Total spend per calendar month, averaged across months in the period."
                     comparisonLabel="vs prev period"
+                    meta={`${data.tokenCostSummary?.monthlyTrend?.length ?? 0} months tracked · ${formatCompactCurrency(data.metrics.cost.summary.current || 0)} total AI cost`}
                     onClick={() =>
                       openDrilldown(
                         'avg_monthly_cost',
@@ -158,8 +196,9 @@ export default function ExecutiveOverviewPage() {
                     title="Cost per Active User"
                     delta={data.metrics.costPerActiveUser?.summary}
                     formatType="currency"
-                    description="Average spend per active developer license. Click to view top power user spend rankings."
+                    description="Total spend ÷ number of active users (users with usage > 0)."
                     comparisonLabel="vs prev period"
+                    meta={`${data.tokenCostSummary?.activeUserCount ?? 0} active users · Across ${data.tokenCostSummary?.byServiceLine?.length ?? 0} service lines`}
                     onClick={() =>
                       openDrilldown(
                         'cost_per_user',
@@ -168,25 +207,6 @@ export default function ExecutiveOverviewPage() {
                         `${formatCompactCurrency(data.metrics.costPerActiveUser?.summary?.current || 0)} / user`,
                         data.metrics.costPerActiveUser?.summary,
                         data.metrics.cost.series
-                      )
-                    }
-                  />
-
-                  <KpiCard
-                    title="Total Token Consumption"
-                    delta={data.metrics.tokenConsumption.summary}
-                    unit="tokens"
-                    formatType="compact"
-                    description="Total raw tokens consumed. Click to enter in-page breakdown across AI tools & service lines."
-                    comparisonLabel="vs prev period"
-                    onClick={() =>
-                      openDrilldown(
-                        'token_consumption',
-                        'Total Token Consumption',
-                        'Comprehensive volume breakdown across tools, regions, and service lines',
-                        `${formatCompactNumber(data.metrics.tokenConsumption.summary.current || 0)} tokens`,
-                        data.metrics.tokenConsumption.summary,
-                        data.metrics.tokenConsumption.series
                       )
                     }
                   />

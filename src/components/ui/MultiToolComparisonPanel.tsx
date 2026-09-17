@@ -378,7 +378,7 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
                   <div className="mt-3">
                     <HierarchyDrilldownPanel
                       rows={overlapHierarchyRows}
-                      title="Multi-Platform License Hierarchy"
+                      title="Multi-Platform License"
                       subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
                       onSelectUser={(email) => onDrilldown?.(undefined, email)}
                     />

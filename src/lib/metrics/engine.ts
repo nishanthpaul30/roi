@@ -244,6 +244,21 @@ export async function getMetric(
       break;
     }
 
+    case 'AI_ADOPTION_RATE': {
+      // Adoption = users who actually consumed at least 1 token, as a share of
+      // the full provisioned roster (every distinct user holding any row —
+      // Usage or License — in the period, active or dormant).
+      isRate = true;
+      const cRoster = new Set(currentSpendRows.map(r => r.userMail.toLowerCase())).size;
+      const cActive = new Set(currentRows.filter(r => r.tokenConsumption > 0).map(r => r.userMail.toLowerCase())).size;
+      currentVal = cRoster > 0 ? (cActive / cRoster) * 100 : 0;
+
+      const pRoster = new Set(previousSpendRows.map(r => r.userMail.toLowerCase())).size;
+      const pActive = new Set(previousRows.filter(r => r.tokenConsumption > 0).map(r => r.userMail.toLowerCase())).size;
+      prevVal = pRoster > 0 ? (pActive / pRoster) * 100 : 0;
+      break;
+    }
+
     case 'AVG_DAILY_COST': {
       // This previously fell through to the default branch, which sums cost and
       // never divides — so "average daily cost" was reporting the period total.
@@ -273,6 +288,7 @@ export async function getMetric(
     else if (metricId === 'COST' || metricId === 'AVG_MONTHLY_COST') val = r.cost;
     else if (metricId === 'COST_PER_1K_TOKENS') val = r.cost; // will recalc per month below
     else if (metricId === 'BILLABLE_UTILIZATION_RATE') val = r.tokenConsumption;
+    else if (metricId === 'AI_ADOPTION_RATE') val = r.tokenConsumption > 0 ? 1 : 0;
     else val = r.cost;
     const existing = monthMap.get(r.monthId);
     monthMap.set(r.monthId, { label: r.monthYear, value: (existing?.value || 0) + val });

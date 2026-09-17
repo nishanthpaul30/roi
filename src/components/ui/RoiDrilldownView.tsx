@@ -1209,7 +1209,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
             // sub-entity scope changes so the CT/Non-CT skip-level actually applies.
             key={selectedSubEntity ? `${selectedSubEntity.type}:${selectedSubEntity.id}` : 'root'}
             rows={targetRows}
-            title="Hierarchy Drilldown"
+            title="Organization View"
             subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
             initialPath={
               selectedSubEntity?.type === 'ct_non_ct'

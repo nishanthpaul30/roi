@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import { TrendingUp, TrendingDown, Minus, Info, ArrowUpRight } from 'lucide-react';
 import { MetricDelta } from '@/lib/metrics/types';
 import { formatCompactCurrency, formatCompactNumber } from '@/lib/format';
@@ -10,6 +11,16 @@ interface KpiCardProps {
   description?: string;
   comparisonLabel?: string;
   onClick?: () => void;
+  // Minimal supporting context shown bottom-right of the card, e.g. "399 active · 97 inactive"
+  meta?: string;
+  // Replaces the default formatted value/unit display, e.g. "$8.9K / $228K" --
+  // used when the card's main figure is a comparison of two raw values rather
+  // than a single formatted number.
+  valueOverride?: ReactNode;
+  // Small badge shown beside the value, independent of the trend delta badge
+  // (which only appears when a real previous period exists) -- e.g. a
+  // percentage that's always relevant regardless of period-over-period data.
+  sideNote?: ReactNode;
 }
 
 export function KpiCard({
@@ -20,6 +31,9 @@ export function KpiCard({
   description,
   comparisonLabel = 'vs prev period',
   onClick,
+  meta,
+  valueOverride,
+  sideNote,
 }: KpiCardProps) {
   if (!delta) return null;
 
@@ -68,17 +82,22 @@ export function KpiCard({
       </div>
 
       {/* Main KPI Value */}
-      <div className="my-1 flex items-baseline justify-between">
+      <div className="my-1 flex items-start justify-between gap-2">
         <span
           className="text-2xl lg:text-3xl font-extrabold text-ey-light tracking-tight group-hover:text-white transition-colors"
-          title={formatType === 'percentage' ? undefined : exactVal(current)}
+          title={valueOverride || formatType === 'percentage' ? undefined : exactVal(current)}
         >
-          {formatVal(current)} {unit && <span className="text-sm font-normal text-ey-muted">{unit}</span>}
+          {valueOverride ?? (
+            <>
+              {formatVal(current)} {unit && <span className="text-sm font-normal text-ey-muted">{unit}</span>}
+            </>
+          )}
         </span>
 
-        {/* Trend Arrow Badge — omitted entirely when there's no genuine prior
-            period to compare against, rather than showing a hollow "N/A" */}
-        {previousDataAvailable && (
+        {/* Trend Arrow Badge takes priority when a real previous period
+            exists; otherwise fall back to the static sideNote pill (e.g. a
+            percentage that's always relevant, not a period-over-period delta) */}
+        {previousDataAvailable ? (
           <div
             className={`flex items-center space-x-1 text-xs font-bold px-2 py-0.5 rounded-full border ${
               isPositiveTrend
@@ -101,7 +120,11 @@ export function KpiCard({
                 : `${percentageDelta > 0 ? '+' : ''}${percentageDelta}%`}
             </span>
           </div>
-        )}
+        ) : sideNote ? (
+          <div className="text-xs font-bold text-ey-muted bg-ey-black border border-ey-border rounded-full px-2 py-0.5 shrink-0">
+            {sideNote}
+          </div>
+        ) : null}
       </div>
 
       {/* Detailed Delta Breakdown Footer — same: left blank rather than
@@ -119,6 +142,12 @@ export function KpiCard({
               </span>
             </span>
           </div>
+        </div>
+      )}
+
+      {meta && (
+        <div className={`text-[11px] text-ey-muted text-right ${previousDataAvailable ? 'mt-1' : 'mt-3 pt-2 border-t border-ey-border/80'}`}>
+          {meta}
         </div>
       )}
     </div>

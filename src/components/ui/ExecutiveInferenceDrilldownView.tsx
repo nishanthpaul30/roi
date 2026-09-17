@@ -737,7 +737,7 @@ export function ExecutiveInferenceDrilldownView({
         stat: `${priceMultiple.toFixed(1)}x Price Gap ($${(cheapest?.costPerM || 0).toFixed(2)} - $${(priciest?.costPerM || 0).toFixed(2)}/M)`,
         statSub: rateLine,
         finding: `${cheapest?.label} is the cheapest tool at $${(cheapest?.costPerM || 0).toFixed(2)} per million tokens. ${priciest?.label} is the most expensive at $${(priciest?.costPerM || 0).toFixed(2)} per million tokens — about ${priceMultiple.toFixed(1)}x more for the same volume of usage.`,
-        actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens). Consolidate overlapping dual-tool licenses to eliminate redundant fixed license fees across ${multiToolData.dualToolUsers.length} users.`,
+        actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens). Consolidate overlapping multi-tool licenses to eliminate redundant fixed license fees across ${multiToolData.dualToolUsers.length} users.`,
       };
     })(),
     vendor_spread: (() => {
@@ -1019,9 +1019,6 @@ export function ExecutiveInferenceDrilldownView({
               <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border ${currentMeta.tagColor}`}>
                 {currentMeta.tag}
               </span>
-              <span className="text-xs font-mono text-ey-muted bg-ey-black/60 border border-ey-border/60 px-2 py-0.5 rounded">
-                Telemetry Depth: {selectedEntity ? 'Level 4 (Raw Core Logs)' : 'Level 2/3 (Dimensional Analytics)'}
-              </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-ey-light tracking-tight flex items-center gap-3">
               <span>{currentMeta.title}</span>
@@ -1068,7 +1065,7 @@ export function ExecutiveInferenceDrilldownView({
               {/* Mandated Hierarchy Navigator — always shown first, at the top */}
               <HierarchyDrilldownPanel
                 rows={activePeriodRows}
-                title={`Level 3: Active License Hierarchy (${activeUserList.length} Users)`}
+                title={`Level 3: Active License View (${activeUserList.length} Users)`}
                 onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
               />
 
@@ -1080,7 +1077,7 @@ export function ExecutiveInferenceDrilldownView({
                   <p className="text-[10px] text-ey-muted">Real per-license Cost in USD</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Active Engaged Users</span>
+                  <span className="text-ey-muted text-[10px] uppercase font-bold">Active Engaged Licenses</span>
                   <p className="text-2xl font-bold text-emerald-400">{activeUserCount} Users</p>
                   <p className="text-[10px] text-emerald-300/80">{activeSeatPercent}% of Provisioned Pool</p>
                 </div>
@@ -1216,7 +1213,7 @@ export function ExecutiveInferenceDrilldownView({
               {/* Mandated Hierarchy Navigator — always shown first, at the top, scoped to the top-20% power users' rows */}
               <HierarchyDrilldownPanel
                 rows={allRows.filter((r) => top20Users.some((u) => u.email === (r.userMail || '').toLowerCase().trim()))}
-                title={`Level 3: Top 20% Power User Hierarchy (${top20Users.length} Key Accounts)`}
+                title={`Level 3: Top 20% Power User View (${top20Users.length} Key Accounts)`}
                 onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
               />
 
@@ -1475,7 +1472,7 @@ export function ExecutiveInferenceDrilldownView({
 
                   <HierarchyDrilldownPanel
                     rows={dualToolHierarchyRows}
-                    title="Level 3: Multi-Platform License Hierarchy"
+                    title="Level 3: Multi-Platform License"
                     subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
                     onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
                   />
@@ -1560,7 +1557,7 @@ export function ExecutiveInferenceDrilldownView({
               {/* Mandated Hierarchy Navigator — always shown first, at the top */}
               <HierarchyDrilldownPanel
                 rows={allRows}
-                title="Level 3: Billability & Org Hierarchy"
+                title="Level 3: Billability & Org"
                 subtitle="Drill CT/Non-CT down to Sub-Service Line 2 to reach the users behind billable and non-billable spend. Engagement-code detail is in the table below."
                 onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
               />
@@ -1610,7 +1607,7 @@ export function ExecutiveInferenceDrilldownView({
                     </p>
                     <p className="text-xs text-ey-muted">Active in nearly every month in window</p>
                     <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
-                      <span>Continue to Hierarchy</span>
+                      <span>Continue to View</span>
                       <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </div>
@@ -1630,7 +1627,7 @@ export function ExecutiveInferenceDrilldownView({
                     </p>
                     <p className="text-xs text-ey-muted">Frequent, consistent monthly usage</p>
                     <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
-                      <span>Continue to Hierarchy</span>
+                      <span>Continue to View</span>
                       <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </div>
@@ -1650,7 +1647,7 @@ export function ExecutiveInferenceDrilldownView({
                     </p>
                     <p className="text-xs text-ey-muted">Target cohort for competency training</p>
                     <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
-                      <span>Continue to Hierarchy</span>
+                      <span>Continue to View</span>
                       <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </div>
@@ -1669,7 +1666,7 @@ export function ExecutiveInferenceDrilldownView({
                       const email = (r.userMail || '').toLowerCase().trim();
                       return userCohorts[selectedCohortFacet].some((u) => u.email === email);
                     })}
-                    title={`Level 3: ${selectedCohortFacet === 'embedded' ? 'Core Habitual' : selectedCohortFacet === 'regular' ? 'Regular' : 'Occasional'} Cohort Hierarchy`}
+                    title={`Level 3: ${selectedCohortFacet === 'embedded' ? 'Core Habitual' : selectedCohortFacet === 'regular' ? 'Regular' : 'Occasional'} Cohort`}
                     onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
                   />
                 </>
@@ -1746,7 +1743,7 @@ export function ExecutiveInferenceDrilldownView({
       {selectedEntity && selectedEntity.type !== 'user' && (
         <HierarchyDrilldownPanel
           rows={granularRows}
-          title={`Level 4: ${selectedEntity.label || selectedEntity.name} Hierarchy`}
+          title={`Level 4: ${selectedEntity.label || selectedEntity.name}`}
           subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
           onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
         />

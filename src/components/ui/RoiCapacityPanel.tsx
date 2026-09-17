@@ -189,10 +189,10 @@ export function RoiCapacityPanel({
         rows={hierarchyRows}
         title={
           activeTab === 'zone1'
-            ? 'Zone 1: Unused AI License Hierarchy'
+            ? 'Zone 1: Unused AI License View'
             : activeTab === 'zone2'
-            ? 'Zone 2: Budget Breach & Overage Hierarchy'
-            : 'All User Licenses — Capacity & Zone Hierarchy'
+            ? 'Zone 2: Budget Breach & Overage View'
+            : 'All User Licenses — Capacity & Zone View'
         }
         onSelectUser={(email) => {
           const row = capacityByEmail.get(email.toLowerCase());

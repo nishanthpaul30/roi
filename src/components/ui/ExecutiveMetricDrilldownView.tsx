@@ -41,6 +41,7 @@ interface ExecutiveMetricDrilldownViewProps {
   data: DrilldownMetricData;
   onBack: () => void;
   filters?: GlobalFilterState;
+  parentTitle?: string;
 }
 
 const fmtMoney = formatCompactCurrency;
@@ -93,6 +94,13 @@ function ctNonCtSegmentDisplay(metricId: string, segment: { cost: number; tokens
       footnote: `${fmtMoney(segment.cost)} spend (${pct}% of total)`,
     };
   }
+  if (metricId === 'ai_adoption') {
+    const users = segment.userCount || 0;
+    return {
+      primary: `${users} active users`,
+      footnote: `${fmtTokens(segment.tokens)} tokens · ${fmtMoney(segment.cost)} spend`,
+    };
+  }
   // total_investment (default)
   return {
     primary: fmtMoney(segment.cost),
@@ -100,7 +108,7 @@ function ctNonCtSegmentDisplay(metricId: string, segment: { cost: number; tokens
   };
 }
 
-export function ExecutiveMetricDrilldownView({ data, onBack, filters }: ExecutiveMetricDrilldownViewProps) {
+export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitle = 'Overview' }: ExecutiveMetricDrilldownViewProps) {
   const { id, title, subtitle, currentValue, deltaText, trend, series, summaryData } = data;
 
   // Level 3 Deep-Dive Sub-Drilldown State
@@ -270,7 +278,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters }: Executiv
             onClick={onBack}
             className="text-ey-muted hover:text-ey-yellow transition-colors font-semibold flex items-center gap-1 cursor-pointer"
           >
-            <span>Overview</span>
+            <span>{parentTitle}</span>
           </button>
           <ChevronRight className="w-3.5 h-3.5 text-ey-border shrink-0" />
 
@@ -323,14 +331,6 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters }: Executiv
                 ? `Inspecting ${granularRows.length} raw usage log entries for ${subDrilldown.name}`
                 : subtitle}
             </p>
-          </div>
-
-          <div className="flex items-center space-x-2 text-xs font-mono bg-ey-black/60 border border-ey-border px-3 py-1.5 rounded-xl shrink-0">
-            <span className="text-ey-muted">Status:</span>
-            <span className="text-emerald-400 font-bold flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              {subDrilldown ? `${granularRows.length} Log Entries` : 'Level 1 Telemetry Active'}
-            </span>
           </div>
         </div>
 
@@ -531,7 +531,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters }: Executiv
               </button>
               <HierarchyDrilldownPanel
                 rows={allRows.filter((r) => String(r[pendingFacet.field] || '').toLowerCase() === pendingFacet.value.toLowerCase())}
-                title={`Level 3: ${pendingFacet.value} Hierarchy`}
+                title={`Level 3: ${pendingFacet.value}`}
                 initialPath={
                   pendingFacet.field === 'ctNonCt'
                     ? [{ levelId: 'ctNonCt', field: 'ctNonCt', fieldLabel: 'CT / Non-CT', value: pendingFacet.value }]
@@ -605,6 +605,71 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters }: Executiv
                       <span className="text-cyan-300 font-bold">{fmtTokens(s.tokens)} tokens</span>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {id === 'ai_adoption' && (
+            <div className="space-y-6">
+              {/* Roster Summary */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
+                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
+                  <span className="text-ey-muted text-[10px] uppercase font-bold">Active Users</span>
+                  <p className="text-2xl font-extrabold text-emerald-400">{summaryData?.activeUserCount ?? 0}</p>
+                  <p className="text-[10px] text-ey-muted">Recorded at least 1 token of usage</p>
+                </div>
+                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
+                  <span className="text-ey-muted text-[10px] uppercase font-bold">Dormant Licenses</span>
+                  <p className="text-2xl font-extrabold text-amber-400">{summaryData?.inactiveUserCount ?? 0}</p>
+                  <p className="text-[10px] text-ey-muted">Provisioned, zero usage this period</p>
+                </div>
+                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
+                  <span className="text-ey-muted text-[10px] uppercase font-bold">Total Roster</span>
+                  <p className="text-2xl font-extrabold text-ey-light">{summaryData?.totalRosterUserCount ?? 0}</p>
+                  <p className="text-[10px] text-ey-muted">Every provisioned user this period</p>
+                </div>
+              </div>
+
+              {/* Per-Tool Adoption Share & Wastage -> Level 3 Trigger */}
+              <div className="bg-ey-card border border-ey-border rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-ey-border pb-3">
+                  <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-ey-yellow" />
+                    <span>Adoption Share &amp; Wastage by AI Tool</span>
+                  </h3>
+                  <span className="text-[10px] font-mono text-ey-yellow">Click tool for log records 🔍</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="text-ey-muted uppercase tracking-wider border-b border-ey-border">
+                      <tr>
+                        <th className="py-2 pr-3">AI Tool</th>
+                        <th className="py-2 pr-3 text-right">License Holders</th>
+                        <th className="py-2 pr-3 text-right">Active Users</th>
+                        <th className="py-2 pr-3 text-right">Adoption Share</th>
+                        <th className="py-2 pr-3 text-right">Wastage</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ey-border/60">
+                      {byTool.map((t: any) => (
+                        <tr
+                          key={t.tool}
+                          onClick={() => chooseFacet({ field: 'aiTool', value: t.tool, label: 'Adoption Share & Wastage by AI Tool' })}
+                          className="hover:bg-ey-black/40 cursor-pointer transition group"
+                        >
+                          <td className="py-2.5 pr-3 font-bold text-ey-light group-hover:text-ey-yellow flex items-center gap-1.5">
+                            <span>{toolLabel(t.tool)}</span>
+                            <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </td>
+                          <td className="py-2.5 pr-3 text-right text-ey-muted">{t.licenseHolderCount}</td>
+                          <td className="py-2.5 pr-3 text-right text-ey-light">{t.userCount}</td>
+                          <td className="py-2.5 pr-3 text-right text-emerald-400 font-bold">{t.adoptionSharePercent}%</td>
+                          <td className="py-2.5 pr-3 text-right text-amber-400 font-bold">{t.wastagePercent}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -758,7 +823,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters }: Executiv
           title="Return to previous screen (Esc)"
         >
           <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
-          <span>{subDrilldown || pendingFacet ? `Back to ${title}` : 'Back to Overview'}</span>
+          <span>{subDrilldown || pendingFacet ? `Back to ${title}` : `Back to ${parentTitle}`}</span>
           <kbd className="text-[10px] bg-black/20 text-ey-black px-1.5 py-0.5 rounded font-mono font-bold">Esc</kbd>
         </button>
 
@@ -766,7 +831,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters }: Executiv
           <button
             onClick={onBack}
             className="p-2.5 bg-ey-black hover:bg-ey-card text-ey-light hover:text-ey-yellow border border-ey-border hover:border-ey-yellow rounded-full shadow-2xl transition cursor-pointer"
-            title="Exit Drilldown to Overview"
+            title={`Exit Drilldown to ${parentTitle}`}
           >
             <X className="w-4 h-4" />
           </button>

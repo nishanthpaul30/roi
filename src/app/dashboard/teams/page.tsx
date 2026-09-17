@@ -6,7 +6,7 @@ import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { KpiCard } from '@/components/ui/KpiCard';
 import { HierarchicalTable, HierGroup } from '@/components/ui/HierarchicalTable';
 import { RoiDrilldownView, RoiDrilldownTarget } from '@/components/ui/RoiDrilldownView';
-import { Building2, Layers } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
@@ -146,12 +146,6 @@ export default function OrgAndRegionalPage() {
                     Unified view of token consumption and spend aggregated by Service Line and Sub-Practice. For a country-level breakdown, see Geo Pulse.
                   </p>
                 </div>
-              </div>
-              <div className="flex items-center space-x-2 text-xs bg-ey-black/60 border border-ey-border rounded-lg px-3 py-2 text-ey-light shrink-0 self-start sm:self-center">
-                <Layers className="w-4 h-4 text-ey-yellow shrink-0" />
-                <span className="font-mono text-[11px] text-ey-muted">
-                  Dimensions: <strong>5 Service Lines</strong> · <strong>14 Practices</strong>
-                </span>
               </div>
             </div>
 
