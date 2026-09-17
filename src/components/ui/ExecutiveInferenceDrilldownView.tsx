@@ -276,6 +276,17 @@ export function ExecutiveInferenceDrilldownView({
   const avgLicenseCostPerSeat = summary && activeUserCount > 0 ? summary.totalLicenseCost / activeUserCount : 100;
   const inactiveLeakageCost = Math.round(inactiveUserCount * avgLicenseCostPerSeat);
 
+  // Literal count for the Dormant Unutilized Licenses tile only: distinct
+  // users with a Usage-type row whose GenAI Tool Consumption is exactly 0.
+  const zeroValueUsageRowUserCount = useMemo(() => {
+    const emails = new Set(
+      allRows
+        .filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption === 0)
+        .map((r) => (r.userMail || '').toLowerCase().trim())
+    );
+    return emails.size;
+  }, [allRows]);
+
   // Real dormant seats: roster users with zero activity in the current filtered period,
   // identified by cross-referencing their own (out-of-period) rows for identity/license data.
   const dormantUsers = useMemo(() => {
@@ -1081,8 +1092,8 @@ export function ExecutiveInferenceDrilldownView({
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Dormant Unutilized Licenses</span>
-                  <p className="text-2xl font-bold text-rose-400">{inactiveUserCount} Licenses</p>
-                  <p className="text-[10px] text-rose-300/80">No Usage-row activity recorded</p>
+                  <p className="text-2xl font-bold text-rose-400">{zeroValueUsageRowUserCount} Licenses</p>
+                  <p className="text-[10px] text-rose-300/80">Usage row recorded with 0 GenAI Tool Consumption</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Annualized License Leakage</span>
