@@ -245,6 +245,7 @@ export default function RoiPage() {
               licenseRoiPercent={summary.licenseRoiPercent}
               licenseUnderutilizedCost={summary.licenseUnderutilizedCost}
               licenseOverutilizedValue={summary.licenseOverutilizedValue}
+              inactiveUserCount={summary.inactiveUserCount}
               filters={filters}
               onSelectUser={(u) =>
                 openDrilldown({

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { UserCapacityRow, GlobalFilterState } from '@/lib/metrics/types';
 import { useRawRows } from '@/hooks/useRawRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
-import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert } from 'lucide-react';
+import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert, UserX } from 'lucide-react';
 import { formatCompactCurrency as fmtCost } from '@/lib/format';
 
 interface RoiCapacityPanelProps {
@@ -16,8 +16,9 @@ interface RoiCapacityPanelProps {
   hardCeiling: number;
   totalLicenseCost: number;
   licenseRoiPercent: number;
-  licenseUnderutilizedCost: number;
+  licenseUnderutilizedCost?: number;
   licenseOverutilizedValue: number;
+  inactiveUserCount?: number;
   pageSize?: number;
   onSelectUser?: (user: UserCapacityRow) => void;
   onSelectZone?: (zone: 'zone1_under' | 'zone2_over' | 'ceiling_risk') => void;
@@ -35,6 +36,7 @@ export function RoiCapacityPanel({
   licenseRoiPercent,
   licenseUnderutilizedCost,
   licenseOverutilizedValue,
+  inactiveUserCount,
   onSelectUser,
   onSelectZone,
   filters,
@@ -65,6 +67,17 @@ export function RoiCapacityPanel({
     const allowedEmails = new Set(displayedList.map((u) => u.userMail.toLowerCase()));
     return allRows.filter((r) => allowedEmails.has((r.userMail || '').toLowerCase()));
   }, [allRows, displayedList]);
+
+  const zeroConsumptionCount = useMemo(() => {
+    if (typeof inactiveUserCount === 'number') return inactiveUserCount;
+    const zeroUsageEmails = new Set<string>();
+    for (const r of allRows) {
+      if (r.calculationMethod === 'Usage' && r.tokenConsumption === 0) {
+        zeroUsageEmails.add((r.userMail || '').toLowerCase().trim());
+      }
+    }
+    return zeroUsageEmails.size;
+  }, [inactiveUserCount, allRows]);
 
   return (
     <div className="space-y-6">
@@ -163,11 +176,11 @@ export function RoiCapacityPanel({
           </div>
 
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 flex items-start space-x-3">
-            <TrendingDown className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <UserX className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-amber-300 font-bold">Underutilized License Spend</p>
+              <p className="text-amber-300 font-bold">Zero-Consumption Users</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-amber-200">{fmtCost(licenseUnderutilizedCost)}</strong> unconsumed — SUM(License Cost − Actual Usage Cost) per user where License Cost &gt; Actual Usage Cost.
+                <strong className="text-amber-200">{zeroConsumptionCount} users</strong> with 0 GenAI Tool Consumption while filtered by &apos;Usage&apos; in &apos;Calculation Method&apos; column.
               </p>
             </div>
           </div>
