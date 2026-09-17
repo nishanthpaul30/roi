@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { UserCapacityRow, GlobalFilterState } from '@/lib/metrics/types';
 import { useRawRows } from '@/hooks/useRawRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
-import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert, Users } from 'lucide-react';
+import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert } from 'lucide-react';
 import { formatCompactCurrency as fmtCost } from '@/lib/format';
 
 interface RoiCapacityPanelProps {
@@ -16,6 +16,7 @@ interface RoiCapacityPanelProps {
   hardCeiling: number;
   totalLicenseCost: number;
   licenseRoiPercent: number;
+  licenseUnderutilizedCost: number;
   licenseOverutilizedValue: number;
   pageSize?: number;
   onSelectUser?: (user: UserCapacityRow) => void;
@@ -32,6 +33,7 @@ export function RoiCapacityPanel({
   hardCeiling,
   totalLicenseCost,
   licenseRoiPercent,
+  licenseUnderutilizedCost,
   licenseOverutilizedValue,
   onSelectUser,
   onSelectZone,
@@ -51,17 +53,6 @@ export function RoiCapacityPanel({
 
   // Raw CSV rows, needed to walk the mandated hierarchy before any user is named.
   const { rows: allRows } = useRawRows(filters);
-
-  // Literal count: distinct users appearing in a Usage-type row whose GenAI
-  // Tool Consumption is exactly 0 (as opposed to users with no Usage row at all).
-  const zeroConsumptionUserCount = useMemo(() => {
-    const emails = new Set(
-      allRows
-        .filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption === 0)
-        .map((r) => r.userMail.toLowerCase())
-    );
-    return emails.size;
-  }, [allRows]);
 
   const capacityByEmail = useMemo(() => {
     const map = new Map<string, UserCapacityRow>();
@@ -172,11 +163,11 @@ export function RoiCapacityPanel({
           </div>
 
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 flex items-start space-x-3">
-            <Users className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <TrendingDown className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-amber-300 font-bold">Zero-Consumption Users</p>
+              <p className="text-amber-300 font-bold">Underutilized License Spend</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-amber-200">{zeroConsumptionUserCount} users</strong> have a Usage record with GenAI Tool Consumption equal to 0.
+                <strong className="text-amber-200">{fmtCost(licenseUnderutilizedCost)}</strong> of purchased license cost went unconsumed by usage.
               </p>
             </div>
           </div>
