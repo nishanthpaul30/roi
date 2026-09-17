@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { UserCapacityRow, GlobalFilterState } from '@/lib/metrics/types';
 import { useRawRows } from '@/hooks/useRawRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
-import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert } from 'lucide-react';
+import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert, Users } from 'lucide-react';
 import { formatCompactCurrency as fmtCost } from '@/lib/format';
 
 interface RoiCapacityPanelProps {
@@ -16,7 +16,6 @@ interface RoiCapacityPanelProps {
   hardCeiling: number;
   totalLicenseCost: number;
   licenseRoiPercent: number;
-  licenseUnderutilizedCost: number;
   licenseOverutilizedValue: number;
   pageSize?: number;
   onSelectUser?: (user: UserCapacityRow) => void;
@@ -33,7 +32,6 @@ export function RoiCapacityPanel({
   hardCeiling,
   totalLicenseCost,
   licenseRoiPercent,
-  licenseUnderutilizedCost,
   licenseOverutilizedValue,
   onSelectUser,
   onSelectZone,
@@ -43,6 +41,7 @@ export function RoiCapacityPanel({
 
   const zone1List = userCapacityBreakdown.filter((u) => u.zone === 'zone1_under');
   const zone2List = userCapacityBreakdown.filter((u) => u.zone === 'zone2_over');
+  const zeroConsumptionUserCount = userCapacityBreakdown.filter((u) => u.tokenConsumption === 0).length;
 
   const displayedList =
     activeTab === 'zone1' ? zone1List : activeTab === 'zone2' ? zone2List : userCapacityBreakdown;
@@ -163,11 +162,11 @@ export function RoiCapacityPanel({
           </div>
 
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 flex items-start space-x-3">
-            <TrendingDown className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <Users className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-amber-300 font-bold">Underutilized License Spend</p>
+              <p className="text-amber-300 font-bold">Zero-Consumption Users</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-amber-200">{fmtCost(licenseUnderutilizedCost)}</strong> of purchased license cost went unconsumed by usage.
+                <strong className="text-amber-200">{zeroConsumptionUserCount} users</strong> hold a licensed AI tool but recorded 0 tokens of consumption.
               </p>
             </div>
           </div>

@@ -243,7 +243,6 @@ export default function RoiPage() {
               hardCeiling={summary.hardCeiling}
               totalLicenseCost={summary.totalLicenseCost}
               licenseRoiPercent={summary.licenseRoiPercent}
-              licenseUnderutilizedCost={summary.licenseUnderutilizedCost}
               licenseOverutilizedValue={summary.licenseOverutilizedValue}
               filters={filters}
               onSelectUser={(u) =>
