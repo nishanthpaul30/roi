@@ -41,7 +41,6 @@ export function RoiCapacityPanel({
 
   const zone1List = userCapacityBreakdown.filter((u) => u.zone === 'zone1_under');
   const zone2List = userCapacityBreakdown.filter((u) => u.zone === 'zone2_over');
-  const zeroConsumptionUserCount = userCapacityBreakdown.filter((u) => u.tokenConsumption === 0).length;
 
   const displayedList =
     activeTab === 'zone1' ? zone1List : activeTab === 'zone2' ? zone2List : userCapacityBreakdown;
@@ -52,6 +51,17 @@ export function RoiCapacityPanel({
 
   // Raw CSV rows, needed to walk the mandated hierarchy before any user is named.
   const { rows: allRows } = useRawRows(filters);
+
+  // Literal count: distinct users appearing in a Usage-type row whose GenAI
+  // Tool Consumption is exactly 0 (as opposed to users with no Usage row at all).
+  const zeroConsumptionUserCount = useMemo(() => {
+    const emails = new Set(
+      allRows
+        .filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption === 0)
+        .map((r) => r.userMail.toLowerCase())
+    );
+    return emails.size;
+  }, [allRows]);
 
   const capacityByEmail = useMemo(() => {
     const map = new Map<string, UserCapacityRow>();
@@ -166,7 +176,7 @@ export function RoiCapacityPanel({
             <div>
               <p className="text-amber-300 font-bold">Zero-Consumption Users</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-amber-200">{zeroConsumptionUserCount} users</strong> hold a licensed AI tool but recorded 0 tokens of consumption.
+                <strong className="text-amber-200">{zeroConsumptionUserCount} users</strong> have a Usage record with GenAI Tool Consumption equal to 0.
               </p>
             </div>
           </div>

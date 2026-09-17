@@ -1082,7 +1082,7 @@ export function ExecutiveInferenceDrilldownView({
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Dormant Unutilized Licenses</span>
                   <p className="text-2xl font-bold text-rose-400">{inactiveUserCount} Licenses</p>
-                  <p className="text-[10px] text-rose-300/80">0 Tokens in Selected Period</p>
+                  <p className="text-[10px] text-rose-300/80">No Usage-row activity recorded</p>
                 </div>
                 <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
                   <span className="text-ey-muted text-[10px] uppercase font-bold">Annualized License Leakage</span>
