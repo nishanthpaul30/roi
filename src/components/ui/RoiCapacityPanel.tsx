@@ -192,7 +192,7 @@ export function RoiCapacityPanel({
             ? 'Zone 1: Unused AI License View'
             : activeTab === 'zone2'
             ? 'Zone 2: Budget Breach & Overage View'
-            : 'All User Licenses — Capacity & Zone View'
+            : 'CT vs Non-CT Spend'
         }
         onSelectUser={(email) => {
           const row = capacityByEmail.get(email.toLowerCase());

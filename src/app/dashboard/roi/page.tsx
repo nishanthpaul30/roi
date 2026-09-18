@@ -5,25 +5,15 @@ import { useMetricsData } from '@/hooks/useMetricsData';
 import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { KpiCard } from '@/components/ui/KpiCard';
 import { MetricChart } from '@/components/ui/MetricChart';
-import { DataTable } from '@/components/ui/DataTable';
 import { RoiCapacityPanel } from '@/components/ui/RoiCapacityPanel';
 import { ProjectBillabilityPanel } from '@/components/ui/ProjectBillabilityPanel';
 import { RoiDrilldownView, RoiDrilldownTarget } from '@/components/ui/RoiDrilldownView';
 import { ExecutiveMetricDrilldownView } from '@/components/ui/ExecutiveMetricDrilldownView';
 import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
 import { ExecutivePrintTemplate } from '@/components/reports/ExecutivePrintTemplate';
-import { Coins, Zap } from 'lucide-react';
+import { Coins } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
-
-const TOOL_LABELS: Record<string, string> = {
-  chatgpt: 'ChatGPT',
-  github: 'GitHub Copilot',
-  claude: 'Claude',
-  replit: 'Replit',
-  factory: 'Factory AI',
-  cursor: 'Cursor AI',
-};
 
 export default function RoiPage() {
   const { filters, setFilters, data, loading } = useMetricsData();
@@ -272,19 +262,11 @@ export default function RoiPage() {
               }
             />
 
-            {/* Engagement Code Telemetry & Billability Panel */}
+            {/* Billable / Non-Billable Spend Panel — the Engagement Code
+                Telemetry & Spend Rankings table that used to sit below this
+                has moved to the Engagement Analytics page. */}
             <ProjectBillabilityPanel
               summary={summary}
-              onSelectProject={(projectCode, billable) =>
-                openDrilldown({
-                  type: 'project',
-                  id: projectCode,
-                  title: `Project Telemetry: ${projectCode}`,
-                  subtitle: `Row-level CSV usage records for project investment code ${projectCode} (${billable ? 'Billable' : 'Non-Billable'}).`,
-                  badge: billable ? 'Billable' : 'Non-Billable',
-                  filterCriteria: { projectCode },
-                })
-              }
               onSelectBillability={(bType) =>
                 openDrilldown({
                   type: 'billability',
@@ -298,32 +280,6 @@ export default function RoiPage() {
                 })
               }
             />
-
-            {/* Financial Summary panel */}
-            <div className="bg-ey-card border border-ey-border rounded-xl p-6 shadow-sm">
-              <h3 className="text-sm font-bold text-ey-light flex items-center gap-2 mb-4 border-b border-ey-border pb-3">
-                <Zap className="w-4 h-4 text-ey-yellow" />
-                Capacity &amp; Financial Governance Summary
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
-                {[
-                  { label: 'Unused Capacity (total)', value: fmtCost(summary.totalWasteCost), sub: 'unconsumed free-dollar limit', color: 'text-amber-400' },
-                  { label: 'Overage Spend (total)', value: fmtCost(summary.totalOverageCost), sub: 'billed beyond per-tool free-dollar limit', color: 'text-purple-400' },
-                  { label: 'Quota Efficiency Rate', value: `${summary.licenseEfficiencyRate}%`, sub: 'actual ÷ limit', color: 'text-emerald-400' },
-                  { label: 'Total API Cost', value: fmtCost(summary.totalCost), sub: 'actual billed USD', color: 'text-ey-light' },
-                  { label: 'Cost per 1K tokens', value: `$${summary.costPer1kTokens.toFixed(6)}`, sub: '/ 1K tokens', color: 'text-ey-yellow' },
-                  { label: 'Near Dollar Cap Users', value: `${summary.ceilingRiskCount} users`, sub: `≥90% of ${fmtCost(summary.hardCeiling)}`, color: 'text-red-400' },
-                  { label: 'Total License Cost', value: fmtCost(summary.totalLicenseCost), sub: 'sum of per-license Cost in USD', color: 'text-sky-400' },
-                  { label: 'Usage vs License Cost', value: `${summary.licenseRoiPercent}%`, sub: 'usage cost ÷ license cost', color: 'text-sky-400' },
-                ].map((item) => (
-                  <div key={item.label} className="bg-ey-black border border-ey-border rounded-lg p-3">
-                    <p className="text-ey-muted text-[10px] mb-1 font-mono">{item.label}</p>
-                    <p className={`text-base font-bold ${item.color}`}>{item.value}</p>
-                    <p className="text-ey-muted text-[10px]">{item.sub}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
 
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -343,37 +299,6 @@ export default function RoiPage() {
               />
             </div>
 
-            {/* AI Tool Breakdown */}
-            {summary.byAiTool?.length > 0 && (
-              <DataTable
-                title="Cost &amp; Token Efficiency by AI Tool"
-                data={summary.byAiTool.map((t) => ({
-                  rawTool: t.tool,
-                  tool: TOOL_LABELS[t.tool] || t.tool,
-                  tokens: formatCompactNumber(t.tokens),
-                  cost: fmtCost(t.cost),
-                  share: `${((t.tokens / summary.totalTokenConsumption) * 100).toFixed(4)}%`,
-                  costPer1k: `$${t.costPer1kTokens.toFixed(6)}`,
-                }))}
-                columns={[
-                  { header: 'AI Tool', accessorKey: 'tool' },
-                  { header: 'Token Consumption', accessorKey: 'tokens' },
-                  { header: 'Cost (USD)', accessorKey: 'cost' },
-                  { header: 'Cost per 1K Tokens', accessorKey: 'costPer1k' },
-                  { header: 'Token Share', accessorKey: 'share' },
-                ]}
-                onRowClick={(row: any) =>
-                  openDrilldown({
-                    type: 'tool',
-                    id: row.rawTool,
-                    title: `AI Platform Telemetry: ${row.tool}`,
-                    subtitle: `Raw CSV telemetry records and unit economics for ${row.tool}.`,
-                    badge: row.tool,
-                    filterCriteria: { aiTool: row.rawTool },
-                  })
-                }
-              />
-            )}
           </>
         )}
           </>

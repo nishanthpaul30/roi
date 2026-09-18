@@ -5,7 +5,6 @@ import { useMetricsData } from '@/hooks/useMetricsData';
 import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { KpiCard } from '@/components/ui/KpiCard';
 import { ExecutiveInferencesPanel } from '@/components/ui/ExecutiveInferencesPanel';
-import { MultiToolComparisonPanel } from '@/components/ui/MultiToolComparisonPanel';
 import { ExecutiveMetricDrilldownView } from '@/components/ui/ExecutiveMetricDrilldownView';
 import { ExecutiveInferenceDrilldownView } from '@/components/ui/ExecutiveInferenceDrilldownView';
 import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
@@ -218,32 +217,6 @@ export default function ExecutiveOverviewPage() {
                   onSelectInference={(infId) => {
                     setInferenceInitialEntity(null);
                     setActiveInferenceDrilldown(infId);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                />
-
-                {/* Multi-Tool Spend & Efficiency Comparison across all active AI tools */}
-                <MultiToolComparisonPanel
-                  summary={data.tokenCostSummary}
-                  filters={filters}
-                  onDrilldown={(tool, userMail) => {
-                    if (userMail) {
-                      setInferenceInitialEntity({ type: 'user', name: userMail, label: userMail });
-                    } else if (tool) {
-                      const TOOL_ENTERPRISE_LABELS: Record<string, string> = {
-                        chatgpt: 'ChatGPT Enterprise',
-                        github: 'GitHub Copilot Enterprise',
-                        claude: 'Claude Enterprise',
-                        replit: 'Replit Enterprise',
-                        factory: 'Factory AI Enterprise',
-                        cursor: 'Cursor AI Enterprise',
-                      };
-                      const toolLabel = TOOL_ENTERPRISE_LABELS[tool.toLowerCase()] || tool;
-                      setInferenceInitialEntity({ type: 'tool', name: tool, label: toolLabel });
-                    } else {
-                      setInferenceInitialEntity(null);
-                    }
-                    setActiveInferenceDrilldown('multi_tool_comparison');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                 />

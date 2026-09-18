@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   Users,
   UserCheck,
@@ -11,8 +10,7 @@ import {
   Layers,
   ArrowUpRight,
   ShieldAlert,
-  Wallet,
-  Gauge,
+  CheckCircle2,
 } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
 import { formatCompactCurrency as fmtCost } from '@/lib/format';
@@ -26,7 +24,6 @@ const fmtPct = (v: number) => `${(Number.isFinite(v) ? v : 0).toFixed(1)}%`;
 
 export function ExecutiveInferencesPanel({ summary, onSelectInference }: ExecutiveInferencesPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
-  const router = useRouter();
 
   if (!summary) return null;
 
@@ -49,13 +46,6 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
   const top20Spend = usersSorted.slice(0, top20Count).reduce((s, u) => s + u.actualCost, 0);
   const top10Percent = totalCost > 0 ? (top10Spend / totalCost) * 100 : 0;
   const top20Percent = totalCost > 0 ? (top20Spend / totalCost) * 100 : 0;
-
-  // 4b. Usage vs License Cost Governance
-  const licenseUnderutilizedCost = summary.licenseUnderutilizedCost || 0;
-  const licenseRoiPercent = summary.licenseRoiPercent || 0;
-
-  // 4c. Multi-Tool License Consolidation (multi-platform seat overlap)
-  const overlap = summary.multiToolOverlap;
 
   // 5. Client Billability (real Billable/Non-Billable CSV flag)
   const nonBillablePercent = 100 - (summary.billableSpendPercent || 0);
@@ -81,30 +71,10 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
         inactiveUserCount > 0
           ? 'Automate a 30-day inactivity license reclamation workflow: reallocate dormant licenses to waitlisted teams or convert low-activity licenses to consumption-only API keys.'
           : 'Maintain active monitoring and expand license capacity proactively as new engineering cohorts onboard.',
-    },
-    {
-      id: 'license_roi_governance',
-      drilldownId: '__navigate_roi__',
-      title: 'License Spend Efficiency Analysis',
-      tag: 'Financial Governance',
-      tagColor: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
-      icon: Wallet,
-      stat: `${fmtPct(licenseRoiPercent)} usage vs license`,
-      statSub: `${fmtCost(licenseUnderutilizedCost)} unconsumed${overlap && overlap.dualToolUserCount > 0 ? ` + ${fmtCost(overlap.totalDualToolSpend)} multi-license` : ''}`,
-      finding: `${fmtPct(licenseRoiPercent)} of the ${fmtCost(summary.totalLicenseCost)} in real per-license Cost in USD was actually consumed as usage.${overlap && overlap.dualToolUserCount > 0 ? ` On top of that, ${overlap.dualToolUserCount} users run two or more AI platforms concurrently, adding ${fmtCost(overlap.totalDualToolSpend)} in consolidatable multi-license spend.` : ''}`,
-      actionableInsight: 'Open the Token & Spend ROI page to reclaim or downgrade underutilized licenses, and standardize multi-platform users onto a single primary AI tool.',
-    },
-    {
-      id: 'capacity_waste_overage',
-      drilldownId: '__navigate_roi__',
-      title: 'Unused Capacity & Overage Risk',
-      tag: 'Capacity Governance',
-      tagColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-      icon: Gauge,
-      stat: `${fmtCost(summary.totalWasteCost)} Unconsumed Capacity`,
-      statSub: `${fmtCost(summary.totalOverageCost)} overage · ${summary.ceilingRiskCount} users near cap`,
-      finding: `${fmtCost(summary.totalWasteCost)} of free-dollar capacity went unconsumed across the org. Separately, ${fmtCost(summary.totalOverageCost)} was billed beyond those free-dollar limits, and ${summary.ceilingRiskCount} users have reached or exceeded 90% of the ${fmtCost(summary.hardCeiling)} hard spend ceiling.`,
-      actionableInsight: 'Open the Token & Spend ROI page to review the Zone 1 unused capacity and Zone 2 overage breakdown, and flag users nearing the spend ceiling before they hit hard limits.',
+      benefitOutcome:
+        inactiveUserCount > 0
+          ? `Recovers up to ${fmtCost(inactiveLeakageCost)}/mo in reclaimed license spend. Also frees ${inactiveUserCount} seats for waitlisted teams and gives leadership a clean, auditable license-utilization baseline.`
+          : `Protects the full ${fmtCost(summary.totalLicenseCost)} license investment from idle-seat leakage. Also keeps onboarding friction low as new hires can be provisioned with confidence.`,
     },
     {
       id: 'project_billability',
@@ -116,6 +86,7 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
       statSub: `${fmtCost(summary.billableSpend)} Billable vs ${fmtCost(summary.nonBillableSpend)} Non-Billable`,
       finding: `${fmtPct(summary.billableSpendPercent || 0)} of total AI spend (${fmtCost(summary.billableSpend)}) is flagged Billable in the CSV. Non-billable internal overhead accounts for ${fmtCost(summary.nonBillableSpend)} (${fmtPct(nonBillablePercent)}).`,
       actionableInsight: 'Audit the largest non-billable cost centers to ensure internal AI investment yields reusable intellectual property or client delivery templates.',
+      benefitOutcome: `Protects the ROI on ${fmtCost(summary.nonBillableSpend)} of non-billable spend by redirecting it toward reusable IP instead of one-off internal use. Also strengthens cost-allocation audit trails and makes the case for billing back qualifying work.`,
     },
     {
       id: 'habitual_retention',
@@ -132,6 +103,10 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
         cohorts && cohorts.dropoutPercent > 20
           ? 'Investigate the Dropout cohort for onboarding friction before expanding license capacity further.'
           : 'AI tools show healthy habitual usage. Focus shift from basic onboarding to advanced competency training.',
+      benefitOutcome:
+        cohorts && cohorts.dropoutPercent > 20
+          ? `Protects roughly ${fmtCost(cohorts.dropoutCount * avgLicenseCostPerSeat)}/mo in license spend now at risk from the ${cohorts.dropoutCount}-person Dropout cohort churning off their seats. Also lifts overall productivity return once those seats convert to habitual use.`
+          : `Sustains the return on the full ${fmtCost(summary.totalLicenseCost)} license investment by keeping usage habitual rather than one-off. Also compounds productivity gains as advanced training deepens adoption.`,
     },
     {
       id: 'pareto_risk',
@@ -143,18 +118,12 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
       statSub: `${top20Count} power users drive majority cost`,
       finding: `Spend concentration: the top 10% of active users (${top10Count} people) account for ${fmtPct(top10Percent)} of total spend, and the top 20% (${top20Count} people) account for ${fmtPct(top20Percent)} of all expenditure (${fmtCost(top20Spend)}).`,
       actionableInsight: `Avoid broad, org-wide cuts. Conduct targeted usage reviews for the top ${top20Count} power users and negotiate tier-based volume plans.`,
+      benefitOutcome: `Targets the highest-leverage cost lever: tier-based volume pricing for the ${top20Count} users already driving ${fmtCost(top20Spend)} (${fmtPct(top20Percent)} of spend) can cut real dollars without an org-wide policy that disrupts the other 80% of users. Also keeps your highest-value power users fully productive.`,
     },
   ];
 
-  const handleCardClick = (item: { id: string; drilldownId?: string }) => {
-    const target = item.drilldownId || item.id;
-    if (target === '__navigate_roi__') {
-      router.push('/dashboard/roi');
-      return;
-    }
-    if (onSelectInference) {
-      onSelectInference(target);
-    }
+  const handleCardClick = (item: { id: string }) => {
+    onSelectInference?.(item.id);
   };
 
   return (
@@ -235,10 +204,19 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
                 </div>
 
                 {/* Executive Recommendation */}
-                <div className="pt-2 border-t border-ey-border/60">
+                <div className="pt-2 border-t border-ey-border/60 space-y-2">
                   <div className="text-[11px] bg-ey-yellow/5 p-2 rounded-lg border border-ey-yellow/20 group-hover:border-ey-yellow/30 transition-colors">
                     <span className="font-bold text-ey-yellow block mb-0.5 text-[10px] uppercase tracking-wider">Suggestive Action:</span>
                     <span className="text-ey-light text-[10px] leading-normal line-clamp-2">{item.actionableInsight}</span>
+                  </div>
+
+                  {/* Benefits & Outcome — cost-first payoff of taking the action */}
+                  <div className="text-[11px] bg-emerald-500/5 p-2 rounded-lg border border-emerald-500/20 group-hover:border-emerald-500/30 transition-colors">
+                    <span className="font-bold text-emerald-400 flex items-center gap-1 mb-0.5 text-[10px] uppercase tracking-wider">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Benefits &amp; Outcome:
+                    </span>
+                    <span className="text-ey-light text-[10px] leading-normal line-clamp-3">{item.benefitOutcome}</span>
                   </div>
                 </div>
               </div>

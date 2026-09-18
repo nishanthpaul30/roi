@@ -1,25 +1,16 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMetricsData } from '@/hooks/useMetricsData';
 import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { useRawRows } from '@/hooks/useRawRows';
-import { Briefcase, ChevronRight, RotateCcw, ArrowUpRight, X, Search, Info } from 'lucide-react';
+import { Briefcase, ChevronRight, RotateCcw, ArrowUpRight, X, Info } from 'lucide-react';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
-
-interface LevelField {
-  key: keyof CsvUsageRow;
-  label: string;
-}
-
-interface Level {
-  id: string;
-  title: string;
-  fields: LevelField[];
-}
+import { summarize, type Level, type PathEntry } from '@/lib/hierarchyDrilldown';
+import { EngagementCodeRankingsPanel } from '@/components/ui/EngagementCodeRankingsPanel';
 
 // The engagement-side hierarchy, picked up where the org hierarchy (CT/Non-CT ->
 // Country -> Service Line -> Sub-Service Line 1 -> Sub-Service Line 2 -> Users)
@@ -33,37 +24,6 @@ const LEVELS: Level[] = [
   { id: 'engagementCompetency', title: 'Engagement Competency', fields: [{ key: 'engagementCompetency', label: 'Engagement Competency' }] },
 ];
 
-interface PathEntry {
-  levelId: string;
-  field: keyof CsvUsageRow;
-  fieldLabel: string;
-  value: string;
-}
-
-function summarize(rows: CsvUsageRow[], field: keyof CsvUsageRow) {
-  const map = new Map<string, CsvUsageRow[]>();
-  for (const r of rows) {
-    const v = String(r[field] || 'Unknown').trim() || 'Unknown';
-    if (!map.has(v)) map.set(v, []);
-    map.get(v)!.push(r);
-  }
-  return Array.from(map.entries())
-    .map(([value, groupRows]) => ({
-      value,
-      rowCount: groupRows.length,
-      // Active = someone who actually used the tool. A License row records a
-      // held seat, not activity, so it must not inflate this count.
-      userCount: new Set(
-        groupRows
-          .filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0)
-          .map((r) => r.userMail.toLowerCase())
-      ).size,
-      tokens: Math.round(groupRows.reduce((s, r) => s + r.tokenConsumption, 0)),
-      cost: Number(groupRows.reduce((s, r) => s + r.cost, 0).toFixed(2)),
-    }))
-    .sort((a, b) => b.cost - a.cost);
-}
-
 function EngagementAnalytics() {
   const { filters, setFilters, data } = useMetricsData();
   const { rows: baseRows, loading: rowsLoading } = useRawRows(filters);
@@ -72,15 +32,11 @@ function EngagementAnalytics() {
 
   const userParam = (searchParams.get('user') || '').toLowerCase().trim();
   const [path, setPath] = useState<PathEntry[]>([]);
-  // Finds a specific engagement in the level-1 list. There are ~400 codes, so
-  // scrolling for a known one is the slow path.
-  const [codeQuery, setCodeQuery] = useState('');
 
   // Arriving from a different user's row has to restart the drilldown — the
   // engagement path from the previous user rarely exists under the new one.
   useEffect(() => {
     setPath([]);
-    setCodeQuery('');
   }, [userParam]);
 
   // Costs here are Total AI Investment (Usage + License rows), matching the
@@ -265,24 +221,28 @@ function EngagementAnalytics() {
             columns={rawColumns}
             pageSize={15}
           />
+        ) : currentLevel.id === 'engagementCode' ? (
+          /* Level 1: Engagement Code — replaced by the Engagement Code
+             Telemetry & Spend Rankings panel (relocated from the ROI page).
+             Selecting a row continues the same path-based drilldown as
+             every other level below: it pushes the code into `path` via
+             selectValue, advancing to Level 2 (Engagement Super Region). */
+          <EngagementCodeRankingsPanel
+            data={summarize(pathRows, 'projectCode').map((g) => ({
+              projectCode: g.value,
+              tokens: g.tokens,
+              cost: g.cost,
+              userCount: g.userCount,
+            }))}
+            levelLabel={`Level ${path.length + 1}: Engagement Code`}
+            onSelectProject={(projectCode) =>
+              selectValue('engagementCode', 'projectCode', 'Engagement Code', projectCode)
+            }
+          />
         ) : (
           <div className="space-y-6">
             {currentLevel.fields.map((f) => {
-              const allGroups = summarize(pathRows, f.key);
-              // Search applies to the engagement-code step only — that's the id
-              // people arrive knowing; the levels below it are short lists.
-              const isCodeLevel = currentLevel.id === 'engagementCode';
-              const q = codeQuery.trim().toLowerCase();
-              const groups = isCodeLevel && q
-                ? allGroups.filter((g) => g.value.toLowerCase().includes(q))
-                : allGroups;
-
-              // Enter on a query that narrows to exactly one code drills straight in.
-              const onSearchKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-                if (e.key === 'Enter' && groups.length === 1) {
-                  selectValue(currentLevel.id, f.key, f.label, groups[0].value);
-                }
-              };
+              const groups = summarize(pathRows, f.key);
 
               return (
                 <div key={f.key} className="bg-ey-card border border-ey-border rounded-xl p-5 shadow-sm">
@@ -292,45 +252,13 @@ function EngagementAnalytics() {
                         Level {path.length + 1}: {f.label}
                       </h3>
                       <p className="text-xs text-ey-muted">
-                        Click a value to continue drilling.{' '}
-                        {isCodeLevel && q
-                          ? `${groups.length} of ${allGroups.length} engagement codes match "${codeQuery.trim()}".`
-                          : `${allGroups.length} distinct value${allGroups.length === 1 ? '' : 's'} at this step.`}
+                        Click a value to continue drilling. {groups.length} distinct value{groups.length === 1 ? '' : 's'} at this step.
                       </p>
                     </div>
-
-                    {isCodeLevel && (
-                      <div className="relative shrink-0">
-                        <Search className="w-3.5 h-3.5 text-ey-muted absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        <input
-                          id="engagement-code-search"
-                          type="text"
-                          value={codeQuery}
-                          onChange={(e) => setCodeQuery(e.target.value)}
-                          onKeyDown={onSearchKeyDown}
-                          placeholder="Search engagement code…"
-                          aria-label="Search engagement code"
-                          className="h-9 w-60 bg-ey-black border border-ey-border text-ey-light text-xs rounded-lg pl-8 pr-8 focus:outline-none focus:border-ey-yellow"
-                        />
-                        {codeQuery && (
-                          <button
-                            onClick={() => setCodeQuery('')}
-                            aria-label="Clear engagement code search"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-ey-muted hover:text-ey-yellow transition"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                   {groups.length === 0 ? (
-                    <p className="text-xs text-ey-muted py-6 text-center">
-                      {isCodeLevel && q
-                        ? `No engagement code matches "${codeQuery.trim()}".`
-                        : 'No data matches the current path.'}
-                    </p>
+                    <p className="text-xs text-ey-muted py-6 text-center">No data matches the current path.</p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs text-ey-light">
