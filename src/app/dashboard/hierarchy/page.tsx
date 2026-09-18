@@ -10,17 +10,7 @@ import Link from 'next/link';
 import { GitBranch, ChevronRight, RotateCcw, ArrowUpRight, TableProperties, Globe2, Briefcase, Info } from 'lucide-react';
 import { GeoHierarchyMap } from '@/components/ui/GeoHierarchyMap';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
-
-interface LevelField {
-  key: keyof CsvUsageRow;
-  label: string;
-}
-
-interface Level {
-  id: string;
-  title: string;
-  fields: LevelField[];
-}
+import { summarize, type Level, type PathEntry } from '@/lib/hierarchyDrilldown';
 
 // The required application-wide hierarchy — always followed while drilling down:
 // CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1 -> Sub-Service Line 2 ->
@@ -37,37 +27,6 @@ const LEVELS: Level[] = [
   { id: 'subServiceLine2', title: 'Sub-Service Line 2', fields: [{ key: 'subServiceLine2', label: 'Sub-Service Line 2' }] },
   { id: 'user', title: 'Users', fields: [{ key: 'userMail', label: 'User' }] },
 ];
-
-interface PathEntry {
-  levelId: string;
-  field: keyof CsvUsageRow;
-  fieldLabel: string;
-  value: string;
-}
-
-function summarize(rows: CsvUsageRow[], field: keyof CsvUsageRow) {
-  const map = new Map<string, CsvUsageRow[]>();
-  for (const r of rows) {
-    const v = String(r[field] || 'Unknown').trim() || 'Unknown';
-    if (!map.has(v)) map.set(v, []);
-    map.get(v)!.push(r);
-  }
-  return Array.from(map.entries())
-    .map(([value, groupRows]) => ({
-      value,
-      rowCount: groupRows.length,
-      // Active = someone who actually used the tool. A License row records a
-      // held seat, not activity, so it must not inflate this count.
-      userCount: new Set(
-        groupRows
-          .filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0)
-          .map((r) => r.userMail.toLowerCase())
-      ).size,
-      tokens: Math.round(groupRows.reduce((s, r) => s + r.tokenConsumption, 0)),
-      cost: Number(groupRows.reduce((s, r) => s + r.cost, 0).toFixed(2)),
-    }))
-    .sort((a, b) => b.cost - a.cost);
-}
 
 export default function HierarchyDrilldownPage() {
   const { filters, setFilters, data } = useMetricsData();

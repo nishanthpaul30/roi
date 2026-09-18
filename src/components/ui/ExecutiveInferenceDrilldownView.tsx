@@ -115,6 +115,7 @@ export interface InferenceDefinition {
   statSub: string;
   finding: string;
   actionableInsight: string;
+  benefitOutcome: string;
 }
 
 interface ExecutiveInferenceDrilldownViewProps {
@@ -717,6 +718,10 @@ export function ExecutiveInferenceDrilldownView({
         inactiveUserCount > 0
           ? `Automate a 30-day inactivity license reclamation workflow: reallocate dormant licenses to waitlisted teams or convert low-activity licenses to consumption-only API keys.`
           : `Maintain active monitoring and expand license capacity proactively.`,
+      benefitOutcome:
+        inactiveUserCount > 0
+          ? `Recovers up to ${fmtCost(inactiveLeakageCost)}/mo in reclaimed license spend. Also frees ${inactiveUserCount} seats for waitlisted teams and gives leadership a clean, auditable license-utilization baseline.`
+          : `Protects the full license investment from idle-seat leakage. Also keeps onboarding friction low as new hires can be provisioned with confidence.`,
     },
     pareto_risk: {
       id: 'pareto_risk',
@@ -729,6 +734,7 @@ export function ExecutiveInferenceDrilldownView({
       finding: `Spend is heavily concentrated: the top 10% of users (${top10PercentCount} people) account for ${fmtCost(top10Spend)} (${((top10Spend / totalOrgSpend) * 100).toFixed(1)}%), and the top 20% (${top20PercentCount} people) drive ${fmtCost(top20Spend)} (${top20SpendPercent}%).`,
       actionableInsight:
         'Avoid broad, org-wide cuts. Conduct targeted usage reviews for top power users and negotiate tier-based volume plans.',
+      benefitOutcome: `Targets the highest-leverage cost lever: tier-based volume pricing for the ${top20PercentCount} users already driving ${fmtCost(top20Spend)} (${top20SpendPercent}% of spend) can cut real dollars without an org-wide policy that disrupts the other 80% of users. Also keeps your highest-value power users fully productive.`,
     },
     multi_tool_comparison: (() => {
       const sorted = [...multiToolData.toolList].sort((a, b) => a.costPerM - b.costPerM);
@@ -747,6 +753,7 @@ export function ExecutiveInferenceDrilldownView({
         statSub: `${fmtCost(multiToolData.dualToolSpend)} redundant spend`,
         finding: `${cheapest?.label} is the cheapest tool at $${(cheapest?.costPerM || 0).toFixed(2)} per million tokens. ${priciest?.label} is the most expensive at $${(priciest?.costPerM || 0).toFixed(2)} per million tokens — about ${priceMultiple.toFixed(1)}x more for the same volume of usage.`,
         actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens). Consolidate overlapping multi-tool licenses to eliminate redundant fixed license fees across ${multiToolData.dualToolUsers.length} users.`,
+        benefitOutcome: `Recovers up to ${fmtCost(multiToolData.dualToolSpend)} in redundant multi-license spend by consolidating ${multiToolData.dualToolUsers.length} overlapping users onto a single primary tool. Also lowers per-token spend by routing volume toward the ${priceMultiple.toFixed(1)}x cheaper option, and simplifies vendor management.`,
       };
     })(),
     vendor_spread: (() => {
@@ -767,6 +774,7 @@ export function ExecutiveInferenceDrilldownView({
         statSub: `${fmtCost(multiToolData.dualToolSpend)} redundant spend`,
         finding: `${cheapest?.label} unit cost is $${(cheapest?.costPerM || 0).toFixed(2)}/M tokens, and ${priciest?.label} is the highest at $${(priciest?.costPerM || 0).toFixed(2)}/M. ${topSpend?.label} accounts for ${(topSpend?.spendShare || 0).toFixed(1)}% of spend (${fmtCost(topSpend?.cost || 0)}) across ${sorted.length} active tools. Multi-platform license overlap was identified across multi-tool users with redundant license overhead.`,
         actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens) to reduce token spend.`,
+        benefitOutcome: `Recovers up to ${fmtCost(multiToolData.dualToolSpend)} in redundant multi-license spend by consolidating overlapping users, plus per-token savings from shifting volume to the ${priceMultiple.toFixed(1)}x cheaper tool. Also reduces vendor sprawl across the ${sorted.length} active platforms.`,
       };
     })(),
     project_billability: (() => {
@@ -783,6 +791,7 @@ export function ExecutiveInferenceDrilldownView({
         finding: `${billableSpendPercent.toFixed(1)}% of total AI spend (${fmtCost(summary?.billableSpend || 0)}) is flagged Billable, derived from Engagement Codes starting with E-, and directly assigned to revenue-generating client engagements. Non-billable internal spend (${fmtCost(summary?.nonBillableSpend || 0)}) accounts for ${nonBillablePct.toFixed(1)}%.`,
         actionableInsight:
           'Audit the largest non-billable cost centers to ensure internal AI investment yields reusable intellectual property or client delivery templates.',
+        benefitOutcome: `Protects the ROI on ${fmtCost(summary?.nonBillableSpend || 0)} of non-billable spend by redirecting it toward reusable IP instead of one-off internal use. Also strengthens cost-allocation audit trails and makes the case for billing back qualifying work.`,
       };
     })(),
     habitual_retention: (() => {
@@ -802,6 +811,10 @@ export function ExecutiveInferenceDrilldownView({
           occasionalPct > 20
             ? 'Investigate the Occasional cohort for onboarding friction or workflow gaps before expanding license capacity further.'
             : 'AI tools show healthy habitual usage among active licenses. Focus shift from basic onboarding to advanced competency training.',
+        benefitOutcome:
+          occasionalPct > 20
+            ? `Protects roughly ${fmtCost(userCohorts.occasional.length * avgLicenseCostPerSeat)}/mo in license spend now at risk from the ${userCohorts.occasional.length}-person Occasional cohort churning off their seats. Also lifts overall productivity return once those seats convert to habitual use.`
+            : `Sustains the return on the active license base by keeping usage habitual rather than one-off. Also compounds productivity gains as advanced training deepens adoption.`,
       };
     })(),
   };
@@ -1050,6 +1063,15 @@ export function ExecutiveInferenceDrilldownView({
           <div className="flex-1 text-xs">
             <span className="font-bold text-ey-yellow uppercase tracking-wider mr-2">Suggestive Action:</span>
             <span className="text-ey-light leading-relaxed">{currentMeta.actionableInsight}</span>
+          </div>
+        </div>
+
+        {/* Benefits & Outcome — cost-first payoff of taking the action above */}
+        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3.5 flex items-start space-x-3">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+          <div className="flex-1 text-xs">
+            <span className="font-bold text-emerald-400 uppercase tracking-wider mr-2">Benefits &amp; Outcome:</span>
+            <span className="text-ey-light leading-relaxed">{currentMeta.benefitOutcome}</span>
           </div>
         </div>
 
