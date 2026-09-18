@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { UserCapacityRow, GlobalFilterState } from '@/lib/metrics/types';
 import { useRawRows } from '@/hooks/useRawRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
-import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert } from 'lucide-react';
+import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert, UserX } from 'lucide-react';
 import { formatCompactCurrency as fmtCost } from '@/lib/format';
 
 interface RoiCapacityPanelProps {
@@ -16,8 +16,9 @@ interface RoiCapacityPanelProps {
   hardCeiling: number;
   totalLicenseCost: number;
   licenseRoiPercent: number;
-  licenseUnderutilizedCost: number;
+  licenseUnderutilizedCost?: number;
   licenseOverutilizedValue: number;
+  inactiveUserCount?: number;
   pageSize?: number;
   onSelectUser?: (user: UserCapacityRow) => void;
   onSelectZone?: (zone: 'zone1_under' | 'zone2_over' | 'ceiling_risk') => void;
@@ -35,19 +36,20 @@ export function RoiCapacityPanel({
   licenseRoiPercent,
   licenseUnderutilizedCost,
   licenseOverutilizedValue,
+  inactiveUserCount,
   onSelectUser,
   onSelectZone,
   filters,
 }: RoiCapacityPanelProps) {
-  const [activeTab, setActiveTab] = useState<'zone1' | 'zone2' | 'all'>('all');
+  const [activeTab, setActiveTab] = useState<'underutilized' | 'overage' | 'all'>('all');
 
   const zone1List = userCapacityBreakdown.filter((u) => u.zone === 'zone1_under');
   const zone2List = userCapacityBreakdown.filter((u) => u.zone === 'zone2_over');
 
   const displayedList =
-    activeTab === 'zone1' ? zone1List : activeTab === 'zone2' ? zone2List : userCapacityBreakdown;
+    activeTab === 'underutilized' ? zone1List : activeTab === 'overage' ? zone2List : userCapacityBreakdown;
 
-  const handleTabChange = (tab: 'zone1' | 'zone2' | 'all') => {
+  const handleTabChange = (tab: 'underutilized' | 'overage' | 'all') => {
     setActiveTab(tab);
   };
 
@@ -60,11 +62,22 @@ export function RoiCapacityPanel({
     return map;
   }, [userCapacityBreakdown]);
 
-  // Scope raw rows down to the same set of seats currently shown in the tab (all / zone1 / zone2)
+  // Scope raw rows down to the same set of seats currently shown in the tab (all / underutilized / overage)
   const hierarchyRows = useMemo(() => {
     const allowedEmails = new Set(displayedList.map((u) => u.userMail.toLowerCase()));
     return allRows.filter((r) => allowedEmails.has((r.userMail || '').toLowerCase()));
   }, [allRows, displayedList]);
+
+  const zeroConsumptionCount = useMemo(() => {
+    if (typeof inactiveUserCount === 'number') return inactiveUserCount;
+    const zeroUsageEmails = new Set<string>();
+    for (const r of allRows) {
+      if (r.calculationMethod === 'Usage' && r.tokenConsumption === 0) {
+        zeroUsageEmails.add((r.userMail || '').toLowerCase().trim());
+      }
+    }
+    return zeroUsageEmails.size;
+  }, [inactiveUserCount, allRows]);
 
   return (
     <div className="space-y-6">
@@ -77,7 +90,7 @@ export function RoiCapacityPanel({
               <span>Financial Governance &amp; Capacity Optimization</span>
             </h2>
             <p className="text-xs text-ey-muted mt-0.5">
-              Bifurcated analysis of unconsumed license quotas (Zone 1 Unused) vs usage limit breaches (Zone 2 Overage).
+              Bifurcated analysis of unconsumed license quotas (Under-Utilized) vs usage limit breaches (Overage).
             </p>
           </div>
 
@@ -94,25 +107,25 @@ export function RoiCapacityPanel({
             </button>
 
             <button
-              onClick={() => handleTabChange('zone1')}
+              onClick={() => handleTabChange('underutilized')}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition ${
-                activeTab === 'zone1'
+                activeTab === 'underutilized'
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
                   : 'bg-ey-black text-ey-muted border-ey-border hover:text-ey-light'
               }`}
             >
-              Zone 1: Under-Utilized ({zone1List.length})
+              Under-Utilized ({zone1List.length})
             </button>
 
             <button
-              onClick={() => handleTabChange('zone2')}
+              onClick={() => handleTabChange('overage')}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition ${
-                activeTab === 'zone2'
+                activeTab === 'overage'
                   ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm'
                   : 'bg-ey-black text-ey-muted border-ey-border hover:text-ey-light'
               }`}
             >
-              Zone 2: Over-Utilized ({zone2List.length})
+              Over-Utilized ({zone2List.length})
             </button>
           </div>
         </div>
@@ -122,7 +135,7 @@ export function RoiCapacityPanel({
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 flex items-start space-x-3">
             <TrendingDown className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-amber-300 font-bold">Zone 1 — AI Cost Optimization Opportunity</p>
+              <p className="text-amber-300 font-bold">AI Cost Optimization Opportunity</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
                 <strong className="text-amber-200">{fmtCost(totalWasteCost)}</strong> of license quotas went unconsumed across {zone1List.length} users.
               </p>
@@ -132,7 +145,7 @@ export function RoiCapacityPanel({
           <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3.5 flex items-start space-x-3">
             <TrendingUp className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-purple-300 font-bold">Zone 2 — Overage Spend Exposure</p>
+              <p className="text-purple-300 font-bold">Overage Spend Exposure</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
                 <strong className="text-purple-200">{fmtCost(totalOverageCost)}</strong> in additional usage billed beyond standard limits for {zone2List.length} users.
               </p>
@@ -144,7 +157,7 @@ export function RoiCapacityPanel({
             <div>
               <p className="text-red-300 font-bold">Hard Dollar Cap Warning</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-red-200">{ceilingRiskCount} users</strong> have reached or exceeded 90% of the platform hard spend ceiling ({fmtCost(hardCeiling)}).
+                <strong className="text-red-200">{ceilingRiskCount} users</strong> have reached or exceeded 90% of their per-tool spend ceiling.
               </p>
             </div>
           </div>
@@ -163,11 +176,11 @@ export function RoiCapacityPanel({
           </div>
 
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 flex items-start space-x-3">
-            <TrendingDown className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <UserX className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-amber-300 font-bold">Underutilized License Spend</p>
+              <p className="text-amber-300 font-bold">Zero-Consumption Users</p>
               <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-amber-200">{fmtCost(licenseUnderutilizedCost)}</strong> of purchased license cost went unconsumed by usage.
+                <strong className="text-amber-200">{zeroConsumptionCount} users</strong> with 0 GenAI Tool Consumption while filtered by &apos;Usage&apos; in &apos;Calculation Method&apos; column.
               </p>
             </div>
           </div>
@@ -188,11 +201,11 @@ export function RoiCapacityPanel({
       <HierarchyDrilldownPanel
         rows={hierarchyRows}
         title={
-          activeTab === 'zone1'
-            ? 'Zone 1: Unused AI License View'
-            : activeTab === 'zone2'
-            ? 'Zone 2: Budget Breach & Overage View'
-            : 'CT vs Non-CT Spend'
+          activeTab === 'underutilized'
+            ? 'Unused AI License View'
+            : activeTab === 'overage'
+            ? 'Budget Breach & Overage View'
+            : 'All User Licenses — Capacity View'
         }
         onSelectUser={(email) => {
           const row = capacityByEmail.get(email.toLowerCase());
