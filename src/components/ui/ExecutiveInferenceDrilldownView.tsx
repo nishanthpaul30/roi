@@ -20,7 +20,6 @@ import {
   Filter,
   CheckCircle2,
   Download,
-  Info,
   Calendar,
   ExternalLink,
   RefreshCw,
@@ -33,12 +32,12 @@ import {
   Award,
   Briefcase,
   BadgeDollarSign,
-  MinusCircle,
 } from 'lucide-react';
 import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { useRawRows } from '@/hooks/useRawRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
+import { StatTile } from './StatTile';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
 // Visual style per known AI tool (full literal Tailwind class strings so the JIT compiler
@@ -165,6 +164,10 @@ export function ExecutiveInferenceDrilldownView({
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [inspectingRecord, setInspectingRecord] = useState<CsvUsageRow | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+
+  // Pagination for the License Reclamation "Usage Below Free Limit" warning table
+  const [warningPage, setWarningPage] = useState(1);
+  const warningPageSize = 10;
 
   // Listen for Escape key to go back intuitively
   React.useEffect(() => {
@@ -327,11 +330,14 @@ export function ExecutiveInferenceDrilldownView({
     return Array.from(map.values()).sort((a, b) => b.monthlyCost - a.monthlyCost);
   }, [dormantUsers]);
 
-  // License Reclamation: seats with real license cost that fall below an 80%
-  // usage-ROI threshold, built from the same userCapacityBreakdown figures the
-  // rest of this screen already uses -- not a separate recomputation from raw
-  // rows -- so this stays consistent with every other dormant/underutilized
-  // figure on the app (see the seat_utilization revert history for why that matters).
+  // License Reclamation: exactly two rules, built from the same
+  // userCapacityBreakdown figures the rest of this screen already uses --
+  // not a separate recomputation from raw rows -- so this stays consistent
+  // with every other dormant/underutilized figure on the app.
+  // Rule 1: sum and RECLAIM only fully dormant licenses (0 usage). Their full
+  // license cost is recoverable since nothing was consumed.
+  // Rule 2: seats using less than their free limit (zone1_under, i.e.
+  // wasteCost > overageCost) are WARNED about only -- never reclaimed.
   const emailToRow = useMemo(() => {
     const map = new Map<string, CsvUsageRow>();
     for (const r of allRows) {
@@ -344,41 +350,62 @@ export function ExecutiveInferenceDrilldownView({
   const reclamationUsers = useMemo(() => {
     const breakdown = summary?.userCapacityBreakdown || [];
     return breakdown
-      .filter((u) => u.licenseCost > 0 && u.licenseRoiPercent < 80)
-      .map((u) => {
-        const recoverableAmount = Number((u.licenseCost - u.actualCost).toFixed(4));
-        const recommendation: 'revoke' | 'downgrade' | 'review' =
-          u.tokenConsumption === 0 ? 'revoke' : u.licenseRoiPercent < 50 ? 'downgrade' : 'review';
-        return {
-          email: u.userMail.toLowerCase().trim(),
-          displayName: u.displayName,
-          aiTools: u.aiTools,
-          licenseCost: u.licenseCost,
-          actualUsageCost: u.actualCost,
-          licenseRoiPercent: u.licenseRoiPercent,
-          recoverableAmount,
-          recommendation,
-        };
-      })
-      .filter((u) => u.recoverableAmount > 0)
+      .filter((u) => u.licenseCost > 0 && u.tokenConsumption === 0)
+      .map((u) => ({
+        email: u.userMail.toLowerCase().trim(),
+        displayName: u.displayName,
+        aiTools: u.aiTools,
+        licenseCost: u.licenseCost,
+        recoverableAmount: u.licenseCost,
+      }))
       .sort((a, b) => b.recoverableAmount - a.recoverableAmount);
   }, [summary]);
 
-  const reclamationEmailSet = useMemo(() => new Set(reclamationUsers.map((u) => u.email)), [reclamationUsers]);
+  const usageWarningUsers = useMemo(() => {
+    const breakdown = summary?.userCapacityBreakdown || [];
+    return breakdown
+      .filter((u) => u.tokenConsumption > 0 && u.zone === 'zone1_under')
+      .map((u) => ({
+        email: u.userMail.toLowerCase().trim(),
+        displayName: u.displayName,
+        aiTools: u.aiTools,
+        actualCost: u.actualCost,
+        usageFreeTokenLimit: u.usageFreeTokenLimit,
+        wasteCost: u.wasteCost,
+      }))
+      .sort((a, b) => b.wasteCost - a.wasteCost);
+  }, [summary]);
+
+  const totalWarningUsageCost = useMemo(() => usageWarningUsers.reduce((s, u) => s + u.actualCost, 0), [usageWarningUsers]);
+  const totalWarningFreeLimit = useMemo(() => usageWarningUsers.reduce((s, u) => s + u.usageFreeTokenLimit, 0), [usageWarningUsers]);
+  const totalWarningUnusedCapacity = Math.max(0, totalWarningFreeLimit - totalWarningUsageCost);
+  const warningTotalPages = Math.ceil(usageWarningUsers.length / warningPageSize) || 1;
+  const paginatedWarningUsers = usageWarningUsers.slice(
+    (warningPage - 1) * warningPageSize,
+    warningPage * warningPageSize
+  );
+
+  const reclamationEmailSet = useMemo(
+    () => new Set([...reclamationUsers.map((u) => u.email), ...usageWarningUsers.map((u) => u.email)]),
+    [reclamationUsers, usageWarningUsers]
+  );
   const reclamationRows = useMemo(
     () => allRows.filter((r) => reclamationEmailSet.has((r.userMail || '').toLowerCase().trim())),
     [allRows, reclamationEmailSet]
   );
   const totalRecoverableAmount = useMemo(() => reclamationUsers.reduce((s, u) => s + u.recoverableAmount, 0), [reclamationUsers]);
-  const totalFlaggedLicenseCost = useMemo(() => reclamationUsers.reduce((s, u) => s + u.licenseCost, 0), [reclamationUsers]);
-  const reclamationDormantCount = useMemo(() => reclamationUsers.filter((u) => u.recommendation === 'revoke').length, [reclamationUsers]);
-  const reclamationUnderutilizedCount = useMemo(
-    () => reclamationUsers.filter((u) => u.recommendation !== 'revoke').length,
-    [reclamationUsers]
-  );
-  const avgRecoverablePerSeat = reclamationUsers.length > 0 ? totalRecoverableAmount / reclamationUsers.length : 0;
+  const reclamationDormantCount = reclamationUsers.length;
+  const usageWarningCount = usageWarningUsers.length;
+  const avgRecoverablePerSeat = reclamationDormantCount > 0 ? totalRecoverableAmount / reclamationDormantCount : 0;
+
+  // Warning only: same ceilingRiskCount/hardCeiling figures as the "Users at
+  // Usage Ceiling" card on the Token & Spend ROI page (roi/page.tsx) -- reused
+  // directly rather than recomputed, so both cards always agree on who is
+  // "at the limit". Not a reclamation rule -- purely informational.
+  const nearingTokenLimitCount = summary?.ceilingRiskCount ?? 0;
+  const usageCeilingHardLimit = summary?.hardCeiling ?? 0;
   const recoverablePercentOfLicenseCost =
-    totalFlaggedLicenseCost > 0 ? ((totalRecoverableAmount / totalFlaggedLicenseCost) * 100).toFixed(1) : '0.0';
+    summary && summary.totalLicenseCost > 0 ? ((totalRecoverableAmount / summary.totalLicenseCost) * 100).toFixed(1) : '0.0';
 
   const reclamationByServiceLine = useMemo(() => {
     const map = new Map<string, { serviceLine: string; count: number; recoverableAmount: number }>();
@@ -891,19 +918,19 @@ export function ExecutiveInferenceDrilldownView({
       tagColor: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
       icon: BadgeDollarSign,
       stat: `${fmtCost(totalRecoverableAmount)} Recoverable`,
-      statSub: `${reclamationDormantCount} Dormant + ${reclamationUnderutilizedCount} Under-Utilized Seats`,
+      statSub: `${reclamationDormantCount} Dormant Seats to Reclaim · ${usageWarningCount} Below Free Limit (Warning)`,
       finding:
-        reclamationUsers.length > 0
-          ? `${reclamationUsers.length} provisioned seats (${reclamationDormantCount} fully dormant, ${reclamationUnderutilizedCount} under-utilized) fall below the 80% usage-ROI threshold, leaving ${fmtCost(totalRecoverableAmount)} recoverable out of ${fmtCost(totalFlaggedLicenseCost)} in license cost tied up in these seats (${recoverablePercentOfLicenseCost}%).`
-          : `No seats currently fall below the 80% usage-ROI reclamation threshold.`,
+        reclamationDormantCount > 0 || usageWarningCount > 0
+          ? `${reclamationDormantCount} seat${reclamationDormantCount === 1 ? '' : 's'} recorded 0 usage against a real license cost, totaling ${fmtCost(totalRecoverableAmount)} (${recoverablePercentOfLicenseCost}% of total license cost) that can be reclaimed outright. A further ${usageWarningCount} seat${usageWarningCount === 1 ? '' : 's'} are active but consuming less than their included free limit -- flagged as a warning only, not reclaimed.`
+          : 'No dormant seats to reclaim, and no active seats currently running under their free limit.',
       actionableInsight:
-        reclamationUsers.length > 0
-          ? `Revoke the ${reclamationDormantCount} zero-consumption license${reclamationDormantCount === 1 ? '' : 's'} outright, and downgrade the remaining ${reclamationUnderutilizedCount} under-utilized seat${reclamationUnderutilizedCount === 1 ? '' : 's'} to a lower tier or consumption-only plan.`
-          : 'Maintain current license allocation -- utilization is healthy across all provisioned seats.',
+        reclamationDormantCount > 0
+          ? `Reclaim the ${reclamationDormantCount} zero-usage license${reclamationDormantCount === 1 ? '' : 's'} outright. Monitor the ${usageWarningCount} under-the-free-limit seat${usageWarningCount === 1 ? '' : 's'} -- no action taken on these, just a usage warning.`
+          : 'No dormant licenses to reclaim this period.',
       benefitOutcome:
-        reclamationUsers.length > 0
-          ? `Recovers up to ${fmtCost(totalRecoverableAmount)}/period in reclaimable license spend (avg ${fmtCost(avgRecoverablePerSeat)}/seat) by acting on these ${reclamationUsers.length} flagged seats, without touching any well-utilized license.`
-          : `Protects the full ${fmtCost(totalFlaggedLicenseCost)} license investment -- no reclamation action needed this period.`,
+        reclamationDormantCount > 0
+          ? `Recovers ${fmtCost(totalRecoverableAmount)}/period in license spend (avg ${fmtCost(avgRecoverablePerSeat)}/seat) by reclaiming only the ${reclamationDormantCount} fully dormant seats, without touching any seat that has recorded real usage.`
+          : `Protects the full license investment -- no dormant seats to reclaim this period.`,
     },
   };
 
@@ -1189,65 +1216,36 @@ export function ExecutiveInferenceDrilldownView({
 
               {/* Level 2 KPI Tiles */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
-                {/* Card 1: Total Provisioned Licenses */}
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-ey-muted text-[10px] uppercase font-bold">Total Provisioned Licenses</span>
-                    <div className="group/info relative cursor-pointer">
-                      <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
-                      <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50 font-sans normal-case">
-                        Count of distinct users across all rows (License + Usage) in the selected period — every provisioned seat regardless of activity.
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-2xl font-bold text-ey-light">{totalRosterSeats} Licenses</p>
-                  <p className="text-[10px] text-ey-muted">Real per-license Cost in USD</p>
-                </div>
-
-                {/* Card 2: Active Engaged Licenses */}
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-ey-muted text-[10px] uppercase font-bold">Active Engaged Licenses</span>
-                    <div className="group/info relative cursor-pointer">
-                      <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
-                      <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50 font-sans normal-case">
-                        Filter Calculation Method = &apos;Usage&apos; AND GenAI Tool Consumption &gt; 0. Count of distinct users — users with real prompt activity this period.
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-2xl font-bold text-emerald-400">{activeUserCount} Users</p>
-                  <p className="text-[10px] text-emerald-300/80">{activeSeatPercent}% of Provisioned Pool</p>
-                </div>
-
-                {/* Card 3: Unutilized Licenses */}
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-ey-muted text-[10px] uppercase font-bold">Unutilized Licenses</span>
-                    <div className="group/info relative cursor-pointer">
-                      <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
-                      <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50 font-sans normal-case">
-                        Filter Calculation Method = &apos;Usage&apos; AND GenAI Tool Consumption = 0. Count of distinct users — provisioned seats with zero recorded consumption.
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-2xl font-bold text-rose-400">{inactiveUserCount} Licenses</p>
-                  <p className="text-[10px] text-rose-300/80">No Usage-row activity recorded</p>
-                </div>
-
-                {/* Card 4: Annualized License Leakage */}
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-ey-muted text-[10px] uppercase font-bold">Annualized License Leakage</span>
-                    <div className="group/info relative cursor-pointer">
-                      <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
-                      <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50 font-sans normal-case">
-                        Unutilized Licenses × Avg License Cost/Seat × 12. Monthly leakage = unutilized count × (Total License Cost ÷ Active Users), annualized by ×12.
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-2xl font-bold text-ey-yellow">{fmtCost(inactiveLeakageCost * 12)}/yr</p>
-                  <p className="text-[10px] text-ey-yellow/80">{fmtCost(inactiveLeakageCost)}/mo Direct Unused Spend</p>
-                </div>
+                <StatTile
+                  label="Total Provisioned Licenses"
+                  value={`${totalRosterSeats} Licenses`}
+                  subtitle="Real per-license Cost in USD"
+                  tooltip="Count of distinct users across all rows (License + Usage) in the selected period — every provisioned seat regardless of activity."
+                />
+                <StatTile
+                  label="Active Engaged Licenses"
+                  value={`${activeUserCount} Users`}
+                  valueClassName="text-emerald-400"
+                  subtitle={`${activeSeatPercent}% of Provisioned Pool`}
+                  subtitleClassName="text-emerald-300/80"
+                  tooltip="Filter Calculation Method = 'Usage' AND GenAI Tool Consumption > 0. Count of distinct users — users with real prompt activity this period."
+                />
+                <StatTile
+                  label="Unutilized Licenses"
+                  value={`${inactiveUserCount} Licenses`}
+                  valueClassName="text-rose-400"
+                  subtitle="No Usage-row activity recorded"
+                  subtitleClassName="text-rose-300/80"
+                  tooltip="Filter Calculation Method = 'Usage' AND GenAI Tool Consumption = 0. Count of distinct users — provisioned seats with zero recorded consumption."
+                />
+                <StatTile
+                  label="Annualized License Leakage"
+                  value={`${fmtCost(inactiveLeakageCost * 12)}/yr`}
+                  valueClassName="text-ey-yellow"
+                  subtitle={`${fmtCost(inactiveLeakageCost)}/mo Direct Unused Spend`}
+                  subtitleClassName="text-ey-yellow/80"
+                  tooltip="Unutilized Licenses × Avg License Cost/Seat × 12. Monthly leakage = unutilized count × (Total License Cost ÷ Active Users), annualized by ×12."
+                />
               </div>
 
               {/* Level 3: Inactive Licenses Roster & Reclamation Table */}
@@ -1369,37 +1367,49 @@ export function ExecutiveInferenceDrilldownView({
             <div className="space-y-6">
               {/* Level 2 KPI Tiles */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Recoverable License Cost</span>
-                  <p className="text-2xl font-bold text-emerald-400">{fmtCost(totalRecoverableAmount)}</p>
-                  <p className="text-[10px] text-emerald-300/80">{recoverablePercentOfLicenseCost}% of {fmtCost(totalFlaggedLicenseCost)} flagged license cost</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Dormant Seats</span>
-                  <p className="text-2xl font-bold text-rose-400">{reclamationDormantCount} Seats</p>
-                  <p className="text-[10px] text-rose-300/80">0 GenAI Tool Consumption recorded</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Under-Utilized Seats</span>
-                  <p className="text-2xl font-bold text-amber-400">{reclamationUnderutilizedCount} Seats</p>
-                  <p className="text-[10px] text-amber-300/80">&lt;80% of license cost consumed</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Avg Recoverable / Seat</span>
-                  <p className="text-2xl font-bold text-ey-yellow">{fmtCost(avgRecoverablePerSeat)}</p>
-                  <p className="text-[10px] text-ey-yellow/80">Across {reclamationUsers.length} flagged seats</p>
-                </div>
+                <StatTile
+                  label="Recoverable License Cost"
+                  value={fmtCost(totalRecoverableAmount)}
+                  valueClassName="text-emerald-400"
+                  subtitle={`${recoverablePercentOfLicenseCost}% of total license cost`}
+                  subtitleClassName="text-emerald-300/80"
+                  tooltip="Rule 1: sum of License Cost (USD) for every user with Calculation Method = 'Usage' AND GenAI Tool Consumption = 0 across all their held tools. Only 0-usage seats are counted here."
+                />
+                <StatTile
+                  label="Dormant Seats (Reclaim)"
+                  value={`${reclamationDormantCount} Seats`}
+                  valueClassName="text-rose-400"
+                  subtitle="0 GenAI Tool Consumption recorded"
+                  subtitleClassName="text-rose-300/80"
+                  tooltip="Count of distinct users with a real License Cost > 0 and GenAI Tool Consumption = 0 on their Usage rows. These are the seats reclaimed under Rule 1."
+                />
+                <StatTile
+                  label="Below Free Limit (Warning)"
+                  value={`${usageWarningCount} Seats`}
+                  valueClassName="text-amber-400"
+                  subtitle="Active, but under the included free limit"
+                  subtitleClassName="text-amber-300/80"
+                  tooltip="Rule 2: count of active users (GenAI Tool Consumption > 0) whose usage cost falls under their tool's included free-dollar limit (Zone 1: wasteCost > overageCost). Flagged as a warning only -- never reclaimed."
+                />
+                <StatTile
+                  label="Users at Usage Ceiling"
+                  value={`${nearingTokenLimitCount} Users`}
+                  valueClassName="text-ey-yellow"
+                  subtitle={`${fmtCost(usageCeilingHardLimit)} hard ceiling · 90% threshold`}
+                  subtitleClassName="text-ey-yellow/80"
+                  tooltip="Same figure as the Users at Usage Ceiling card on the Token & Spend ROI page: users who have reached or exceeded 90% of the hard spend ceiling. Warning only -- not a reclamation rule."
+                />
               </div>
 
-              {/* Mandated Hierarchy Navigator, scoped to just the flagged (dormant/under-utilized) seats */}
+              {/* Mandated Hierarchy Navigator, scoped to dormant + below-free-limit seats */}
               <HierarchyDrilldownPanel
                 rows={reclamationRows}
-                title={`Flagged License View (${reclamationUsers.length} Seats)`}
-                subtitle="Drill down through the org structure to the flagged seats below -- only dormant or under-utilized licenses appear here."
+                title={`Flagged License View (${reclamationDormantCount + usageWarningCount} Seats)`}
+                subtitle="Drill down through the org structure to the seats below -- dormant (reclaimable) and below-free-limit (warning only) seats."
                 onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
               />
 
-              {/* Level 3: Reclamation Action Ledger */}
+              {/* Rule 1: Reclamation Action Ledger -- dormant (0 usage) seats only */}
               <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ey-border/60 pb-3">
                   <div>
@@ -1408,15 +1418,15 @@ export function ExecutiveInferenceDrilldownView({
                       <span>License Reclamation Action Ledger (1-Click Reclamation)</span>
                     </h3>
                     <p className="text-xs text-ey-muted mt-0.5">
-                      Seats with real license cost consuming below 80% usage-ROI, grouped by Service Line.
+                      Rule 1: only fully dormant seats (0 usage) are reclaimed, grouped by Service Line.
                     </p>
                   </div>
                   <button
-                    onClick={() => handleTriggerAction(`Automated Reclamation Workflow dispatched to ${reclamationUsers.length} flagged seat${reclamationUsers.length === 1 ? '' : 's'}.`)}
+                    onClick={() => handleTriggerAction(`Automated Reclamation Workflow dispatched to ${reclamationDormantCount} dormant seat${reclamationDormantCount === 1 ? '' : 's'}.`)}
                     className="px-3 py-1.5 bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 self-start sm:self-center"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Reclaim All Flagged Licenses</span>
+                    <span>Reclaim All Dormant Licenses</span>
                   </button>
                 </div>
 
@@ -1425,7 +1435,7 @@ export function ExecutiveInferenceDrilldownView({
                     <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
                       <tr>
                         <th className="px-4 py-3">Service Line</th>
-                        <th className="px-4 py-3 text-center">Flagged Seats</th>
+                        <th className="px-4 py-3 text-center">Dormant Seats</th>
                         <th className="px-4 py-3 text-right">Recoverable ($)</th>
                         <th className="px-4 py-3 text-center">Action Trigger</th>
                       </tr>
@@ -1433,7 +1443,7 @@ export function ExecutiveInferenceDrilldownView({
                     <tbody className="divide-y divide-ey-border">
                       {reclamationByServiceLine.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">No flagged licenses at this time.</td>
+                          <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">No dormant licenses at this time.</td>
                         </tr>
                       ) : reclamationByServiceLine.map((sl) => {
                         const isExpanded = expandedDormantServiceLine === `reclamation:${sl.serviceLine}`;
@@ -1442,7 +1452,7 @@ export function ExecutiveInferenceDrilldownView({
                         <tr
                           onClick={() => setExpandedDormantServiceLine(isExpanded ? null : `reclamation:${sl.serviceLine}`)}
                           className="hover:bg-ey-card-hover/80 transition cursor-pointer"
-                          title={`Click to ${isExpanded ? 'hide' : 'view'} individual flagged seats in ${sl.serviceLine}`}
+                          title={`Click to ${isExpanded ? 'hide' : 'view'} individual dormant seats in ${sl.serviceLine}`}
                         >
                           <td className="px-4 py-3 font-medium text-ey-light">
                             <span className="flex items-center gap-1.5">
@@ -1460,7 +1470,7 @@ export function ExecutiveInferenceDrilldownView({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleTriggerAction(`${sl.count} flagged license${sl.count === 1 ? '' : 's'} in ${sl.serviceLine} reclaimed and returned to pool.`);
+                                handleTriggerAction(`${sl.count} dormant license${sl.count === 1 ? '' : 's'} in ${sl.serviceLine} reclaimed and returned to pool.`);
                               }}
                               className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
                             >
@@ -1476,8 +1486,6 @@ export function ExecutiveInferenceDrilldownView({
                                   <tr>
                                     <th className="px-4 py-2 pl-10">Provisioned Employee</th>
                                     <th className="px-4 py-2 text-right">License Cost</th>
-                                    <th className="px-4 py-2 text-right">Usage ROI</th>
-                                    <th className="px-4 py-2 text-center">Recommendation</th>
                                     <th className="px-4 py-2 text-right">Recoverable</th>
                                     <th className="px-4 py-2 text-center">Action Trigger</th>
                                   </tr>
@@ -1492,29 +1500,6 @@ export function ExecutiveInferenceDrilldownView({
                                         <div className="text-[10px] text-ey-muted">{u.email}</div>
                                       </td>
                                       <td className="px-4 py-2.5 text-right">{fmtCost(u.licenseCost)}</td>
-                                      <td className="px-4 py-2.5 text-right">
-                                        <span className={u.recommendation === 'revoke' ? 'text-red-400 font-bold' : u.recommendation === 'downgrade' ? 'text-amber-400 font-bold' : 'text-sky-400 font-bold'}>
-                                          {u.licenseRoiPercent}%
-                                        </span>
-                                      </td>
-                                      <td className="px-4 py-2.5 text-center">
-                                        {u.recommendation === 'revoke' ? (
-                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/40">
-                                            <X className="w-3 h-3" />
-                                            Revoke
-                                          </span>
-                                        ) : u.recommendation === 'downgrade' ? (
-                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                                            <MinusCircle className="w-3 h-3" />
-                                            Downgrade
-                                          </span>
-                                        ) : (
-                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40">
-                                            <CheckCircle2 className="w-3 h-3" />
-                                            Review
-                                          </span>
-                                        )}
-                                      </td>
                                       <td className="px-4 py-2.5 text-right font-bold text-emerald-400">{fmtCost(u.recoverableAmount)}</td>
                                       <td className="px-4 py-2.5 text-center">
                                         <button
@@ -1538,6 +1523,97 @@ export function ExecutiveInferenceDrilldownView({
                   </table>
                 </div>
               </div>
+
+              {/* Rule 2: Usage-Below-Free-Limit Warning -- flagged only, never reclaimed */}
+              <div className="bg-ey-card border border-amber-500/30 rounded-2xl p-5 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ey-border/60 pb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                      <span>Usage Below Free Limit (Warning Only)</span>
+                    </h3>
+                    <p className="text-xs text-ey-muted mt-0.5">
+                      Rule 2: these seats are active but consuming less than their included free limit. No reclamation action is taken -- shown as a warning only.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4 bg-ey-black/40 border border-ey-border rounded-xl px-4 py-2.5 shrink-0 font-mono">
+                    <div className="text-right">
+                      <p className="text-[10px] text-ey-muted uppercase tracking-wider">Warned Seats</p>
+                      <p className="text-lg font-bold text-amber-300 leading-none">{usageWarningCount}</p>
+                    </div>
+                    <div className="w-px h-8 bg-ey-border" />
+                    <div className="text-right">
+                      <p className="text-[10px] text-ey-muted uppercase tracking-wider">Unused Free Capacity</p>
+                      <p className="text-lg font-bold text-amber-300 leading-none">{fmtCost(totalWarningUnusedCapacity)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto border border-ey-border rounded-xl">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
+                      <tr>
+                        <th className="px-4 py-3">Employee</th>
+                        <th className="px-4 py-3 text-right">Usage Cost</th>
+                        <th className="px-4 py-3 text-right">Free Limit</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ey-border">
+                      {paginatedWarningUsers.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">No seats currently under their free limit.</td>
+                        </tr>
+                      ) : paginatedWarningUsers.map((u) => (
+                        <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
+                          <td className="px-4 py-3 font-medium text-ey-light">
+                            <div>{u.displayName}</div>
+                            <div className="text-[10px] text-ey-muted">{u.email}</div>
+                          </td>
+                          <td className="px-4 py-3 text-right">{fmtCost(u.actualCost)}</td>
+                          <td className="px-4 py-3 text-right text-ey-muted">{fmtCost(u.usageFreeTokenLimit)}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                              <AlertTriangle className="w-3 h-3" />
+                              Warning
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {warningTotalPages > 1 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-ey-muted font-mono">
+                    <div>
+                      Showing {(warningPage - 1) * warningPageSize + 1} to{' '}
+                      {Math.min(warningPage * warningPageSize, usageWarningUsers.length)} of{' '}
+                      {usageWarningUsers.length} seats
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setWarningPage((p) => Math.max(1, p - 1))}
+                        disabled={warningPage === 1}
+                        className="px-3 py-1 bg-ey-black border border-ey-border rounded-lg hover:bg-ey-card-hover disabled:opacity-40"
+                      >
+                        Previous
+                      </button>
+                      <span>
+                        Page {warningPage} of {warningTotalPages}
+                      </span>
+                      <button
+                        onClick={() => setWarningPage((p) => Math.min(warningTotalPages, p + 1))}
+                        disabled={warningPage === warningTotalPages}
+                        className="px-3 py-1 bg-ey-black border border-ey-border rounded-lg hover:bg-ey-card-hover disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1552,26 +1628,32 @@ export function ExecutiveInferenceDrilldownView({
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Total Organization Spend</span>
-                  <p className="text-2xl font-bold text-ey-light">{fmtCost(totalOrgSpend)}</p>
-                  <p className="text-[10px] text-ey-muted">Across {activeUserList.length} Active Employees</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Top 10% Spend Share</span>
-                  <p className="text-2xl font-bold text-rose-400">{fmtCost(top10Spend)}</p>
-                  <p className="text-[10px] text-rose-300/80">{top10PercentCount} Users ({((top10Spend / totalOrgSpend) * 100).toFixed(1)}% of Budget)</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Top 20% Spend Share</span>
-                  <p className="text-2xl font-bold text-amber-400">{fmtCost(top20Spend)}</p>
-                  <p className="text-[10px] text-amber-300/80">{top20PercentCount} Users ({top20SpendPercent}% of Budget)</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Remaining 80% Pool</span>
-                  <p className="text-2xl font-bold text-emerald-400">{fmtCost(totalOrgSpend - top20Spend)}</p>
-                  <p className="text-[10px] text-emerald-300/80">{activeUserList.length - top20PercentCount} Users ({(100 - parseFloat(top20SpendPercent)).toFixed(1)}%)</p>
-                </div>
+                <StatTile
+                  label="Total Organization Spend"
+                  value={fmtCost(totalOrgSpend)}
+                  subtitle={`Across ${activeUserList.length} Active Employees`}
+                />
+                <StatTile
+                  label="Top 10% Spend Share"
+                  value={fmtCost(top10Spend)}
+                  valueClassName="text-rose-400"
+                  subtitle={`${top10PercentCount} Users (${((top10Spend / totalOrgSpend) * 100).toFixed(1)}% of Budget)`}
+                  subtitleClassName="text-rose-300/80"
+                />
+                <StatTile
+                  label="Top 20% Spend Share"
+                  value={fmtCost(top20Spend)}
+                  valueClassName="text-amber-400"
+                  subtitle={`${top20PercentCount} Users (${top20SpendPercent}% of Budget)`}
+                  subtitleClassName="text-amber-300/80"
+                />
+                <StatTile
+                  label="Remaining 80% Pool"
+                  value={fmtCost(totalOrgSpend - top20Spend)}
+                  valueClassName="text-emerald-400"
+                  subtitle={`${activeUserList.length - top20PercentCount} Users (${(100 - parseFloat(top20SpendPercent)).toFixed(1)}%)`}
+                  subtitleClassName="text-emerald-300/80"
+                />
               </div>
             </div>
           )}
@@ -1769,26 +1851,32 @@ export function ExecutiveInferenceDrilldownView({
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Client Billable Spend</span>
-                  <p className="text-2xl font-bold text-emerald-400">{(summary?.billableSpendPercent || 0).toFixed(1)}%</p>
-                  <p className="text-[10px] text-emerald-300/80">Billable Client Engagements</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Non-Billable Investment</span>
-                  <p className="text-2xl font-bold text-cyan-400">{(100 - (summary?.billableSpendPercent || 0)).toFixed(1)}%</p>
-                  <p className="text-[10px] text-cyan-300/80">Internal R&amp;D &amp; Innovation Spend</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Total Engagement Codes</span>
-                  <p className="text-2xl font-bold text-ey-light">{projectCodeBreakdown.length}</p>
-                  <p className="text-[10px] text-ey-muted">Active Work Orders Tracked</p>
-                </div>
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <span className="text-ey-muted text-[10px] uppercase font-bold">Non-Billable Cost Leakage</span>
-                  <p className="text-2xl font-bold text-emerald-400">0.0% Unassigned</p>
-                  <p className="text-[10px] text-emerald-300/80">100% Code Compliance</p>
-                </div>
+                <StatTile
+                  label="Client Billable Spend"
+                  value={`${(summary?.billableSpendPercent || 0).toFixed(1)}%`}
+                  valueClassName="text-emerald-400"
+                  subtitle="Billable Client Engagements"
+                  subtitleClassName="text-emerald-300/80"
+                />
+                <StatTile
+                  label="Non-Billable Investment"
+                  value={`${(100 - (summary?.billableSpendPercent || 0)).toFixed(1)}%`}
+                  valueClassName="text-cyan-400"
+                  subtitle="Internal R&D & Innovation Spend"
+                  subtitleClassName="text-cyan-300/80"
+                />
+                <StatTile
+                  label="Total Engagement Codes"
+                  value={projectCodeBreakdown.length}
+                  subtitle="Active Work Orders Tracked"
+                />
+                <StatTile
+                  label="Non-Billable Cost Leakage"
+                  value="0.0% Unassigned"
+                  valueClassName="text-emerald-400"
+                  subtitle="100% Code Compliance"
+                  subtitleClassName="text-emerald-300/80"
+                />
               </div>
             </div>
           )}

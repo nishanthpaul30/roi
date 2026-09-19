@@ -48,15 +48,17 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
   const top10Percent = totalCost > 0 ? (top10Spend / totalCost) * 100 : 0;
   const top20Percent = totalCost > 0 ? (top20Spend / totalCost) * 100 : 0;
 
-  // 2. License Reclamation — seats with real license cost falling below an 80%
-  // usage-ROI threshold (same figures the Active/Inactive tile draws on).
-  const reclamationSeats = summary.userCapacityBreakdown
-    .filter((u) => u.licenseCost > 0 && u.licenseRoiPercent < 80)
-    .map((u) => ({ ...u, recoverableAmount: Number((u.licenseCost - u.actualCost).toFixed(4)) }))
-    .filter((u) => u.recoverableAmount > 0);
-  const reclamationDormantCount = reclamationSeats.filter((u) => u.tokenConsumption === 0).length;
-  const reclamationUnderutilizedCount = reclamationSeats.length - reclamationDormantCount;
-  const totalRecoverableAmount = reclamationSeats.reduce((s, u) => s + u.recoverableAmount, 0);
+  // 2. License Reclamation — exactly two rules (same figures the Active/Inactive
+  // tile draws on). Rule 1: sum and reclaim only fully dormant seats (0 usage).
+  // Rule 2: seats using less than their free limit are a warning only, never reclaimed.
+  const reclamationDormantSeats = summary.userCapacityBreakdown.filter(
+    (u) => u.licenseCost > 0 && u.tokenConsumption === 0
+  );
+  const reclamationDormantCount = reclamationDormantSeats.length;
+  const totalRecoverableAmount = reclamationDormantSeats.reduce((s, u) => s + u.licenseCost, 0);
+  const usageWarningCount = summary.userCapacityBreakdown.filter(
+    (u) => u.tokenConsumption > 0 && u.zone === 'zone1_under'
+  ).length;
 
   // 5. Client Billability (real Billable/Non-Billable CSV flag)
   const nonBillablePercent = 100 - (summary.billableSpendPercent || 0);
@@ -94,19 +96,19 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
       tagColor: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
       icon: BadgeDollarSign,
       stat: `${fmtCost(totalRecoverableAmount)} Recoverable`,
-      statSub: `${reclamationDormantCount} Dormant + ${reclamationUnderutilizedCount} Under-Utilized Seats`,
+      statSub: `${reclamationDormantCount} Dormant Seats to Reclaim · ${usageWarningCount} Below Free Limit (Warning)`,
       finding:
-        reclamationSeats.length > 0
-          ? `${reclamationSeats.length} provisioned seats (${reclamationDormantCount} fully dormant, ${reclamationUnderutilizedCount} under-utilized) fall below the 80% usage-ROI threshold, leaving ${fmtCost(totalRecoverableAmount)} recoverable in license spend.`
-          : 'No seats currently fall below the 80% usage-ROI reclamation threshold.',
+        reclamationDormantCount > 0 || usageWarningCount > 0
+          ? `${reclamationDormantCount} seat${reclamationDormantCount === 1 ? '' : 's'} recorded 0 usage against a real license cost, totaling ${fmtCost(totalRecoverableAmount)} that can be reclaimed outright. A further ${usageWarningCount} seat${usageWarningCount === 1 ? '' : 's'} are active but consuming less than their included free limit -- flagged as a warning only, not reclaimed.`
+          : 'No dormant seats to reclaim, and no active seats currently running under their free limit.',
       actionableInsight:
-        reclamationSeats.length > 0
-          ? `Revoke the ${reclamationDormantCount} zero-consumption license${reclamationDormantCount === 1 ? '' : 's'} outright, and downgrade the remaining ${reclamationUnderutilizedCount} under-utilized seat${reclamationUnderutilizedCount === 1 ? '' : 's'} to a lower tier or consumption-only plan.`
-          : 'Maintain current license allocation -- utilization is healthy across all provisioned seats.',
+        reclamationDormantCount > 0
+          ? `Reclaim the ${reclamationDormantCount} zero-usage license${reclamationDormantCount === 1 ? '' : 's'} outright. Monitor the ${usageWarningCount} under-the-free-limit seat${usageWarningCount === 1 ? '' : 's'} -- no action taken on these, just a usage warning.`
+          : 'No dormant licenses to reclaim this period.',
       benefitOutcome:
-        reclamationSeats.length > 0
-          ? `Recovers up to ${fmtCost(totalRecoverableAmount)}/period in reclaimable license spend by acting on these ${reclamationSeats.length} flagged seats, without touching any well-utilized license.`
-          : `Protects the full license investment -- no reclamation action needed this period.`,
+        reclamationDormantCount > 0
+          ? `Recovers ${fmtCost(totalRecoverableAmount)}/period in license spend by reclaiming only the ${reclamationDormantCount} fully dormant seats, without touching any seat that has recorded real usage.`
+          : `Protects the full license investment -- no dormant seats to reclaim this period.`,
     },
     {
       id: 'project_billability',

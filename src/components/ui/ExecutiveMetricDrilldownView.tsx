@@ -21,7 +21,6 @@ import {
   Database,
   Calendar,
   X,
-  Info,
 } from 'lucide-react';
 import { MetricChart } from '@/components/ui/MetricChart';
 import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
@@ -29,6 +28,7 @@ import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { GlobalFilterState } from '@/lib/metrics/types';
 import { useRawRows } from '@/hooks/useRawRows';
 import { HierarchyDrilldownPanel, PathEntry } from './HierarchyDrilldownPanel';
+import { StatTile } from './StatTile';
 import { formatCompactCurrency, formatCompactNumber } from '@/lib/format';
 
 interface SubDrilldownState {
@@ -378,31 +378,30 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
         <div className="space-y-6">
           {/* Level 3 KPI Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
-            <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-              <span className="text-ey-muted text-[10px] uppercase font-bold">Total Billed Spend</span>
-              <p className="text-xl font-bold text-ey-yellow">{fmtMoney(level3TotalCost)}</p>
-              <p className="text-[10px] text-ey-muted">{granularRows.length} usage events</p>
-            </div>
-
-            <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-              <span className="text-ey-muted text-[10px] uppercase font-bold">Total Token Volume</span>
-              <p className="text-xl font-bold text-ey-light">{fmtTokens(level3TotalTokens)}</p>
-              <p className="text-[10px] text-ey-muted">Prompt + Completion</p>
-            </div>
-
-            <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-              <span className="text-ey-muted text-[10px] uppercase font-bold">Billable Log Entries</span>
-              <p className="text-xl font-bold text-emerald-400">{level3BillableRows} / {granularRows.length}</p>
-              <p className="text-[10px] text-emerald-300">
-                {granularRows.length > 0 ? ((level3BillableRows / granularRows.length) * 100).toFixed(1) : 0}% Billable
-              </p>
-            </div>
-
-            <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-              <span className="text-ey-muted text-[10px] uppercase font-bold">Entity Type</span>
-              <p className="text-xl font-bold text-cyan-300 capitalize">{subDrilldown.type.replace('_', ' ')}</p>
-              <p className="text-[10px] text-ey-muted truncate">{subDrilldown.name}</p>
-            </div>
+            <StatTile
+              label="Total Billed Spend"
+              value={fmtMoney(level3TotalCost)}
+              valueClassName="text-ey-yellow"
+              subtitle={`${granularRows.length} usage events`}
+            />
+            <StatTile
+              label="Total Token Volume"
+              value={fmtTokens(level3TotalTokens)}
+              subtitle="Prompt + Completion"
+            />
+            <StatTile
+              label="Billable Log Entries"
+              value={`${level3BillableRows} / ${granularRows.length}`}
+              valueClassName="text-emerald-400"
+              subtitle={`${granularRows.length > 0 ? ((level3BillableRows / granularRows.length) * 100).toFixed(1) : 0}% Billable`}
+              subtitleClassName="text-emerald-300"
+            />
+            <StatTile
+              label="Entity Type"
+              value={<span className="capitalize">{subDrilldown.type.replace('_', ' ')}</span>}
+              valueClassName="text-cyan-300"
+              subtitle={<span className="truncate">{subDrilldown.name}</span>}
+            />
           </div>
 
           {/* Granular Usage Log Entries Table */}
@@ -615,50 +614,26 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
             <div className="space-y-6">
               {/* Roster Summary */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
-                {/* Card: Active Users */}
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-ey-muted text-[10px] uppercase font-bold">Active Users</span>
-                    <div className="group/info relative cursor-pointer">
-                      <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
-                      <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50 font-sans normal-case">
-                        Filter Calculation Method = &apos;Usage&apos; AND GenAI Tool Consumption &gt; 0. Count of distinct users — users with real prompt activity this period.
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-2xl font-extrabold text-emerald-400">{summaryData?.activeUserCount ?? 0}</p>
-                  <p className="text-[10px] text-ey-muted">Recorded at least 1 token of usage</p>
-                </div>
-
-                {/* Card: Unutilized Licenses */}
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-ey-muted text-[10px] uppercase font-bold">Unutilized Licenses</span>
-                    <div className="group/info relative cursor-pointer">
-                      <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
-                      <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50 font-sans normal-case">
-                        Filter Calculation Method = &apos;Usage&apos; AND GenAI Tool Consumption = 0. Count of distinct users — provisioned seats with zero recorded consumption.
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-2xl font-extrabold text-amber-400">{summaryData?.inactiveUserCount ?? 0}</p>
-                  <p className="text-[10px] text-ey-muted">Provisioned, zero usage this period</p>
-                </div>
-
-                {/* Card: Total Roster */}
-                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-ey-muted text-[10px] uppercase font-bold">Total Roster</span>
-                    <div className="group/info relative cursor-pointer">
-                      <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
-                      <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-48 z-50 font-sans normal-case">
-                        Count of distinct users across all rows (License + Usage) in the selected period — every provisioned seat regardless of activity.
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-2xl font-extrabold text-ey-light">{summaryData?.totalRosterUserCount ?? 0}</p>
-                  <p className="text-[10px] text-ey-muted">Every provisioned user this period</p>
-                </div>
+                <StatTile
+                  label="Active Users"
+                  value={summaryData?.activeUserCount ?? 0}
+                  valueClassName="text-emerald-400"
+                  subtitle="Recorded at least 1 token of usage"
+                  tooltip="Filter Calculation Method = 'Usage' AND GenAI Tool Consumption > 0. Count of distinct users — users with real prompt activity this period."
+                />
+                <StatTile
+                  label="Unutilized Licenses"
+                  value={summaryData?.inactiveUserCount ?? 0}
+                  valueClassName="text-amber-400"
+                  subtitle="Provisioned, zero usage this period"
+                  tooltip="Filter Calculation Method = 'Usage' AND GenAI Tool Consumption = 0. Count of distinct users — provisioned seats with zero recorded consumption."
+                />
+                <StatTile
+                  label="Total Roster"
+                  value={summaryData?.totalRosterUserCount ?? 0}
+                  subtitle="Every provisioned user this period"
+                  tooltip="Count of distinct users across all rows (License + Usage) in the selected period — every provisioned seat regardless of activity."
+                />
               </div>
 
               {/* Per-Tool Adoption Share & Wastage -> Level 3 Trigger */}
