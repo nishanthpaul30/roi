@@ -130,10 +130,21 @@ export const METRICS: { key: MetricKey; label: string }[] = [
   { key: 'tokenConsumption', label: 'GenAI Tool Consumption' },
 ];
 
+// billableFlag is stored as the literal string 'True' / 'False' (see
+// csvLoader.ts) — fine for filtering, but confusing as a row/column label
+// or bar-chart value next to every other Billable/Non-Billable display in
+// the app, so it's translated here wherever it's used as a breakdown axis.
+function formatBillableFlag(val: string): string {
+  if (val === 'True') return 'Billable';
+  if (val === 'False') return 'Non-Billable';
+  return val;
+}
+
 function extractDim(row: CsvUsageRow, dim: DimensionKey): string {
   if (dim === 'monthLabel') return row.monthYear.replace(/_/g, ' ');
   const val = row[dim as keyof CsvUsageRow];
-  return val ? String(val) : 'Unknown';
+  const str = val ? String(val) : 'Unknown';
+  return dim === 'billableFlag' ? formatBillableFlag(str) : str;
 }
 
 function extractMetric(row: CsvUsageRow, metric: MetricKey): number {

@@ -29,6 +29,12 @@ interface GlobalFilterBarProps {
   onFilterChange: (newFilters: GlobalFilterState) => void;
   onExportCsv?: () => void;
   filterOptions?: FilterOptions;
+  /** When true, every control here is inert and greyed out — the page has its
+   * own local filters instead and these shared ones must not affect what it
+   * shows (e.g. the Data Playground's Start/End Period pickers). */
+  disabled?: boolean;
+  /** Shown next to the disabled controls, e.g. pointing at the page's own filters. */
+  disabledMessage?: string;
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -48,6 +54,8 @@ export function GlobalFilterBar({
   onFilterChange,
   onExportCsv,
   filterOptions,
+  disabled = false,
+  disabledMessage,
 }: GlobalFilterBarProps) {
   const { logout } = useAuth();
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
@@ -100,11 +108,16 @@ export function GlobalFilterBar({
 
   const activeFilterCountWithMonth = activeFilterCount + (selectedMonth !== 'all' ? 1 : 0);
 
+  const disabledSelectClass = `${selectClass} opacity-50 cursor-not-allowed`;
+  const disabledTitle = disabledMessage || 'Disabled on this page — use the page-level filters below instead.';
+
   const monthSelectEl = (
     <select
       value={selectedMonth}
       onChange={(e) => handleMonthChange(e.target.value)}
-      className={selectClass}
+      disabled={disabled}
+      title={disabled ? disabledTitle : undefined}
+      className={disabled ? disabledSelectClass : selectClass}
     >
       <option value={allMonths.value}>{allMonths.label}</option>
       {monthOptions.map((m) => (
@@ -117,7 +130,9 @@ export function GlobalFilterBar({
     <select
       value={filters.aiTool}
       onChange={(e) => handleChange('aiTool', e.target.value)}
-      className={selectClass}
+      disabled={disabled}
+      title={disabled ? disabledTitle : undefined}
+      className={disabled ? disabledSelectClass : selectClass}
     >
       <option value="all">All Tools</option>
       {(filterOptions?.aiTools || ['chatgpt', 'github', 'claude']).map(t => (
@@ -130,7 +145,9 @@ export function GlobalFilterBar({
     <select
       value={filters.managementRegion}
       onChange={(e) => handleChange('managementRegion', e.target.value)}
-      className={selectClass}
+      disabled={disabled}
+      title={disabled ? disabledTitle : undefined}
+      className={disabled ? disabledSelectClass : selectClass}
     >
       <option value="all">All Regions</option>
       {(filterOptions?.managementRegions || ['EMEA', 'APAC', 'Americas']).map(r => (
@@ -143,7 +160,9 @@ export function GlobalFilterBar({
     <select
       value={filters.serviceLine}
       onChange={(e) => handleChange('serviceLine', e.target.value)}
-      className={selectClass}
+      disabled={disabled}
+      title={disabled ? disabledTitle : undefined}
+      className={disabled ? disabledSelectClass : selectClass}
     >
       <option value="all">All Service Lines</option>
       {(filterOptions?.serviceLines || ['Consulting', 'Tax', 'Assurance', 'S&T', 'CBS']).map(s => (
@@ -156,7 +175,9 @@ export function GlobalFilterBar({
     <select
       value={filters.country}
       onChange={(e) => handleChange('country', e.target.value)}
-      className={selectClass}
+      disabled={disabled}
+      title={disabled ? disabledTitle : undefined}
+      className={disabled ? disabledSelectClass : selectClass}
     >
       <option value="all">All Countries</option>
       {(filterOptions?.countries || []).map(c => (
@@ -194,21 +215,34 @@ export function GlobalFilterBar({
             <Globe2 className="w-4 h-4 text-purple-400 shrink-0" />
             {countrySelectEl}
           </div>
+
+          {disabled && (
+            <span
+              title={disabledTitle}
+              className="text-[10px] font-semibold text-ey-muted italic shrink-0 ml-1"
+            >
+              (disabled on this page)
+            </span>
+          )}
         </div>
 
         {/* Mobile: single Filters toggle instead of 5 inline selects */}
         <button
           onClick={() => setIsMobileFiltersOpen((v) => !v)}
           aria-expanded={isMobileFiltersOpen}
+          disabled={disabled}
+          title={disabled ? disabledTitle : undefined}
           className={`md:hidden h-9 flex items-center gap-1.5 px-3 rounded-lg border text-xs font-semibold transition shrink-0 ${
-            isMobileFiltersOpen || activeFilterCountWithMonth > 0
+            disabled
+              ? 'bg-ey-black border-ey-border text-ey-muted opacity-50 cursor-not-allowed'
+              : isMobileFiltersOpen || activeFilterCountWithMonth > 0
               ? 'bg-ey-yellow/15 border-ey-yellow/50 text-ey-yellow'
               : 'bg-ey-black border-ey-border text-ey-light'
           }`}
         >
           <SlidersHorizontal className="w-4 h-4" />
           <span>Filters</span>
-          {activeFilterCountWithMonth > 0 && (
+          {!disabled && activeFilterCountWithMonth > 0 && (
             <span className="bg-ey-yellow text-ey-black font-bold text-[9px] w-4 h-4 rounded-full flex items-center justify-center shrink-0">
               {activeFilterCountWithMonth}
             </span>
@@ -218,7 +252,7 @@ export function GlobalFilterBar({
 
         {/* Right: Reset & User (always visible, both breakpoints) */}
         <div className="flex items-center gap-2 shrink-0 flex-nowrap">
-          {activeFilterCountWithMonth > 0 && (
+          {!disabled && activeFilterCountWithMonth > 0 && (
             <button
               onClick={resetToAll}
               title={`Clear ${activeFilterCountWithMonth} active filter${activeFilterCountWithMonth > 1 ? 's' : ''}`}
