@@ -1109,9 +1109,8 @@ export function ExecutiveInferenceDrilldownView({
               setSearchTerm('');
               setCurrentPage(1);
             }}
-            className={`${
-              selectedEntity ? 'text-ey-muted hover:text-ey-yellow cursor-pointer' : 'text-ey-yellow font-bold'
-            } transition-colors flex items-center gap-1`}
+            className={`${selectedEntity ? 'text-ey-muted hover:text-ey-yellow cursor-pointer' : 'text-ey-yellow font-bold'
+              } transition-colors flex items-center gap-1`}
           >
             <span>Level 1: Strategic Inferences</span>
           </button>
@@ -1283,75 +1282,75 @@ export function ExecutiveInferenceDrilldownView({
                       {dormantByServiceLine.map((sl) => {
                         const isExpanded = expandedDormantServiceLine === sl.serviceLine;
                         return (
-                        <React.Fragment key={sl.serviceLine}>
-                        <tr
-                          onClick={() => setExpandedDormantServiceLine(isExpanded ? null : sl.serviceLine)}
-                          className="hover:bg-ey-card-hover/80 transition cursor-pointer"
-                          title={`Click to ${isExpanded ? 'hide' : 'view'} individual dormant licenses in ${sl.serviceLine}`}
-                        >
-                          <td className="px-4 py-3 font-medium text-ey-light">
-                            <span className="flex items-center gap-1.5">
-                              <ChevronRight className={`w-3.5 h-3.5 text-ey-muted transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                              {sl.serviceLine}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
-                              {sl.count} license{sl.count === 1 ? '' : 's'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right font-bold text-rose-400">{fmtCost(sl.monthlyCost)} / mo</td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleTriggerAction(`${sl.count} dormant license${sl.count === 1 ? '' : 's'} in ${sl.serviceLine} reclaimed and returned to pool.`);
-                              }}
-                              className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
+                          <React.Fragment key={sl.serviceLine}>
+                            <tr
+                              onClick={() => setExpandedDormantServiceLine(isExpanded ? null : sl.serviceLine)}
+                              className="hover:bg-ey-card-hover/80 transition cursor-pointer"
+                              title={`Click to ${isExpanded ? 'hide' : 'view'} individual dormant licenses in ${sl.serviceLine}`}
                             >
-                              Reclaim {sl.count} License{sl.count === 1 ? '' : 's'}
-                            </button>
-                          </td>
-                        </tr>
-                        {isExpanded && (
-                          <tr>
-                            <td colSpan={4} className="p-0 bg-ey-black/40">
-                              <table className="w-full text-left text-xs font-mono">
-                                <thead className="text-ey-muted uppercase tracking-wider border-b border-ey-border/60">
-                                  <tr>
-                                    <th className="px-4 py-2 pl-10">Provisioned Employee</th>
-                                    <th className="px-4 py-2">Region</th>
-                                    <th className="px-4 py-2 text-center">Last Activity</th>
-                                    <th className="px-4 py-2 text-right">Fixed Monthly Cost</th>
-                                    <th className="px-4 py-2 text-center">Action Trigger</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-ey-border/40">
-                                  {dormantUsers.filter((u) => u.serviceLine === sl.serviceLine).map((u) => (
-                                    <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
-                                      <td className="px-4 py-2.5 pl-10 font-medium text-ey-light">
-                                        <div>{u.name}</div>
-                                        <div className="text-[10px] text-ey-muted">{u.email}</div>
-                                      </td>
-                                      <td className="px-4 py-2.5 text-ey-muted">{u.region}</td>
-                                      <td className="px-4 py-2.5 text-center text-[10px] text-ey-muted">{u.lastActivityDate}</td>
-                                      <td className="px-4 py-2.5 text-right font-bold text-rose-400">{fmtCost(u.licenseCost)} / mo</td>
-                                      <td className="px-4 py-2.5 text-center">
-                                        <button
-                                          onClick={() => handleTriggerAction(`License for ${u.name} reclaimed and returned to pool.`)}
-                                          className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
-                                        >
-                                          Reclaim License
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </td>
-                          </tr>
-                        )}
-                        </React.Fragment>
+                              <td className="px-4 py-3 font-medium text-ey-light">
+                                <span className="flex items-center gap-1.5">
+                                  <ChevronRight className={`w-3.5 h-3.5 text-ey-muted transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                  {sl.serviceLine}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                                  {sl.count} license{sl.count === 1 ? '' : 's'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right font-bold text-rose-400">{fmtCost(sl.monthlyCost)} / mo</td>
+                              <td className="px-4 py-3 text-center">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleTriggerAction(`${sl.count} dormant license${sl.count === 1 ? '' : 's'} in ${sl.serviceLine} reclaimed and returned to pool.`);
+                                  }}
+                                  className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
+                                >
+                                  Reclaim {sl.count} License{sl.count === 1 ? '' : 's'}
+                                </button>
+                              </td>
+                            </tr>
+                            {isExpanded && (
+                              <tr>
+                                <td colSpan={4} className="p-0 bg-ey-black/40">
+                                  <table className="w-full text-left text-xs font-mono">
+                                    <thead className="text-ey-muted uppercase tracking-wider border-b border-ey-border/60">
+                                      <tr>
+                                        <th className="px-4 py-2 pl-10">Provisioned Employee</th>
+                                        <th className="px-4 py-2">Region</th>
+                                        <th className="px-4 py-2 text-center">Last Activity</th>
+                                        <th className="px-4 py-2 text-right">Fixed Monthly Cost</th>
+                                        <th className="px-4 py-2 text-center">Action Trigger</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-ey-border/40">
+                                      {dormantUsers.filter((u) => u.serviceLine === sl.serviceLine).map((u) => (
+                                        <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
+                                          <td className="px-4 py-2.5 pl-10 font-medium text-ey-light">
+                                            <div>{u.name}</div>
+                                            <div className="text-[10px] text-ey-muted">{u.email}</div>
+                                          </td>
+                                          <td className="px-4 py-2.5 text-ey-muted">{u.region}</td>
+                                          <td className="px-4 py-2.5 text-center text-[10px] text-ey-muted">{u.lastActivityDate}</td>
+                                          <td className="px-4 py-2.5 text-right font-bold text-rose-400">{fmtCost(u.licenseCost)} / mo</td>
+                                          <td className="px-4 py-2.5 text-center">
+                                            <button
+                                              onClick={() => handleTriggerAction(`License for ${u.name} reclaimed and returned to pool.`)}
+                                              className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
+                                            >
+                                              Reclaim License
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
                         );
                       })}
                     </tbody>
@@ -1373,7 +1372,7 @@ export function ExecutiveInferenceDrilldownView({
                   valueClassName="text-emerald-400"
                   subtitle={`${recoverablePercentOfLicenseCost}% of total license cost`}
                   subtitleClassName="text-emerald-300/80"
-                  tooltip="Rule 1: sum of License Cost (USD) for every user with Calculation Method = 'Usage' AND GenAI Tool Consumption = 0 across all their held tools. Only 0-usage seats are counted here."
+                  tooltip="Sum of License Cost (USD) for every user with Calculation Method = 'Usage' AND GenAI Tool Consumption = 0 across all their held tools. Only 0-usage seats are counted here."
                 />
                 <StatTile
                   label="Dormant Seats (Reclaim)"
@@ -1389,7 +1388,7 @@ export function ExecutiveInferenceDrilldownView({
                   valueClassName="text-amber-400"
                   subtitle="Active, but under the included free limit"
                   subtitleClassName="text-amber-300/80"
-                  tooltip="Rule 2: count of active users (GenAI Tool Consumption > 0) whose usage cost falls under their tool's included free-dollar limit (Zone 1: wasteCost > overageCost). Flagged as a warning only -- never reclaimed."
+                  tooltip="Count of active users (GenAI Tool Consumption > 0) whose usage cost falls under their tool's included free-dollar limit (Zone 1: wasteCost > overageCost). Flagged as a warning only -- never reclaimed."
                 />
                 <StatTile
                   label="Users at Usage Ceiling"
@@ -1448,75 +1447,75 @@ export function ExecutiveInferenceDrilldownView({
                       ) : reclamationByServiceLine.map((sl) => {
                         const isExpanded = expandedDormantServiceLine === `reclamation:${sl.serviceLine}`;
                         return (
-                        <React.Fragment key={sl.serviceLine}>
-                        <tr
-                          onClick={() => setExpandedDormantServiceLine(isExpanded ? null : `reclamation:${sl.serviceLine}`)}
-                          className="hover:bg-ey-card-hover/80 transition cursor-pointer"
-                          title={`Click to ${isExpanded ? 'hide' : 'view'} individual dormant seats in ${sl.serviceLine}`}
-                        >
-                          <td className="px-4 py-3 font-medium text-ey-light">
-                            <span className="flex items-center gap-1.5">
-                              <ChevronRight className={`w-3.5 h-3.5 text-ey-muted transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                              {sl.serviceLine}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
-                              {sl.count} seat{sl.count === 1 ? '' : 's'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right font-bold text-emerald-400">{fmtCost(sl.recoverableAmount)}</td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleTriggerAction(`${sl.count} dormant license${sl.count === 1 ? '' : 's'} in ${sl.serviceLine} reclaimed and returned to pool.`);
-                              }}
-                              className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
+                          <React.Fragment key={sl.serviceLine}>
+                            <tr
+                              onClick={() => setExpandedDormantServiceLine(isExpanded ? null : `reclamation:${sl.serviceLine}`)}
+                              className="hover:bg-ey-card-hover/80 transition cursor-pointer"
+                              title={`Click to ${isExpanded ? 'hide' : 'view'} individual dormant seats in ${sl.serviceLine}`}
                             >
-                              Reclaim {sl.count} License{sl.count === 1 ? '' : 's'}
-                            </button>
-                          </td>
-                        </tr>
-                        {isExpanded && (
-                          <tr>
-                            <td colSpan={4} className="p-0 bg-ey-black/40">
-                              <table className="w-full text-left text-xs font-mono">
-                                <thead className="text-ey-muted uppercase tracking-wider border-b border-ey-border/60">
-                                  <tr>
-                                    <th className="px-4 py-2 pl-10">Provisioned Employee</th>
-                                    <th className="px-4 py-2 text-right">License Cost</th>
-                                    <th className="px-4 py-2 text-right">Recoverable</th>
-                                    <th className="px-4 py-2 text-center">Action Trigger</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-ey-border/40">
-                                  {reclamationUsers
-                                    .filter((u) => (emailToRow.get(u.email)?.orgServiceLine || 'General') === sl.serviceLine)
-                                    .map((u) => (
-                                    <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
-                                      <td className="px-4 py-2.5 pl-10 font-medium text-ey-light">
-                                        <div>{u.displayName}</div>
-                                        <div className="text-[10px] text-ey-muted">{u.email}</div>
-                                      </td>
-                                      <td className="px-4 py-2.5 text-right">{fmtCost(u.licenseCost)}</td>
-                                      <td className="px-4 py-2.5 text-right font-bold text-emerald-400">{fmtCost(u.recoverableAmount)}</td>
-                                      <td className="px-4 py-2.5 text-center">
-                                        <button
-                                          onClick={() => handleTriggerAction(`License for ${u.displayName} reclaimed and returned to pool.`)}
-                                          className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
-                                        >
-                                          Reclaim License
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </td>
-                          </tr>
-                        )}
-                        </React.Fragment>
+                              <td className="px-4 py-3 font-medium text-ey-light">
+                                <span className="flex items-center gap-1.5">
+                                  <ChevronRight className={`w-3.5 h-3.5 text-ey-muted transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                  {sl.serviceLine}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                                  {sl.count} seat{sl.count === 1 ? '' : 's'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right font-bold text-emerald-400">{fmtCost(sl.recoverableAmount)}</td>
+                              <td className="px-4 py-3 text-center">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleTriggerAction(`${sl.count} dormant license${sl.count === 1 ? '' : 's'} in ${sl.serviceLine} reclaimed and returned to pool.`);
+                                  }}
+                                  className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
+                                >
+                                  Reclaim {sl.count} License{sl.count === 1 ? '' : 's'}
+                                </button>
+                              </td>
+                            </tr>
+                            {isExpanded && (
+                              <tr>
+                                <td colSpan={4} className="p-0 bg-ey-black/40">
+                                  <table className="w-full text-left text-xs font-mono">
+                                    <thead className="text-ey-muted uppercase tracking-wider border-b border-ey-border/60">
+                                      <tr>
+                                        <th className="px-4 py-2 pl-10">Provisioned Employee</th>
+                                        <th className="px-4 py-2 text-right">License Cost</th>
+                                        <th className="px-4 py-2 text-right">Recoverable</th>
+                                        <th className="px-4 py-2 text-center">Action Trigger</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-ey-border/40">
+                                      {reclamationUsers
+                                        .filter((u) => (emailToRow.get(u.email)?.orgServiceLine || 'General') === sl.serviceLine)
+                                        .map((u) => (
+                                          <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
+                                            <td className="px-4 py-2.5 pl-10 font-medium text-ey-light">
+                                              <div>{u.displayName}</div>
+                                              <div className="text-[10px] text-ey-muted">{u.email}</div>
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right">{fmtCost(u.licenseCost)}</td>
+                                            <td className="px-4 py-2.5 text-right font-bold text-emerald-400">{fmtCost(u.recoverableAmount)}</td>
+                                            <td className="px-4 py-2.5 text-center">
+                                              <button
+                                                onClick={() => handleTriggerAction(`License for ${u.displayName} reclaimed and returned to pool.`)}
+                                                className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
+                                              >
+                                                Reclaim License
+                                              </button>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                    </tbody>
+                                  </table>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
                         );
                       })}
                     </tbody>
@@ -1694,44 +1693,44 @@ export function ExecutiveInferenceDrilldownView({
                         const expenditure = summary?.byAiTool?.find((bt) => bt.tool === t.tool)?.cost || 0;
                         const avgExpenditurePerDev = t.userCount > 0 ? expenditure / t.userCount : 0;
                         return (
-                        <tr
-                          key={t.tool}
-                          onClick={() => setSelectedEntity({ type: 'tool', name: t.tool, label: t.label })}
-                          className="hover:bg-ey-card-hover transition cursor-pointer group"
-                        >
-                          <td className="px-4 py-3 font-semibold text-ey-light">
-                            <div className="flex items-center gap-2">
-                              <span className={`w-2 h-2 rounded-full ${t.barBg}`} />
-                              <span className="group-hover:text-ey-yellow transition-colors">{t.label}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-right text-ey-light">
-                            {formatCompactNumber(t.tokens)}
-                          </td>
-                          <td className="px-4 py-3 text-right font-bold text-ey-light">
-                            {fmtCost(expenditure)}
-                          </td>
-                          <td className="px-4 py-3 text-right font-bold text-ey-yellow">
-                            {fmtCost(t.cost)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-ey-light font-bold">
-                            {t.userCount}
-                          </td>
-                          <td className="px-4 py-3 text-right text-emerald-400 font-bold">
-                            {fmtCost(avgExpenditurePerDev)}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                              {t.billableRatio.toFixed(1)}%
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex items-center gap-1 text-[10px] text-ey-yellow font-bold group-hover:underline">
-                              <span>Drill to Logs</span>
-                              <ChevronRight className="w-3 h-3" />
-                            </span>
-                          </td>
-                        </tr>
+                          <tr
+                            key={t.tool}
+                            onClick={() => setSelectedEntity({ type: 'tool', name: t.tool, label: t.label })}
+                            className="hover:bg-ey-card-hover transition cursor-pointer group"
+                          >
+                            <td className="px-4 py-3 font-semibold text-ey-light">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full ${t.barBg}`} />
+                                <span className="group-hover:text-ey-yellow transition-colors">{t.label}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right text-ey-light">
+                              {formatCompactNumber(t.tokens)}
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold text-ey-light">
+                              {fmtCost(expenditure)}
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold text-ey-yellow">
+                              {fmtCost(t.cost)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-ey-light font-bold">
+                              {t.userCount}
+                            </td>
+                            <td className="px-4 py-3 text-right text-emerald-400 font-bold">
+                              {fmtCost(avgExpenditurePerDev)}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                {t.billableRatio.toFixed(1)}%
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="inline-flex items-center gap-1 text-[10px] text-ey-yellow font-bold group-hover:underline">
+                                <span>Drill to Logs</span>
+                                <ChevronRight className="w-3 h-3" />
+                              </span>
+                            </td>
+                          </tr>
                         );
                       })}
                     </tbody>
@@ -2044,190 +2043,188 @@ export function ExecutiveInferenceDrilldownView({
       )}
 
       {selectedEntity?.type === 'user' && (
-      <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-lg space-y-4">
-        {/* Core Header with Breadcrumb Entity Context */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-ey-border/60 pb-3">
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" />
-                <span>Level 4: Core Usage Log Telemetry (Last Level)</span>
-              </span>
-            </div>
-            <h2 className="text-base font-bold text-ey-light mt-1 flex items-center gap-2">
-              <FileSpreadsheet className="w-5 h-5 text-ey-yellow" />
-              <span>
-                {selectedEntity
-                  ? `Root-Cause Records for ${selectedEntity.label || selectedEntity.name}`
-                  : `All Underlying Raw Telemetry Records (${filteredGranularRows.length} events)`}
-              </span>
-            </h2>
-            <p className="text-xs text-ey-muted mt-0.5">
-              Inspecting the exact raw transaction ledger entries that substantiate this strategic inference.
-            </p>
-          </div>
-
-          {/* Search & Export Actions */}
-          <div className="flex items-center space-x-2 shrink-0">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-ey-muted absolute left-2.5 top-2.5" />
-              <input
-                type="text"
-                placeholder="Search user, tool, project..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="bg-ey-black border border-ey-border text-ey-light text-xs rounded-xl pl-8 pr-3 py-1.5 focus:outline-none focus:border-ey-yellow w-52 sm:w-64 font-mono"
-              />
+        <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-lg space-y-4">
+          {/* Core Header with Breadcrumb Entity Context */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-ey-border/60 pb-3">
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>Level 4: Core Usage Log Telemetry (Last Level)</span>
+                </span>
+              </div>
+              <h2 className="text-base font-bold text-ey-light mt-1 flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-ey-yellow" />
+                <span>
+                  {selectedEntity
+                    ? `Root-Cause Records for ${selectedEntity.label || selectedEntity.name}`
+                    : `All Underlying Raw Telemetry Records (${filteredGranularRows.length} events)`}
+                </span>
+              </h2>
+              <p className="text-xs text-ey-muted mt-0.5">
+                Inspecting the exact raw transaction ledger entries that substantiate this strategic inference.
+              </p>
             </div>
 
-            <button
-              onClick={handleExportFilteredCsv}
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-ey-black border border-ey-border hover:border-ey-yellow text-ey-light text-xs font-semibold rounded-xl transition shadow-sm"
-              title="Export filtered records as CSV"
-            >
-              <Download className="w-3.5 h-3.5 text-ey-yellow" />
-              <span className="hidden sm:inline">Export Audit CSV</span>
-            </button>
-          </div>
-        </div>
+            {/* Search & Export Actions */}
+            <div className="flex items-center space-x-2 shrink-0">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-ey-muted absolute left-2.5 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Search user, tool, project..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="bg-ey-black border border-ey-border text-ey-light text-xs rounded-xl pl-8 pr-3 py-1.5 focus:outline-none focus:border-ey-yellow w-52 sm:w-64 font-mono"
+                />
+              </div>
 
-        {/* Slice Mini Summary Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-ey-black/50 p-3 rounded-xl border border-ey-border/60 text-xs font-mono">
-          <div>
-            <span className="text-[10px] text-ey-muted uppercase">Matched Log Entries</span>
-            <p className="text-base font-bold text-ey-light">{filteredGranularRows.length} rows</p>
+              <button
+                onClick={handleExportFilteredCsv}
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-ey-black border border-ey-border hover:border-ey-yellow text-ey-light text-xs font-semibold rounded-xl transition shadow-sm"
+                title="Export filtered records as CSV"
+              >
+                <Download className="w-3.5 h-3.5 text-ey-yellow" />
+                <span className="hidden sm:inline">Export Audit CSV</span>
+              </button>
+            </div>
           </div>
-          <div>
-            <span className="text-[10px] text-ey-muted uppercase">Slice Total Spend</span>
-            <p className="text-base font-bold text-ey-yellow">{fmtCost(sliceTotalCost)}</p>
-          </div>
-          <div>
-            <span className="text-[10px] text-ey-muted uppercase">Slice Total Tokens</span>
-            <p className="text-base font-bold text-ey-light">{formatCompactNumber(sliceTotalTokens)}</p>
-          </div>
-          <div>
-            <span className="text-[10px] text-ey-muted uppercase">Billable Status</span>
-            <p className="text-base font-bold text-emerald-400">
-              {sliceBillableCount} / {filteredGranularRows.length} ({filteredGranularRows.length > 0 ? ((sliceBillableCount / filteredGranularRows.length) * 100).toFixed(0) : 0}%)
-            </p>
-          </div>
-        </div>
 
-        {/* Granular Table */}
-        <div className="overflow-x-auto border border-ey-border rounded-xl">
-          <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-              <tr>
-                <th className="px-4 py-3">Month</th>
-                <th className="px-4 py-3">Employee &amp; Email</th>
-                <th className="px-4 py-3">AI Tool</th>
-                <th className="px-4 py-3">Engagement Code</th>
-                <th className="px-4 py-3">Service Line</th>
-                <th className="px-4 py-3">Super Region</th>
-                <th className="px-4 py-3 text-center">Billable</th>
-                <th className="px-4 py-3 text-right">Tokens</th>
-                <th className="px-4 py-3 text-right">Cost (USD)</th>
-                <th className="px-4 py-3 text-center">Inspect</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ey-border">
-              {paginatedGranularRows.length > 0 ? (
-                paginatedGranularRows.map((r, idx) => (
-                  <tr
-                    key={idx}
-                    className="hover:bg-ey-card-hover/90 transition cursor-pointer"
-                    onClick={() => setInspectingRecord(r)}
-                  >
-                    <td className="px-4 py-3 text-ey-muted whitespace-nowrap">{r.monthYear.replace(/_/g, ' ')}</td>
-                    <td className="px-4 py-3 font-medium text-ey-light">
-                      <div>{r.displayName}</div>
-                      <div className="text-[10px] text-ey-muted">{r.userMail}</div>
-                    </td>
-                    <td className="px-4 py-3 capitalize text-ey-yellow">{r.aiTool}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-1.5 py-0.5 rounded text-[10px] border ${
-                          (r.projectCode || '').startsWith('E-')
+          {/* Slice Mini Summary Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-ey-black/50 p-3 rounded-xl border border-ey-border/60 text-xs font-mono">
+            <div>
+              <span className="text-[10px] text-ey-muted uppercase">Matched Log Entries</span>
+              <p className="text-base font-bold text-ey-light">{filteredGranularRows.length} rows</p>
+            </div>
+            <div>
+              <span className="text-[10px] text-ey-muted uppercase">Slice Total Spend</span>
+              <p className="text-base font-bold text-ey-yellow">{fmtCost(sliceTotalCost)}</p>
+            </div>
+            <div>
+              <span className="text-[10px] text-ey-muted uppercase">Slice Total Tokens</span>
+              <p className="text-base font-bold text-ey-light">{formatCompactNumber(sliceTotalTokens)}</p>
+            </div>
+            <div>
+              <span className="text-[10px] text-ey-muted uppercase">Billable Status</span>
+              <p className="text-base font-bold text-emerald-400">
+                {sliceBillableCount} / {filteredGranularRows.length} ({filteredGranularRows.length > 0 ? ((sliceBillableCount / filteredGranularRows.length) * 100).toFixed(0) : 0}%)
+              </p>
+            </div>
+          </div>
+
+          {/* Granular Table */}
+          <div className="overflow-x-auto border border-ey-border rounded-xl">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
+                <tr>
+                  <th className="px-4 py-3">Month</th>
+                  <th className="px-4 py-3">Employee &amp; Email</th>
+                  <th className="px-4 py-3">AI Tool</th>
+                  <th className="px-4 py-3">Engagement Code</th>
+                  <th className="px-4 py-3">Service Line</th>
+                  <th className="px-4 py-3">Super Region</th>
+                  <th className="px-4 py-3 text-center">Billable</th>
+                  <th className="px-4 py-3 text-right">Tokens</th>
+                  <th className="px-4 py-3 text-right">Cost (USD)</th>
+                  <th className="px-4 py-3 text-center">Inspect</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ey-border">
+                {paginatedGranularRows.length > 0 ? (
+                  paginatedGranularRows.map((r, idx) => (
+                    <tr
+                      key={idx}
+                      className="hover:bg-ey-card-hover/90 transition cursor-pointer"
+                      onClick={() => setInspectingRecord(r)}
+                    >
+                      <td className="px-4 py-3 text-ey-muted whitespace-nowrap">{r.monthYear.replace(/_/g, ' ')}</td>
+                      <td className="px-4 py-3 font-medium text-ey-light">
+                        <div>{r.displayName}</div>
+                        <div className="text-[10px] text-ey-muted">{r.userMail}</div>
+                      </td>
+                      <td className="px-4 py-3 capitalize text-ey-yellow">{r.aiTool}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] border ${(r.projectCode || '').startsWith('E-')
                             ? 'bg-blue-500/10 text-blue-300 border-blue-500/30'
                             : 'bg-purple-500/10 text-purple-300 border-purple-500/30'
-                        }`}
-                      >
-                        {r.projectCode || 'N/A'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-ey-muted">{r.orgServiceLine}</td>
-                    <td className="px-4 py-3 text-ey-muted">{r.superRegion}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          r.billableFlag === 'True' || r.billableFlag === 'true'
+                            }`}
+                        >
+                          {r.projectCode || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-ey-muted">{r.orgServiceLine}</td>
+                      <td className="px-4 py-3 text-ey-muted">{r.superRegion}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${r.billableFlag === 'True' || r.billableFlag === 'true'
                             ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                             : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                        }`}
-                      >
-                        {r.billableFlag}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right text-ey-light">{formatCompactNumber(r.tokenConsumption)}</td>
-                    <td className="px-4 py-3 text-right font-bold text-ey-yellow">{fmtCost(r.cost)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setInspectingRecord(r);
-                        }}
-                        className="p-1 text-ey-muted hover:text-ey-yellow transition"
-                        title="Inspect full row payload"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
+                            }`}
+                        >
+                          {r.billableFlag}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right text-ey-light">{formatCompactNumber(r.tokenConsumption)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-ey-yellow">{fmtCost(r.cost)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInspectingRecord(r);
+                          }}
+                          className="p-1 text-ey-muted hover:text-ey-yellow transition"
+                          title="Inspect full row payload"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={10} className="px-4 py-8 text-center text-ey-muted">
+                      No matching usage records found.
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-ey-muted">
-                    No matching usage records found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-ey-muted font-mono">
-            <div>
-              Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
-              {Math.min(currentPage * itemsPerPage, filteredGranularRows.length)} of{' '}
-              {filteredGranularRows.length} records
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1 bg-ey-black border border-ey-border rounded-lg hover:bg-ey-card-hover disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <span>
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 bg-ey-black border border-ey-border rounded-lg hover:bg-ey-card-hover disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-ey-muted font-mono">
+              <div>
+                Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
+                {Math.min(currentPage * itemsPerPage, filteredGranularRows.length)} of{' '}
+                {filteredGranularRows.length} records
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 bg-ey-black border border-ey-border rounded-lg hover:bg-ey-card-hover disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <span>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 bg-ey-black border border-ey-border rounded-lg hover:bg-ey-card-hover disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* ========================================================================= */}
