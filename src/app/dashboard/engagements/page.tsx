@@ -11,6 +11,7 @@ import { Briefcase, ChevronRight, RotateCcw, ArrowUpRight, X, Info } from 'lucid
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 import { summarize, type Level, type PathEntry } from '@/lib/hierarchyDrilldown';
 import { EngagementCodeRankingsPanel } from '@/components/ui/EngagementCodeRankingsPanel';
+import { StatTile } from '@/components/ui/StatTile';
 
 // The engagement-side hierarchy, picked up where the org hierarchy (CT/Non-CT ->
 // Country -> Service Line -> Sub-Service Line 1 -> Sub-Service Line 2 -> Users)
@@ -170,35 +171,33 @@ function EngagementAnalytics() {
         </div>
 
         {/* Live totals for the current path */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          {[
-            { label: 'Rows Matching Path', value: formatCompactNumber(totals.rowCount), info: '' },
-            { label: 'Engagement Codes', value: formatCompactNumber(totals.engagements), info: '' },
-            { label: 'Active Users', value: formatCompactNumber(totals.users), info: 'Users with at least one metered Usage row. Held licenses with no activity are excluded.' },
-            { label: 'Token Consumption', value: formatCompactNumber(totals.tokens), info: '' },
-            {
-              label: 'Total Cost',
-              value: fmtCost(totals.cost),
-              info: `Total AI Investment for this path: ${fmtCost(totals.usageCost)} metered usage + ${fmtCost(totals.licenseCost)} license fees.`,
-            },
-          ].map((tile) => (
-            <div key={tile.label} className="bg-ey-card border border-ey-border rounded-xl p-4">
-              <div className="flex items-start justify-between gap-2 mb-1">
-                <p className="text-[10px] uppercase font-semibold text-ey-muted">{tile.label}</p>
-                {tile.info && (
-                  <div className="group/info relative cursor-pointer shrink-0">
-                    <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
-                    <div className="absolute right-0 top-5 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-52 z-50">
-                      {tile.info}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <p className={`text-lg font-bold text-ey-light ${rowsLoading ? 'opacity-40 animate-pulse' : ''}`}>
-                {rowsLoading ? '—' : tile.value}
-              </p>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatTile
+            label="Engagement Codes"
+            value={formatCompactNumber(totals.engagements)}
+            subtitle="Unique client projects"
+            loading={rowsLoading}
+          />
+          <StatTile
+            label="Active Users"
+            value={formatCompactNumber(totals.users)}
+            subtitle="With metered activity"
+            tooltip="Users with at least one metered Usage row. Held licenses with no activity are excluded."
+            loading={rowsLoading}
+          />
+          <StatTile
+            label="Token Consumption"
+            value={formatCompactNumber(totals.tokens)}
+            subtitle={`${totals.tokens.toLocaleString()} tokens`}
+            loading={rowsLoading}
+          />
+          <StatTile
+            label="Total Cost"
+            value={fmtCost(totals.cost)}
+            subtitle={`${fmtCost(totals.usageCost)} usage · ${fmtCost(totals.licenseCost)} license`}
+            tooltip={`Total AI Investment for this path: ${fmtCost(totals.usageCost)} metered usage + ${fmtCost(totals.licenseCost)} license fees.`}
+            loading={rowsLoading}
+          />
         </div>
 
         {rowsLoading ? (

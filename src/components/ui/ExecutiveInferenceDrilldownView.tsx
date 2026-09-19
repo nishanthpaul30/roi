@@ -6,7 +6,6 @@ import {
   ChevronRight,
   TrendingUp,
   AlertTriangle,
-  Zap,
   Building2,
   Users,
   UserCheck,
@@ -39,6 +38,7 @@ import { useRawRows } from '@/hooks/useRawRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 import { StatTile } from './StatTile';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
+import { generatePrescriptiveInferences } from '@/lib/metrics/prescriptiveEngine';
 
 // Visual style per known AI tool (full literal Tailwind class strings so the JIT compiler
 // can statically detect them even though they're picked dynamically at runtime). Any tool
@@ -397,13 +397,6 @@ export function ExecutiveInferenceDrilldownView({
   const reclamationDormantCount = reclamationUsers.length;
   const usageWarningCount = usageWarningUsers.length;
   const avgRecoverablePerSeat = reclamationDormantCount > 0 ? totalRecoverableAmount / reclamationDormantCount : 0;
-
-  // Warning only: same ceilingRiskCount/hardCeiling figures as the "Users at
-  // Usage Ceiling" card on the Token & Spend ROI page (roi/page.tsx) -- reused
-  // directly rather than recomputed, so both cards always agree on who is
-  // "at the limit". Not a reclamation rule -- purely informational.
-  const nearingTokenLimitCount = summary?.ceilingRiskCount ?? 0;
-  const usageCeilingHardLimit = summary?.hardCeiling ?? 0;
   const recoverablePercentOfLicenseCost =
     summary && summary.totalLicenseCost > 0 ? ((totalRecoverableAmount / summary.totalLicenseCost) * 100).toFixed(1) : '0.0';
 
@@ -794,43 +787,65 @@ export function ExecutiveInferenceDrilldownView({
     return allRows.filter((r) => allowedEmails.has((r.userMail || '').toLowerCase()));
   }, [allRows, multiToolData]);
 
+  // Compute enriched prescriptive intelligence for all inferences
+  const prescriptiveInferences = useMemo(
+    () => generatePrescriptiveInferences(summary, allRows),
+    [summary, allRows]
+  );
+  const prescriptiveMap = useMemo(() => {
+    const m = new Map<string, (typeof prescriptiveInferences)[number]>();
+    for (const item of prescriptiveInferences) {
+      m.set(item.id, item);
+    }
+    return m;
+  }, [prescriptiveInferences]);
+
   // Map of Inference Metadata
   const inferencesMeta: Record<string, InferenceDefinition> = {
-    seat_utilization: {
-      id: 'seat_utilization',
-      title: 'Active / Inactive Users Telemetry (License Utilization)',
-      tag: 'User Engagement Telemetry',
-      tagColor: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-      icon: UserCheck,
-      stat: `${activeSeatPercent}% Active Utilization`,
-      statSub: `${activeUserCount} Active vs ${inactiveUserCount} Inactive Licenses (${fmtCost(inactiveLeakageCost)}/mo Leakage)`,
-      finding:
-        inactiveUserCount > 0
-          ? `Out of ${totalRosterSeats} provisioned enterprise licenses, ${activeUserCount} users (${activeSeatPercent}%) recorded prompt activity, while ${inactiveUserCount} licenses remain completely dormant, incurring ${fmtCost(inactiveLeakageCost)}/mo in unutilized fixed license costs.`
-          : `All ${totalRosterSeats} provisioned enterprise licenses recorded active prompt consumption during this window.`,
-      actionableInsight:
-        inactiveUserCount > 0
-          ? `Automate a 30-day inactivity license reclamation workflow: reallocate dormant licenses to waitlisted teams or convert low-activity licenses to consumption-only API keys.`
-          : `Maintain active monitoring and expand license capacity proactively.`,
-      benefitOutcome:
-        inactiveUserCount > 0
-          ? `Recovers up to ${fmtCost(inactiveLeakageCost)}/mo in reclaimed license spend. Also frees ${inactiveUserCount} seats for waitlisted teams and gives leadership a clean, auditable license-utilization baseline.`
-          : `Protects the full license investment from idle-seat leakage. Also keeps onboarding friction low as new hires can be provisioned with confidence.`,
-    },
-    pareto_risk: {
-      id: 'pareto_risk',
-      title: 'Pareto Cost Concentration (80/20 Risk)',
-      tag: 'Cost Risk Exposure',
-      tagColor: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-      icon: ShieldAlert,
-      stat: `${top20SpendPercent}% Spend in Top 20%`,
-      statSub: `${top20PercentCount} power users drive majority cost (${fmtCost(top20Spend)})`,
-      finding: `Spend is heavily concentrated: the top 10% of users (${top10PercentCount} people) account for ${fmtCost(top10Spend)} (${((top10Spend / totalOrgSpend) * 100).toFixed(1)}%), and the top 20% (${top20PercentCount} people) drive ${fmtCost(top20Spend)} (${top20SpendPercent}%).`,
-      actionableInsight:
-        'Avoid broad, org-wide cuts. Conduct targeted usage reviews for top power users and negotiate tier-based volume plans.',
-      benefitOutcome: `Targets the highest-leverage cost lever: tier-based volume pricing for the ${top20PercentCount} users already driving ${fmtCost(top20Spend)} (${top20SpendPercent}% of spend) can cut real dollars without an org-wide policy that disrupts the other 80% of users. Also keeps your highest-value power users fully productive.`,
-    },
+    seat_utilization: (() => {
+      const p = prescriptiveMap.get('seat_utilization');
+      return {
+        id: 'seat_utilization',
+        title: 'Active / Inactive Users Telemetry (License Utilization)',
+        tag: 'User Engagement Telemetry',
+        tagColor: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+        icon: UserCheck,
+        stat: `${activeSeatPercent}% Active Utilization`,
+        statSub: `${activeUserCount} Active vs ${inactiveUserCount} Inactive Licenses (${fmtCost(inactiveLeakageCost)}/mo Leakage)`,
+        finding: p?.finding || (
+          inactiveUserCount > 0
+            ? `Out of ${totalRosterSeats} provisioned enterprise licenses, ${activeUserCount} users (${activeSeatPercent}%) recorded prompt activity, while ${inactiveUserCount} licenses remain completely dormant, incurring ${fmtCost(inactiveLeakageCost)}/mo in unutilized fixed license costs.`
+            : `All ${totalRosterSeats} provisioned enterprise licenses recorded active prompt consumption during this window.`
+        ),
+        actionableInsight: p?.actionableInsight || (
+          inactiveUserCount > 0
+            ? `Automate a 30-day inactivity license reclamation workflow: reallocate dormant licenses to waitlisted teams or convert low-activity licenses to consumption-only API keys.`
+            : `Maintain active monitoring and expand license capacity proactively.`
+        ),
+        benefitOutcome: p?.benefitOutcome || (
+          inactiveUserCount > 0
+            ? `Recovers up to ${fmtCost(inactiveLeakageCost)}/mo in reclaimed license spend. Also frees ${inactiveUserCount} seats for waitlisted teams and gives leadership a clean, auditable license-utilization baseline.`
+            : `Protects the full license investment from idle-seat leakage. Also keeps onboarding friction low as new hires can be provisioned with confidence.`
+        ),
+      };
+    })(),
+    pareto_risk: (() => {
+      const p = prescriptiveMap.get('pareto_risk');
+      return {
+        id: 'pareto_risk',
+        title: 'Pareto Cost Concentration (80/20 Risk)',
+        tag: 'Cost Risk Exposure',
+        tagColor: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+        icon: ShieldAlert,
+        stat: `${top20SpendPercent}% Spend in Top 20%`,
+        statSub: `${top20PercentCount} power users drive majority cost (${fmtCost(top20Spend)})`,
+        finding: p?.finding || `Spend is heavily concentrated: the top 10% of users (${top10PercentCount} people) account for ${fmtCost(top10Spend)} (${((top10Spend / totalOrgSpend) * 100).toFixed(1)}%), and the top 20% (${top20PercentCount} people) drive ${fmtCost(top20Spend)} (${top20SpendPercent}%).`,
+        actionableInsight: p?.actionableInsight || 'Avoid broad, org-wide cuts. Conduct targeted usage reviews for top power users and negotiate tier-based volume plans.',
+        benefitOutcome: p?.benefitOutcome || `Targets the highest-leverage cost lever: tier-based volume pricing for the ${top20PercentCount} users already driving ${fmtCost(top20Spend)} (${top20SpendPercent}% of spend) can cut real dollars without an org-wide policy that disrupts the other 80% of users. Also keeps your highest-value power users fully productive.`,
+      };
+    })(),
     multi_tool_comparison: (() => {
+      const p = prescriptiveMap.get('multi_tool_comparison');
       const sorted = [...multiToolData.toolList].sort((a, b) => a.costPerM - b.costPerM);
       const cheapest = sorted[0];
       const priciest = sorted[sorted.length - 1];
@@ -845,12 +860,13 @@ export function ExecutiveInferenceDrilldownView({
         icon: Layers,
         stat: `${multiToolData.dualToolUsers.length} Users Multi-License Overlap`,
         statSub: `${fmtCost(multiToolData.dualToolSpend)} redundant spend`,
-        finding: `${cheapest?.label} is the cheapest tool at $${(cheapest?.costPerM || 0).toFixed(2)} per million tokens. ${priciest?.label} is the most expensive at $${(priciest?.costPerM || 0).toFixed(2)} per million tokens — about ${priceMultiple.toFixed(1)}x more for the same volume of usage.`,
-        actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens). Consolidate overlapping multi-tool licenses to eliminate redundant fixed license fees across ${multiToolData.dualToolUsers.length} users.`,
-        benefitOutcome: `Recovers up to ${fmtCost(multiToolData.dualToolSpend)} in redundant multi-license spend by consolidating ${multiToolData.dualToolUsers.length} overlapping users onto a single primary tool. Also lowers per-token spend by routing volume toward the ${priceMultiple.toFixed(1)}x cheaper option, and simplifies vendor management.`,
+        finding: p?.finding || `${cheapest?.label} is the cheapest tool at $${(cheapest?.costPerM || 0).toFixed(2)} per million tokens. ${priciest?.label} is the most expensive at $${(priciest?.costPerM || 0).toFixed(2)} per million tokens — about ${priceMultiple.toFixed(1)}x more for the same volume of usage.`,
+        actionableInsight: p?.actionableInsight || `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens). Consolidate overlapping multi-tool licenses to eliminate redundant fixed license fees across ${multiToolData.dualToolUsers.length} users.`,
+        benefitOutcome: p?.benefitOutcome || `Recovers up to ${fmtCost(multiToolData.dualToolSpend)} in redundant multi-license spend by consolidating ${multiToolData.dualToolUsers.length} overlapping users onto a single primary tool. Also lowers per-token spend by routing volume toward the ${priceMultiple.toFixed(1)}x cheaper option, and simplifies vendor management.`,
       };
     })(),
     vendor_spread: (() => {
+      const p = prescriptiveMap.get('multi_tool_comparison');
       const sorted = [...multiToolData.toolList].sort((a, b) => a.costPerM - b.costPerM);
       const cheapest = sorted[0];
       const priciest = sorted[sorted.length - 1];
@@ -866,12 +882,13 @@ export function ExecutiveInferenceDrilldownView({
         icon: Layers,
         stat: `${multiToolData.dualToolUsers.length} Users Multi-License Overlap`,
         statSub: `${fmtCost(multiToolData.dualToolSpend)} redundant spend`,
-        finding: `${cheapest?.label} unit cost is $${(cheapest?.costPerM || 0).toFixed(2)}/M tokens, and ${priciest?.label} is the highest at $${(priciest?.costPerM || 0).toFixed(2)}/M. ${topSpend?.label} accounts for ${(topSpend?.spendShare || 0).toFixed(1)}% of spend (${fmtCost(topSpend?.cost || 0)}) across ${sorted.length} active tools. Multi-platform license overlap was identified across multi-tool users with redundant license overhead.`,
-        actionableInsight: `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens) to reduce token spend.`,
-        benefitOutcome: `Recovers up to ${fmtCost(multiToolData.dualToolSpend)} in redundant multi-license spend by consolidating overlapping users, plus per-token savings from shifting volume to the ${priceMultiple.toFixed(1)}x cheaper tool. Also reduces vendor sprawl across the ${sorted.length} active platforms.`,
+        finding: p?.finding || `${cheapest?.label} unit cost is $${(cheapest?.costPerM || 0).toFixed(2)}/M tokens, and ${priciest?.label} is the highest at $${(priciest?.costPerM || 0).toFixed(2)}/M. ${topSpend?.label} accounts for ${(topSpend?.spendShare || 0).toFixed(1)}% of spend (${fmtCost(topSpend?.cost || 0)}) across ${sorted.length} active tools. Multi-platform license overlap was identified across multi-tool users with redundant license overhead.`,
+        actionableInsight: p?.actionableInsight || `Steer high-volume, lower-complexity prompt workloads toward lower unit-cost tools ($${(cheapest?.costPerM || 0).toFixed(2)}/M tokens) to reduce token spend.`,
+        benefitOutcome: p?.benefitOutcome || `Recovers up to ${fmtCost(multiToolData.dualToolSpend)} in redundant multi-license spend by consolidating overlapping users, plus per-token savings from shifting volume to the ${priceMultiple.toFixed(1)}x cheaper tool. Also reduces vendor sprawl across the ${sorted.length} active platforms.`,
       };
     })(),
     project_billability: (() => {
+      const p = prescriptiveMap.get('project_billability');
       const billableSpendPercent = summary?.billableSpendPercent || 0;
       const nonBillablePct = 100 - billableSpendPercent;
       return {
@@ -882,13 +899,13 @@ export function ExecutiveInferenceDrilldownView({
         icon: Layers,
         stat: `${billableSpendPercent.toFixed(1)}% Billable AI Spend`,
         statSub: `${billableSpendPercent.toFixed(1)}% Billable vs ${nonBillablePct.toFixed(1)}% Non-Billable`,
-        finding: `${billableSpendPercent.toFixed(1)}% of total AI spend (${fmtCost(summary?.billableSpend || 0)}) is flagged Billable, derived from Engagement Codes starting with E-, and directly assigned to revenue-generating client engagements. Non-billable internal spend (${fmtCost(summary?.nonBillableSpend || 0)}) accounts for ${nonBillablePct.toFixed(1)}%.`,
-        actionableInsight:
-          'Audit the largest non-billable cost centers to ensure internal AI investment yields reusable intellectual property or client delivery templates.',
-        benefitOutcome: `Protects the ROI on ${fmtCost(summary?.nonBillableSpend || 0)} of non-billable spend by redirecting it toward reusable IP instead of one-off internal use. Also strengthens cost-allocation audit trails and makes the case for billing back qualifying work.`,
+        finding: p?.finding || `${billableSpendPercent.toFixed(1)}% of total AI spend (${fmtCost(summary?.billableSpend || 0)}) is flagged Billable, derived from Engagement Codes starting with E-, and directly assigned to revenue-generating client engagements. Non-billable internal spend (${fmtCost(summary?.nonBillableSpend || 0)}) accounts for ${nonBillablePct.toFixed(1)}%.`,
+        actionableInsight: p?.actionableInsight || 'Audit the largest non-billable cost centers to ensure internal AI investment yields reusable intellectual property or client delivery templates.',
+        benefitOutcome: p?.benefitOutcome || `Protects the ROI on ${fmtCost(summary?.nonBillableSpend || 0)} of non-billable spend by redirecting it toward reusable IP instead of one-off internal use. Also strengthens cost-allocation audit trails and makes the case for billing back qualifying work.`,
       };
     })(),
     habitual_retention: (() => {
+      const p = prescriptiveMap.get('habitual_retention');
       const embeddedPct = (userCohorts.embedded.length / (activeUserCount || 1)) * 100;
       const regularPct = (userCohorts.regular.length / (activeUserCount || 1)) * 100;
       const occasionalPct = (userCohorts.occasional.length / (activeUserCount || 1)) * 100;
@@ -900,38 +917,46 @@ export function ExecutiveInferenceDrilldownView({
         icon: Users,
         stat: `${(embeddedPct + regularPct).toFixed(0)}% Regular-or-Better Usage`,
         statSub: `${embeddedPct.toFixed(0)}% Embedded, ${regularPct.toFixed(0)}% Regular, ${occasionalPct.toFixed(0)}% Occasional (of ${activeUserCount} active users)`,
-        finding: `Across ${activeUserCount} active users this period: ${userCohorts.embedded.length} (${embeddedPct.toFixed(0)}%) are Embedded (active in ≥90% of months in the filtered window), ${userCohorts.regular.length} (${regularPct.toFixed(0)}%) are Regular (≥60%), and ${userCohorts.occasional.length} (${occasionalPct.toFixed(0)}%) are Occasional (≥25%). This is measured as active-months ÷ total months in the filtered window, per user — see the Habitual Retention card on Executive Overview for the org-wide cohort breakdown, which also accounts for the ${inactiveUserCount} completely dormant licenses.`,
-        actionableInsight:
+        finding: p?.finding || `Across ${activeUserCount} active users this period: ${userCohorts.embedded.length} (${embeddedPct.toFixed(0)}%) are Embedded (active in ≥90% of months in the filtered window), ${userCohorts.regular.length} (${regularPct.toFixed(0)}%) are Regular (≥60%), and ${userCohorts.occasional.length} (${occasionalPct.toFixed(0)}%) are Occasional (≥25%). This is measured as active-months ÷ total months in the filtered window, per user — see the Habitual Retention card on Executive Overview for the org-wide cohort breakdown, which also accounts for the ${inactiveUserCount} completely dormant licenses.`,
+        actionableInsight: p?.actionableInsight || (
           occasionalPct > 20
             ? 'Investigate the Occasional cohort for onboarding friction or workflow gaps before expanding license capacity further.'
-            : 'AI tools show healthy habitual usage among active licenses. Focus shift from basic onboarding to advanced competency training.',
-        benefitOutcome:
+            : 'AI tools show healthy habitual usage among active licenses. Focus shift from basic onboarding to advanced competency training.'
+        ),
+        benefitOutcome: p?.benefitOutcome || (
           occasionalPct > 20
             ? `Protects roughly ${fmtCost(userCohorts.occasional.length * avgLicenseCostPerSeat)}/mo in license spend now at risk from the ${userCohorts.occasional.length}-person Occasional cohort churning off their seats. Also lifts overall productivity return once those seats convert to habitual use.`
-            : `Sustains the return on the active license base by keeping usage habitual rather than one-off. Also compounds productivity gains as advanced training deepens adoption.`,
+            : `Sustains the return on the active license base by keeping usage habitual rather than one-off. Also compounds productivity gains as advanced training deepens adoption.`
+        ),
       };
     })(),
-    license_reclamation: {
-      id: 'license_reclamation',
-      title: 'License Reclamation Intelligence',
-      tag: 'Financial Governance',
-      tagColor: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-      icon: BadgeDollarSign,
-      stat: `${fmtCost(totalRecoverableAmount)} Recoverable`,
-      statSub: `${reclamationDormantCount} Dormant Seats to Reclaim · ${usageWarningCount} Below Free Limit (Warning)`,
-      finding:
-        reclamationDormantCount > 0 || usageWarningCount > 0
-          ? `${reclamationDormantCount} seat${reclamationDormantCount === 1 ? '' : 's'} recorded 0 usage against a real license cost, totaling ${fmtCost(totalRecoverableAmount)} (${recoverablePercentOfLicenseCost}% of total license cost) that can be reclaimed outright. A further ${usageWarningCount} seat${usageWarningCount === 1 ? '' : 's'} are active but consuming less than their included free limit -- flagged as a warning only, not reclaimed.`
-          : 'No dormant seats to reclaim, and no active seats currently running under their free limit.',
-      actionableInsight:
-        reclamationDormantCount > 0
-          ? `Reclaim the ${reclamationDormantCount} zero-usage license${reclamationDormantCount === 1 ? '' : 's'} outright. Monitor the ${usageWarningCount} under-the-free-limit seat${usageWarningCount === 1 ? '' : 's'} -- no action taken on these, just a usage warning.`
-          : 'No dormant licenses to reclaim this period.',
-      benefitOutcome:
-        reclamationDormantCount > 0
-          ? `Recovers ${fmtCost(totalRecoverableAmount)}/period in license spend (avg ${fmtCost(avgRecoverablePerSeat)}/seat) by reclaiming only the ${reclamationDormantCount} fully dormant seats, without touching any seat that has recorded real usage.`
-          : `Protects the full license investment -- no dormant seats to reclaim this period.`,
-    },
+    license_reclamation: (() => {
+      const p = prescriptiveMap.get('license_reclamation');
+      return {
+        id: 'license_reclamation',
+        title: 'License Reclamation Intelligence',
+        tag: 'Financial Governance',
+        tagColor: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+        icon: BadgeDollarSign,
+        stat: `${fmtCost(totalRecoverableAmount)} Recoverable`,
+        statSub: `${reclamationDormantCount} Dormant Seats to Reclaim · ${usageWarningCount} Below Free Limit (Warning)`,
+        finding: p?.finding || (
+          reclamationDormantCount > 0 || usageWarningCount > 0
+            ? `${reclamationDormantCount} seat${reclamationDormantCount === 1 ? '' : 's'} recorded 0 usage against a real license cost, totaling ${fmtCost(totalRecoverableAmount)} (${recoverablePercentOfLicenseCost}% of total license cost) that can be reclaimed outright. A further ${usageWarningCount} seat${usageWarningCount === 1 ? '' : 's'} are active but consuming less than their included free limit -- flagged as a warning only, not reclaimed.`
+            : 'No dormant seats to reclaim, and no active seats currently running under their free limit.'
+        ),
+        actionableInsight: p?.actionableInsight || (
+          reclamationDormantCount > 0
+            ? `Reclaim the ${reclamationDormantCount} zero-usage license${reclamationDormantCount === 1 ? '' : 's'} outright. Monitor the ${usageWarningCount} under-the-free-limit seat${usageWarningCount === 1 ? '' : 's'} -- no action taken on these, just a usage warning.`
+            : 'No dormant licenses to reclaim this period.'
+        ),
+        benefitOutcome: p?.benefitOutcome || (
+          reclamationDormantCount > 0
+            ? `Recovers ${fmtCost(totalRecoverableAmount)}/period in license spend (avg ${fmtCost(avgRecoverablePerSeat)}/seat) by reclaiming only the ${reclamationDormantCount} fully dormant seats, without touching any seat that has recorded real usage.`
+            : `Protects the full license investment -- no dormant seats to reclaim this period.`
+        ),
+      };
+    })(),
   };
 
   const currentMeta = inferencesMeta[inferenceId] || inferencesMeta.seat_utilization;
@@ -1150,7 +1175,7 @@ export function ExecutiveInferenceDrilldownView({
         {/* Level 1 Title Banner */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-2 border-t border-ey-border/40">
           <div className="space-y-1.5">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
               <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border ${currentMeta.tagColor}`}>
                 {currentMeta.tag}
               </span>
@@ -1171,6 +1196,7 @@ export function ExecutiveInferenceDrilldownView({
           </div>
         </div>
 
+
         {/* Strategic Recommendation Callout */}
         <div className="bg-ey-yellow/5 border border-ey-yellow/20 rounded-xl p-3.5 flex items-start space-x-3">
           <Sparkles className="w-5 h-5 text-ey-yellow shrink-0 mt-0.5" />
@@ -1179,6 +1205,7 @@ export function ExecutiveInferenceDrilldownView({
             <span className="text-ey-light leading-relaxed">{currentMeta.actionableInsight}</span>
           </div>
         </div>
+
 
         {/* Benefits & Outcome — cost-first payoff of taking the action above */}
         <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3.5 flex items-start space-x-3">
@@ -1259,13 +1286,19 @@ export function ExecutiveInferenceDrilldownView({
                       Identified dormant provisioned licenses incurring real per-license fees without prompt telemetry in the selected period.
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleTriggerAction(`Automated 30-Day Reclamation Workflow dispatched to ${dormantUsers.length} dormant account${dormantUsers.length === 1 ? '' : 's'}.`)}
-                    className="px-3 py-1.5 bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 self-start sm:self-center"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Reclaim All Unutilized Licenses</span>
-                  </button>
+                  <div className="flex items-center gap-2.5 self-start sm:self-center">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs font-mono">
+                      <span className="text-ey-muted font-sans font-medium">Savings:</span>
+                      <span className="font-bold text-emerald-400">{fmtCost(inactiveLeakageCost)}</span>
+                    </div>
+                    <button
+                      onClick={() => handleTriggerAction(`Automated 30-Day Reclamation Workflow dispatched to ${dormantUsers.length} dormant account${dormantUsers.length === 1 ? '' : 's'}.`)}
+                      className="px-3 py-1.5 bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 cursor-pointer shrink-0"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Reclaim All Unutilized Licenses</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto border border-ey-border rounded-xl">
@@ -1365,38 +1398,30 @@ export function ExecutiveInferenceDrilldownView({
           {inferenceId === 'license_reclamation' && (
             <div className="space-y-6">
               {/* Level 2 KPI Tiles */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-xs">
                 <StatTile
-                  label="Recoverable License Cost"
-                  value={fmtCost(totalRecoverableAmount)}
-                  valueClassName="text-emerald-400"
-                  subtitle={`${recoverablePercentOfLicenseCost}% of total license cost`}
-                  subtitleClassName="text-emerald-300/80"
-                  tooltip="Sum of License Cost (USD) for every user with Calculation Method = 'Usage' AND GenAI Tool Consumption = 0 across all their held tools. Only 0-usage seats are counted here."
+                  label="Total License Cost"
+                  value={fmtCost(summary?.totalLicenseCost || 0)}
+                  valueClassName="text-ey-light"
+                  subtitle={`${totalRosterSeats} Provisioned Licenses`}
+                  subtitleClassName="text-ey-muted"
+                  tooltip="Total enterprise license investment across all provisioned users in the dataset."
                 />
                 <StatTile
                   label="Dormant Seats (Reclaim)"
-                  value={`${reclamationDormantCount} Seats`}
+                  value={fmtCost(totalRecoverableAmount)}
                   valueClassName="text-rose-400"
-                  subtitle="0 GenAI Tool Consumption recorded"
+                  subtitle={`${reclamationDormantCount} Seats (${recoverablePercentOfLicenseCost}% of total)`}
                   subtitleClassName="text-rose-300/80"
-                  tooltip="Count of distinct users with a real License Cost > 0 and GenAI Tool Consumption = 0 on their Usage rows. These are the seats reclaimed under Rule 1."
+                  tooltip="Total recoverable license cost from confirmed dormant seats (0 token consumption recorded). These are the seats reclaimed under Rule 1."
                 />
                 <StatTile
                   label="Below Free Limit (Warning)"
-                  value={`${usageWarningCount} Seats`}
+                  value={fmtCost(totalWarningUnusedCapacity)}
                   valueClassName="text-amber-400"
-                  subtitle="Active, but under the included free limit"
+                  subtitle={`${usageWarningCount} Seats · under free allowance`}
                   subtitleClassName="text-amber-300/80"
-                  tooltip="Count of active users (GenAI Tool Consumption > 0) whose usage cost falls under their tool's included free-dollar limit (Zone 1: wasteCost > overageCost). Flagged as a warning only -- never reclaimed."
-                />
-                <StatTile
-                  label="Users at Usage Ceiling"
-                  value={`${nearingTokenLimitCount} Users`}
-                  valueClassName="text-ey-yellow"
-                  subtitle={`${fmtCost(usageCeilingHardLimit)} hard ceiling · 90% threshold`}
-                  subtitleClassName="text-ey-yellow/80"
-                  tooltip="Same figure as the Users at Usage Ceiling card on the Token & Spend ROI page: users who have reached or exceeded 90% of the hard spend ceiling. Warning only -- not a reclamation rule."
+                  tooltip="Total unused free capacity across active users whose usage cost falls under their tool's included free allowance. Warning only -- never reclaimed."
                 />
               </div>
 
@@ -1420,13 +1445,19 @@ export function ExecutiveInferenceDrilldownView({
                       Rule 1: only fully dormant seats (0 usage) are reclaimed, grouped by Service Line.
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleTriggerAction(`Automated Reclamation Workflow dispatched to ${reclamationDormantCount} dormant seat${reclamationDormantCount === 1 ? '' : 's'}.`)}
-                    className="px-3 py-1.5 bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 self-start sm:self-center"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Reclaim All Dormant Licenses</span>
-                  </button>
+                  <div className="flex items-center gap-2.5 self-start sm:self-center">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs font-mono">
+                      <span className="text-ey-muted font-sans font-medium">Savings:</span>
+                      <span className="font-bold text-emerald-400">{fmtCost(totalRecoverableAmount)}</span>
+                    </div>
+                    <button
+                      onClick={() => handleTriggerAction(`Automated Reclamation Workflow dispatched to ${reclamationDormantCount} dormant seat${reclamationDormantCount === 1 ? '' : 's'}.`)}
+                      className="px-3 py-1.5 bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 cursor-pointer shrink-0"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Reclaim All Dormant Licenses</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto border border-ey-border rounded-xl">

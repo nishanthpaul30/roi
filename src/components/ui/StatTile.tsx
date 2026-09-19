@@ -9,6 +9,7 @@ interface StatTileProps {
   subtitleClassName?: string;
   tooltip?: ReactNode;
   borderClassName?: string;
+  loading?: boolean;
 }
 
 /**
@@ -27,6 +28,7 @@ export function StatTile({
   subtitleClassName = 'text-ey-muted',
   tooltip,
   borderClassName = 'border-ey-border',
+  loading = false,
 }: StatTileProps) {
   return (
     <div className={`bg-ey-card border ${borderClassName} rounded-xl p-5 shadow-sm flex flex-col justify-between`}>
@@ -43,7 +45,9 @@ export function StatTile({
       </div>
 
       <div className="my-1">
-        <span className={`text-2xl lg:text-3xl font-extrabold tracking-tight ${valueClassName}`}>{value}</span>
+        <span className={`text-2xl lg:text-3xl font-extrabold tracking-tight ${valueClassName} ${loading ? 'opacity-40 animate-pulse' : ''}`}>
+          {loading ? '—' : value}
+        </span>
       </div>
 
       {subtitle && (

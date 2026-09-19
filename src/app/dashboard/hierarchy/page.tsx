@@ -11,6 +11,7 @@ import { GitBranch, ChevronRight, RotateCcw, ArrowUpRight, TableProperties, Glob
 import { GeoHierarchyMap } from '@/components/ui/GeoHierarchyMap';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 import { summarize, type Level, type PathEntry } from '@/lib/hierarchyDrilldown';
+import { StatTile } from '@/components/ui/StatTile';
 
 // The required application-wide hierarchy — always followed while drilling down:
 // CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1 -> Sub-Service Line 2 ->
@@ -155,32 +156,26 @@ export default function HierarchyDrilldownPage() {
 
         {/* Live totals for current path */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { label: 'Active Users', value: formatCompactNumber(overallTotals.users), info: 'Users with at least one metered Usage row. Held licenses with no activity are excluded.' },
-            { label: 'Token Consumption', value: formatCompactNumber(overallTotals.tokens), info: '' },
-            {
-              label: 'Total Cost',
-              value: fmtCost(overallTotals.cost),
-              info: `Total AI Investment for this path: ${fmtCost(overallTotals.usageCost)} metered usage + ${fmtCost(overallTotals.licenseCost)} license fees.`,
-            },
-          ].map((tile) => (
-            <div key={tile.label} className="bg-ey-card border border-ey-border rounded-xl p-4">
-              <div className="flex items-start justify-between gap-2 mb-1">
-                <p className="text-[10px] uppercase font-semibold text-ey-muted">{tile.label}</p>
-                {tile.info && (
-                  <div className="group/info relative cursor-pointer shrink-0">
-                    <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
-                    <div className="absolute right-0 top-5 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-52 z-50">
-                      {tile.info}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <p className={`text-lg font-bold text-ey-light ${rowsLoading ? 'opacity-40 animate-pulse' : ''}`}>
-                {rowsLoading ? '—' : tile.value}
-              </p>
-            </div>
-          ))}
+          <StatTile
+            label="Active Users"
+            value={formatCompactNumber(overallTotals.users)}
+            subtitle="With metered activity"
+            tooltip="Users with at least one metered Usage row. Held licenses with no activity are excluded."
+            loading={rowsLoading}
+          />
+          <StatTile
+            label="Token Consumption"
+            value={formatCompactNumber(overallTotals.tokens)}
+            subtitle={`${overallTotals.tokens.toLocaleString()} tokens`}
+            loading={rowsLoading}
+          />
+          <StatTile
+            label="Total Cost"
+            value={fmtCost(overallTotals.cost)}
+            subtitle={`${fmtCost(overallTotals.usageCost)} usage · ${fmtCost(overallTotals.licenseCost)} license`}
+            tooltip={`Total AI Investment for this path: ${fmtCost(overallTotals.usageCost)} metered usage + ${fmtCost(overallTotals.licenseCost)} license fees.`}
+            loading={rowsLoading}
+          />
         </div>
 
         {rowsLoading ? (
