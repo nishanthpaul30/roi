@@ -32,6 +32,8 @@ import {
   Check,
   Award,
   Briefcase,
+  BadgeDollarSign,
+  MinusCircle,
 } from 'lucide-react';
 import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
@@ -324,6 +326,71 @@ export function ExecutiveInferenceDrilldownView({
     }
     return Array.from(map.values()).sort((a, b) => b.monthlyCost - a.monthlyCost);
   }, [dormantUsers]);
+
+  // License Reclamation: seats with real license cost that fall below an 80%
+  // usage-ROI threshold, built from the same userCapacityBreakdown figures the
+  // rest of this screen already uses -- not a separate recomputation from raw
+  // rows -- so this stays consistent with every other dormant/underutilized
+  // figure on the app (see the seat_utilization revert history for why that matters).
+  const emailToRow = useMemo(() => {
+    const map = new Map<string, CsvUsageRow>();
+    for (const r of allRows) {
+      const email = (r.userMail || '').toLowerCase().trim();
+      if (email && !map.has(email)) map.set(email, r);
+    }
+    return map;
+  }, [allRows]);
+
+  const reclamationUsers = useMemo(() => {
+    const breakdown = summary?.userCapacityBreakdown || [];
+    return breakdown
+      .filter((u) => u.licenseCost > 0 && u.licenseRoiPercent < 80)
+      .map((u) => {
+        const recoverableAmount = Number((u.licenseCost - u.actualCost).toFixed(4));
+        const recommendation: 'revoke' | 'downgrade' | 'review' =
+          u.tokenConsumption === 0 ? 'revoke' : u.licenseRoiPercent < 50 ? 'downgrade' : 'review';
+        return {
+          email: u.userMail.toLowerCase().trim(),
+          displayName: u.displayName,
+          aiTools: u.aiTools,
+          licenseCost: u.licenseCost,
+          actualUsageCost: u.actualCost,
+          licenseRoiPercent: u.licenseRoiPercent,
+          recoverableAmount,
+          recommendation,
+        };
+      })
+      .filter((u) => u.recoverableAmount > 0)
+      .sort((a, b) => b.recoverableAmount - a.recoverableAmount);
+  }, [summary]);
+
+  const reclamationEmailSet = useMemo(() => new Set(reclamationUsers.map((u) => u.email)), [reclamationUsers]);
+  const reclamationRows = useMemo(
+    () => allRows.filter((r) => reclamationEmailSet.has((r.userMail || '').toLowerCase().trim())),
+    [allRows, reclamationEmailSet]
+  );
+  const totalRecoverableAmount = useMemo(() => reclamationUsers.reduce((s, u) => s + u.recoverableAmount, 0), [reclamationUsers]);
+  const totalFlaggedLicenseCost = useMemo(() => reclamationUsers.reduce((s, u) => s + u.licenseCost, 0), [reclamationUsers]);
+  const reclamationDormantCount = useMemo(() => reclamationUsers.filter((u) => u.recommendation === 'revoke').length, [reclamationUsers]);
+  const reclamationUnderutilizedCount = useMemo(
+    () => reclamationUsers.filter((u) => u.recommendation !== 'revoke').length,
+    [reclamationUsers]
+  );
+  const avgRecoverablePerSeat = reclamationUsers.length > 0 ? totalRecoverableAmount / reclamationUsers.length : 0;
+  const recoverablePercentOfLicenseCost =
+    totalFlaggedLicenseCost > 0 ? ((totalRecoverableAmount / totalFlaggedLicenseCost) * 100).toFixed(1) : '0.0';
+
+  const reclamationByServiceLine = useMemo(() => {
+    const map = new Map<string, { serviceLine: string; count: number; recoverableAmount: number }>();
+    for (const u of reclamationUsers) {
+      const serviceLine = emailToRow.get(u.email)?.orgServiceLine || 'General';
+      if (!map.has(serviceLine)) map.set(serviceLine, { serviceLine, count: 0, recoverableAmount: 0 });
+      const entry = map.get(serviceLine)!;
+      entry.count += 1;
+      entry.recoverableAmount = Number((entry.recoverableAmount + u.recoverableAmount).toFixed(4));
+    }
+    return Array.from(map.values()).sort((a, b) => b.recoverableAmount - a.recoverableAmount);
+  }, [reclamationUsers, emailToRow]);
 
   // Compute Power Users (Pareto Analysis: Top 20%)
   const sortedUsersBySpend = useMemo(() => {
@@ -817,6 +884,27 @@ export function ExecutiveInferenceDrilldownView({
             : `Sustains the return on the active license base by keeping usage habitual rather than one-off. Also compounds productivity gains as advanced training deepens adoption.`,
       };
     })(),
+    license_reclamation: {
+      id: 'license_reclamation',
+      title: 'License Reclamation Intelligence',
+      tag: 'Financial Governance',
+      tagColor: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+      icon: BadgeDollarSign,
+      stat: `${fmtCost(totalRecoverableAmount)} Recoverable`,
+      statSub: `${reclamationDormantCount} Dormant + ${reclamationUnderutilizedCount} Under-Utilized Seats`,
+      finding:
+        reclamationUsers.length > 0
+          ? `${reclamationUsers.length} provisioned seats (${reclamationDormantCount} fully dormant, ${reclamationUnderutilizedCount} under-utilized) fall below the 80% usage-ROI threshold, leaving ${fmtCost(totalRecoverableAmount)} recoverable out of ${fmtCost(totalFlaggedLicenseCost)} in license cost tied up in these seats (${recoverablePercentOfLicenseCost}%).`
+          : `No seats currently fall below the 80% usage-ROI reclamation threshold.`,
+      actionableInsight:
+        reclamationUsers.length > 0
+          ? `Revoke the ${reclamationDormantCount} zero-consumption license${reclamationDormantCount === 1 ? '' : 's'} outright, and downgrade the remaining ${reclamationUnderutilizedCount} under-utilized seat${reclamationUnderutilizedCount === 1 ? '' : 's'} to a lower tier or consumption-only plan.`
+          : 'Maintain current license allocation -- utilization is healthy across all provisioned seats.',
+      benefitOutcome:
+        reclamationUsers.length > 0
+          ? `Recovers up to ${fmtCost(totalRecoverableAmount)}/period in reclaimable license spend (avg ${fmtCost(avgRecoverablePerSeat)}/seat) by acting on these ${reclamationUsers.length} flagged seats, without touching any well-utilized license.`
+          : `Protects the full ${fmtCost(totalFlaggedLicenseCost)} license investment -- no reclamation action needed this period.`,
+    },
   };
 
   const currentMeta = inferencesMeta[inferenceId] || inferencesMeta.seat_utilization;
@@ -1273,6 +1361,183 @@ export function ExecutiveInferenceDrilldownView({
                 </div>
               </div>
 
+            </div>
+          )}
+
+          {/* 2b. LICENSE RECLAMATION DECOMPOSITION */}
+          {inferenceId === 'license_reclamation' && (
+            <div className="space-y-6">
+              {/* Level 2 KPI Tiles */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
+                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
+                  <span className="text-ey-muted text-[10px] uppercase font-bold">Recoverable License Cost</span>
+                  <p className="text-2xl font-bold text-emerald-400">{fmtCost(totalRecoverableAmount)}</p>
+                  <p className="text-[10px] text-emerald-300/80">{recoverablePercentOfLicenseCost}% of {fmtCost(totalFlaggedLicenseCost)} flagged license cost</p>
+                </div>
+                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
+                  <span className="text-ey-muted text-[10px] uppercase font-bold">Dormant Seats</span>
+                  <p className="text-2xl font-bold text-rose-400">{reclamationDormantCount} Seats</p>
+                  <p className="text-[10px] text-rose-300/80">0 GenAI Tool Consumption recorded</p>
+                </div>
+                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
+                  <span className="text-ey-muted text-[10px] uppercase font-bold">Under-Utilized Seats</span>
+                  <p className="text-2xl font-bold text-amber-400">{reclamationUnderutilizedCount} Seats</p>
+                  <p className="text-[10px] text-amber-300/80">&lt;80% of license cost consumed</p>
+                </div>
+                <div className="bg-ey-card border border-ey-border p-4 rounded-xl space-y-1">
+                  <span className="text-ey-muted text-[10px] uppercase font-bold">Avg Recoverable / Seat</span>
+                  <p className="text-2xl font-bold text-ey-yellow">{fmtCost(avgRecoverablePerSeat)}</p>
+                  <p className="text-[10px] text-ey-yellow/80">Across {reclamationUsers.length} flagged seats</p>
+                </div>
+              </div>
+
+              {/* Mandated Hierarchy Navigator, scoped to just the flagged (dormant/under-utilized) seats */}
+              <HierarchyDrilldownPanel
+                rows={reclamationRows}
+                title={`Flagged License View (${reclamationUsers.length} Seats)`}
+                subtitle="Drill down through the org structure to the flagged seats below -- only dormant or under-utilized licenses appear here."
+                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+              />
+
+              {/* Level 3: Reclamation Action Ledger */}
+              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ey-border/60 pb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
+                      <BadgeDollarSign className="w-4 h-4 text-rose-400" />
+                      <span>License Reclamation Action Ledger (1-Click Reclamation)</span>
+                    </h3>
+                    <p className="text-xs text-ey-muted mt-0.5">
+                      Seats with real license cost consuming below 80% usage-ROI, grouped by Service Line.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleTriggerAction(`Automated Reclamation Workflow dispatched to ${reclamationUsers.length} flagged seat${reclamationUsers.length === 1 ? '' : 's'}.`)}
+                    className="px-3 py-1.5 bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 self-start sm:self-center"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Reclaim All Flagged Licenses</span>
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto border border-ey-border rounded-xl">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
+                      <tr>
+                        <th className="px-4 py-3">Service Line</th>
+                        <th className="px-4 py-3 text-center">Flagged Seats</th>
+                        <th className="px-4 py-3 text-right">Recoverable ($)</th>
+                        <th className="px-4 py-3 text-center">Action Trigger</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ey-border">
+                      {reclamationByServiceLine.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">No flagged licenses at this time.</td>
+                        </tr>
+                      ) : reclamationByServiceLine.map((sl) => {
+                        const isExpanded = expandedDormantServiceLine === `reclamation:${sl.serviceLine}`;
+                        return (
+                        <React.Fragment key={sl.serviceLine}>
+                        <tr
+                          onClick={() => setExpandedDormantServiceLine(isExpanded ? null : `reclamation:${sl.serviceLine}`)}
+                          className="hover:bg-ey-card-hover/80 transition cursor-pointer"
+                          title={`Click to ${isExpanded ? 'hide' : 'view'} individual flagged seats in ${sl.serviceLine}`}
+                        >
+                          <td className="px-4 py-3 font-medium text-ey-light">
+                            <span className="flex items-center gap-1.5">
+                              <ChevronRight className={`w-3.5 h-3.5 text-ey-muted transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                              {sl.serviceLine}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                              {sl.count} seat{sl.count === 1 ? '' : 's'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-emerald-400">{fmtCost(sl.recoverableAmount)}</td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTriggerAction(`${sl.count} flagged license${sl.count === 1 ? '' : 's'} in ${sl.serviceLine} reclaimed and returned to pool.`);
+                              }}
+                              className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
+                            >
+                              Reclaim {sl.count} License{sl.count === 1 ? '' : 's'}
+                            </button>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={4} className="p-0 bg-ey-black/40">
+                              <table className="w-full text-left text-xs font-mono">
+                                <thead className="text-ey-muted uppercase tracking-wider border-b border-ey-border/60">
+                                  <tr>
+                                    <th className="px-4 py-2 pl-10">Provisioned Employee</th>
+                                    <th className="px-4 py-2 text-right">License Cost</th>
+                                    <th className="px-4 py-2 text-right">Usage ROI</th>
+                                    <th className="px-4 py-2 text-center">Recommendation</th>
+                                    <th className="px-4 py-2 text-right">Recoverable</th>
+                                    <th className="px-4 py-2 text-center">Action Trigger</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-ey-border/40">
+                                  {reclamationUsers
+                                    .filter((u) => (emailToRow.get(u.email)?.orgServiceLine || 'General') === sl.serviceLine)
+                                    .map((u) => (
+                                    <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
+                                      <td className="px-4 py-2.5 pl-10 font-medium text-ey-light">
+                                        <div>{u.displayName}</div>
+                                        <div className="text-[10px] text-ey-muted">{u.email}</div>
+                                      </td>
+                                      <td className="px-4 py-2.5 text-right">{fmtCost(u.licenseCost)}</td>
+                                      <td className="px-4 py-2.5 text-right">
+                                        <span className={u.recommendation === 'revoke' ? 'text-red-400 font-bold' : u.recommendation === 'downgrade' ? 'text-amber-400 font-bold' : 'text-sky-400 font-bold'}>
+                                          {u.licenseRoiPercent}%
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-2.5 text-center">
+                                        {u.recommendation === 'revoke' ? (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/40">
+                                            <X className="w-3 h-3" />
+                                            Revoke
+                                          </span>
+                                        ) : u.recommendation === 'downgrade' ? (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                            <MinusCircle className="w-3 h-3" />
+                                            Downgrade
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40">
+                                            <CheckCircle2 className="w-3 h-3" />
+                                            Review
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-2.5 text-right font-bold text-emerald-400">{fmtCost(u.recoverableAmount)}</td>
+                                      <td className="px-4 py-2.5 text-center">
+                                        <button
+                                          onClick={() => handleTriggerAction(`License for ${u.displayName} reclaimed and returned to pool.`)}
+                                          className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
+                                        >
+                                          Reclaim License
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
 

@@ -11,6 +11,7 @@ import {
   ArrowUpRight,
   ShieldAlert,
   CheckCircle2,
+  BadgeDollarSign,
 } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
 import { formatCompactCurrency as fmtCost } from '@/lib/format';
@@ -47,6 +48,16 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
   const top10Percent = totalCost > 0 ? (top10Spend / totalCost) * 100 : 0;
   const top20Percent = totalCost > 0 ? (top20Spend / totalCost) * 100 : 0;
 
+  // 2. License Reclamation — seats with real license cost falling below an 80%
+  // usage-ROI threshold (same figures the Active/Inactive tile draws on).
+  const reclamationSeats = summary.userCapacityBreakdown
+    .filter((u) => u.licenseCost > 0 && u.licenseRoiPercent < 80)
+    .map((u) => ({ ...u, recoverableAmount: Number((u.licenseCost - u.actualCost).toFixed(4)) }))
+    .filter((u) => u.recoverableAmount > 0);
+  const reclamationDormantCount = reclamationSeats.filter((u) => u.tokenConsumption === 0).length;
+  const reclamationUnderutilizedCount = reclamationSeats.length - reclamationDormantCount;
+  const totalRecoverableAmount = reclamationSeats.reduce((s, u) => s + u.recoverableAmount, 0);
+
   // 5. Client Billability (real Billable/Non-Billable CSV flag)
   const nonBillablePercent = 100 - (summary.billableSpendPercent || 0);
 
@@ -75,6 +86,27 @@ export function ExecutiveInferencesPanel({ summary, onSelectInference }: Executi
         inactiveUserCount > 0
           ? `Recovers up to ${fmtCost(inactiveLeakageCost)}/mo in reclaimed license spend. Also frees ${inactiveUserCount} seats for waitlisted teams and gives leadership a clean, auditable license-utilization baseline.`
           : `Protects the full ${fmtCost(summary.totalLicenseCost)} license investment from idle-seat leakage. Also keeps onboarding friction low as new hires can be provisioned with confidence.`,
+    },
+    {
+      id: 'license_reclamation',
+      title: 'License Reclamation Intelligence',
+      tag: 'Financial Governance',
+      tagColor: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+      icon: BadgeDollarSign,
+      stat: `${fmtCost(totalRecoverableAmount)} Recoverable`,
+      statSub: `${reclamationDormantCount} Dormant + ${reclamationUnderutilizedCount} Under-Utilized Seats`,
+      finding:
+        reclamationSeats.length > 0
+          ? `${reclamationSeats.length} provisioned seats (${reclamationDormantCount} fully dormant, ${reclamationUnderutilizedCount} under-utilized) fall below the 80% usage-ROI threshold, leaving ${fmtCost(totalRecoverableAmount)} recoverable in license spend.`
+          : 'No seats currently fall below the 80% usage-ROI reclamation threshold.',
+      actionableInsight:
+        reclamationSeats.length > 0
+          ? `Revoke the ${reclamationDormantCount} zero-consumption license${reclamationDormantCount === 1 ? '' : 's'} outright, and downgrade the remaining ${reclamationUnderutilizedCount} under-utilized seat${reclamationUnderutilizedCount === 1 ? '' : 's'} to a lower tier or consumption-only plan.`
+          : 'Maintain current license allocation -- utilization is healthy across all provisioned seats.',
+      benefitOutcome:
+        reclamationSeats.length > 0
+          ? `Recovers up to ${fmtCost(totalRecoverableAmount)}/period in reclaimable license spend by acting on these ${reclamationSeats.length} flagged seats, without touching any well-utilized license.`
+          : `Protects the full license investment -- no reclamation action needed this period.`,
     },
     {
       id: 'project_billability',

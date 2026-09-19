@@ -33,6 +33,7 @@ const INSIGHTS_NAV_ITEMS = [
   { name: 'Geo Pulse', href: '/dashboard/hierarchy', icon: GitBranch },
 ];
 
+
 const TOOLS_NAV_ITEMS = [
   { name: 'Data Playground', href: '/dashboard/explore', icon: LayoutGrid },
   { name: 'Metrics Derivation Guide', href: '/dashboard/metrics-derivation', icon: BookOpen },
