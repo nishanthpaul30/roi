@@ -6,12 +6,19 @@ import { useMetricsData } from '@/hooks/useMetricsData';
 import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { ExplorerChart } from '@/components/ui/ExplorerChart';
 import { DataTable, Column } from '@/components/ui/DataTable';
-import { LayoutGrid, Sparkles, Download, SlidersHorizontal, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { LayoutGrid, Sparkles, Download, SlidersHorizontal, RotateCcw, ChevronDown, ChevronUp, CalendarRange, AlertTriangle } from 'lucide-react';
 import { formatCompactCurrency, formatCompactNumber } from '@/lib/format';
 
 interface DimensionOption {
   key: string;
   label: string;
+}
+
+interface PeriodMonthOption {
+  value: string;
+  label: string;
+  start: string;
+  end: string;
 }
 
 interface PivotResult {
@@ -65,6 +72,29 @@ export default function DataExplorerPage() {
       .catch((err) => console.error('Failed to load dataset insights:', err));
   }, []);
 
+  // Start/End Period — this page's own date filter, entirely independent of
+  // the shared GlobalFilterBar (which is disabled here; see the header). Both
+  // are optional and, when set, are inclusive of the whole selected month.
+  const periodMonths: PeriodMonthOption[] = data?.filterOptions?.months ?? [];
+  const [startPeriod, setStartPeriod] = useState('');
+  const [endPeriod, setEndPeriod] = useState('');
+
+  const startPeriodMonth = periodMonths.find((m) => m.value === startPeriod);
+  const endPeriodMonth = periodMonths.find((m) => m.value === endPeriod);
+
+  // "YYYY-MM" values sort chronologically as plain strings.
+  const periodError =
+    startPeriod && endPeriod && endPeriod < startPeriod
+      ? 'End Period must be the same as or later than Start Period.'
+      : null;
+
+  // Only feed a valid, resolved period into the query — an unset side leaves
+  // that end open (falls back to the full dataset range server-side), and an
+  // invalid combination is ignored entirely until corrected.
+  const periodDateRange = periodError
+    ? { start: undefined, end: undefined }
+    : { start: startPeriodMonth?.start, end: endPeriodMonth?.end };
+
   // Extra filters this page exposes beyond the shared GlobalFilterBar — every
   // dimension with no dedicated panel elsewhere (Engagement chain, GDS
   // Location, Cost Center, Calculation Method, Billable flag, etc.).
@@ -97,26 +127,17 @@ export default function DataExplorerPage() {
   };
 
   const loadPivot = useCallback(async () => {
-    // Wait for the dataset's date range to resolve — see useMetricsData.
-    // Requesting now would just be re-requested with the real dates.
-    if (!filters.startDate) {
-      setLoading(true);
-      return;
-    }
+    // An invalid Start/End Period combination blocks the query entirely
+    // rather than silently falling back to the full dataset.
+    if (periodError) return;
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        startDate: filters.startDate,
-        endDate: filters.endDate,
-        aiTool: filters.aiTool,
-        managementRegion: filters.managementRegion,
-        serviceLine: filters.serviceLine,
-        userMail: filters.userMail,
-        country: filters.country,
-        rowDim,
-        colDim,
-        metric,
-      });
+      const params = new URLSearchParams({ rowDim, colDim, metric });
+      // Deliberately not sourced from the (disabled) GlobalFilterBar — this
+      // page's own Start/End Period pickers and Additional Filters are the
+      // only things allowed to scope what it shows.
+      if (periodDateRange.start) params.set('startDate', periodDateRange.start);
+      if (periodDateRange.end) params.set('endDate', periodDateRange.end);
       for (const [key, value] of Object.entries(extraFilters)) {
         if (value && value !== 'all') params.set(key, value);
       }
@@ -132,7 +153,7 @@ export default function DataExplorerPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, rowDim, colDim, metric, extraFilters]);
+  }, [rowDim, colDim, metric, extraFilters, periodError, periodDateRange.start, periodDateRange.end]);
 
   useEffect(() => {
     loadPivot();
@@ -198,15 +219,9 @@ export default function DataExplorerPage() {
     if (!result) return;
     setExporting(true);
     try {
-      const params = new URLSearchParams({
-        startDate: filters.startDate,
-        endDate: filters.endDate,
-        aiTool: filters.aiTool,
-        managementRegion: filters.managementRegion,
-        serviceLine: filters.serviceLine,
-        userMail: filters.userMail,
-        country: filters.country,
-      });
+      const params = new URLSearchParams();
+      if (periodDateRange.start) params.set('startDate', periodDateRange.start);
+      if (periodDateRange.end) params.set('endDate', periodDateRange.end);
       for (const [key, value] of Object.entries(extraFilters)) {
         if (value && value !== 'all') params.set(key, value);
       }
@@ -234,7 +249,7 @@ export default function DataExplorerPage() {
       XLSX.utils.book_append_sheet(workbook, pivotSheet, 'Pivot Summary');
       const rawSheet = XLSX.utils.json_to_sheet(rawRows);
       XLSX.utils.book_append_sheet(workbook, rawSheet, 'Raw Data');
-      XLSX.writeFile(workbook, `data_playground_export_${filters.startDate}_to_${filters.endDate}.xlsx`);
+      XLSX.writeFile(workbook, `data_playground_export_${startPeriod || 'all'}_to_${endPeriod || 'all'}.xlsx`);
       setExportNotice(
         json.truncated
           ? `Raw Data sheet capped at ${rawRows.length.toLocaleString()} of ${(json.totalMatched || 0).toLocaleString()} matching rows. Narrow the filters to export the rest.`
@@ -249,7 +264,13 @@ export default function DataExplorerPage() {
 
   return (
     <div className="flex-1 flex flex-col">
-      <GlobalFilterBar filters={filters} onFilterChange={setFilters} filterOptions={data?.filterOptions} />
+      <GlobalFilterBar
+        filters={filters}
+        onFilterChange={setFilters}
+        filterOptions={data?.filterOptions}
+        disabled
+        disabledMessage="These shared filters don't apply to Data Playground — use the Start/End Period and Additional Filters below instead."
+      />
 
       <main className="p-6 space-y-6 max-w-7xl mx-auto w-full no-print">
         {/* Header */}
@@ -264,7 +285,7 @@ export default function DataExplorerPage() {
                   <span>Data Playground</span>
                   <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300">
                     <Sparkles className="w-3 h-3" />
-                    Any dimension &times; any dimension &times; any metric
+                    Any dimension &times; Any dimension &times; Cost/Token Consumption
                   </span>
                 </h1>
                 <p className="text-xs text-ey-muted mt-0.5">
@@ -371,6 +392,50 @@ export default function DataExplorerPage() {
           </div>
         </div>
 
+        {/* Start/End Period — this page's own date filter, independent of the
+            (disabled) shared filter bar above. Optional on both sides. */}
+        <div className="bg-ey-card border border-ey-border rounded-xl p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <CalendarRange className="w-4 h-4 text-ey-yellow" />
+            <h2 className="text-xs font-bold text-ey-light uppercase tracking-wider">Period Filter</h2>
+            <span className="text-[10px] text-ey-muted font-normal normal-case">(optional — inclusive of both ends)</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[11px] font-semibold text-ey-muted uppercase mb-1.5">Start Period</label>
+              <select
+                value={startPeriod}
+                onChange={(e) => setStartPeriod(e.target.value)}
+                className="w-full bg-ey-black border border-ey-border text-ey-light text-xs rounded-md px-3 py-2 focus:outline-none focus:border-ey-yellow"
+              >
+                <option value="">Any</option>
+                {periodMonths.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-ey-muted uppercase mb-1.5">End Period</label>
+              <select
+                value={endPeriod}
+                onChange={(e) => setEndPeriod(e.target.value)}
+                className="w-full bg-ey-black border border-ey-border text-ey-light text-xs rounded-md px-3 py-2 focus:outline-none focus:border-ey-yellow"
+              >
+                <option value="">Any</option>
+                {periodMonths.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {periodError && (
+            <p className="flex items-center gap-1.5 text-[11px] text-red-400 font-semibold mt-3">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              {periodError}
+            </p>
+          )}
+        </div>
+
         {/* Additional Filters — every dimension without a dedicated panel elsewhere; collapsed by default */}
         <div className="bg-ey-card border border-ey-border rounded-xl p-5 shadow-sm">
           <button
@@ -431,7 +496,13 @@ export default function DataExplorerPage() {
           )}
         </div>
 
-        {loading || !result ? (
+        {periodError ? (
+          <div className="h-64 flex flex-col items-center justify-center gap-2 text-red-400 text-sm text-center px-6">
+            <AlertTriangle className="w-6 h-6" />
+            <p>{periodError}</p>
+            <p className="text-ey-muted text-xs">Fix the Period Filter above to see results.</p>
+          </div>
+        ) : loading || !result ? (
           <div className="h-64 flex items-center justify-center text-ey-muted text-sm animate-pulse">
             Computing cross-tabulation...
           </div>
@@ -442,7 +513,9 @@ export default function DataExplorerPage() {
                 {exportNotice ? (
                   <span className="text-amber-300">{exportNotice}</span>
                 ) : (
-                  'Reflects the Rows, Columns, Metric, and Additional Filters selected above.'
+                  `Reflects the Rows, Columns, Metric, and Additional Filters selected above${
+                    startPeriod || endPeriod ? ', scoped to the selected Period Filter' : ''
+                  }.`
                 )}
               </p>
               <button
