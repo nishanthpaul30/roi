@@ -304,7 +304,7 @@ export function generatePrescriptiveInferences(
         : `No non-billable engagements are currently running above the $100/user/month threshold.`,
     actionableInsight:
       flaggedEngagementCount > 0
-        ? `Open the root-cause diagnostic for each flagged engagement to determine whether the overrun is driven by multi-tool overlap, a small group of power users, or broad heavy usage across the whole team — then apply the matching remediation.`
+        ? `Drill into each flagged engagement's CT/Non-CT → Country → Service Line → Sub-Service Line hierarchy to identify which teams and users are driving the overrun, then apply targeted remediation.`
         : 'No remediation required this period.',
     benefitOutcome:
       flaggedEngagementCount > 0
