@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import * as XLSX from 'xlsx';
 import {
   BookOpen,
   Search,
@@ -19,7 +18,7 @@ import {
   Globe2,
   Bot,
   Wallet,
-  FileSpreadsheet,
+  Download,
 } from 'lucide-react';
 
 // Derivation Data Item Interface
@@ -328,18 +327,20 @@ export default function MetricsDerivationPage() {
     setTimeout(() => setCopiedFormula(null), 2000);
   };
 
-  const handleExportSchemaToExcel = () => {
-    const worksheetData = CSV_SCHEMA.map((row) => ({
-      'CSV Column Name': row.column,
-      'Internal Field': row.fieldName,
-      'Data Type': row.dataType,
-      'Description & Usage': row.description,
-    }));
-    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-    worksheet['!cols'] = [{ wch: 26 }, { wch: 22 }, { wch: 12 }, { wch: 90 }];
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'CSV Schema');
-    XLSX.writeFile(workbook, 'ai_usage_data_schema.xlsx');
+  const handleExportSchemaToCsv = () => {
+    const escapeCsvValue = (value: string) => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+    const headers = ['CSV Column Name', 'Internal Field', 'Data Type', 'Description & Usage'];
+    const rows = CSV_SCHEMA.map((row) => [row.column, row.fieldName, row.dataType, row.description].map(escapeCsvValue));
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'ai_usage_data_schema.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -389,11 +390,11 @@ export default function MetricsDerivationPage() {
           <div className="flex items-center gap-3">
             <span className="text-[11px] text-ey-muted font-mono">{CSV_SCHEMA.filter((c) => !c.column.startsWith('—')).length} CSV Columns + {CSV_SCHEMA.filter((c) => c.column.startsWith('—')).length} Derived Fields • Single Source of Truth</span>
             <button
-              onClick={handleExportSchemaToExcel}
+              onClick={handleExportSchemaToCsv}
               className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-black bg-ey-yellow hover:bg-ey-yellow-hover px-2.5 py-1.5 rounded-lg transition shrink-0"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              Export to Excel
+              <Download className="w-3.5 h-3.5" />
+              Export to CSV
             </button>
           </div>
         </div>

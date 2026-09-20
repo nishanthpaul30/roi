@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import * as XLSX from 'xlsx';
 import { useMetricsData } from '@/hooks/useMetricsData';
 import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { ExplorerChart } from '@/components/ui/ExplorerChart';
@@ -215,7 +214,7 @@ export default function DataExplorerPage() {
     }
   };
 
-  const handleExportExcel = async () => {
+  const handleExportCsv = async () => {
     if (!result) return;
     setExporting(true);
     try {
@@ -229,30 +228,24 @@ export default function DataExplorerPage() {
       const json = await res.json();
       const rawRows: Record<string, any>[] = json.rows || [];
 
-      // Sheet 1: the pivot cross-tab exactly as shown on screen.
-      const pivotSheetData = result.rows.map((r) => {
-        const row: Record<string, any> = {
-          [result.rowDimLabel]: r.label,
-          'Active Users': r.userCount,
-        };
-        if (result.colDim === 'none') {
-          row[result.metricLabel] = r.value;
-        } else {
-          for (const c of result.columns) row[c] = r[c] || 0;
-          row.Total = r.total;
-        }
-        return row;
-      });
+      if (rawRows.length > 0) {
+        const headers = Object.keys(rawRows[0]);
+        const csvRows = rawRows.map((r) => headers.map((h) => escapeCsvValue(r[h])));
+        const csvContent = [headers.join(','), ...csvRows.map((e) => e.join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `data_playground_export_${startPeriod || 'all'}_to_${endPeriod || 'all'}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
 
-      const workbook = XLSX.utils.book_new();
-      const pivotSheet = XLSX.utils.json_to_sheet(pivotSheetData);
-      XLSX.utils.book_append_sheet(workbook, pivotSheet, 'Pivot Summary');
-      const rawSheet = XLSX.utils.json_to_sheet(rawRows);
-      XLSX.utils.book_append_sheet(workbook, rawSheet, 'Raw Data');
-      XLSX.writeFile(workbook, `data_playground_export_${startPeriod || 'all'}_to_${endPeriod || 'all'}.xlsx`);
       setExportNotice(
         json.truncated
-          ? `Raw Data sheet capped at ${rawRows.length.toLocaleString()} of ${(json.totalMatched || 0).toLocaleString()} matching rows. Narrow the filters to export the rest.`
+          ? `Export capped at ${rawRows.length.toLocaleString()} of ${(json.totalMatched || 0).toLocaleString()} matching rows. Narrow the filters to export the rest.`
           : null
       );
     } catch (err) {
@@ -519,13 +512,13 @@ export default function DataExplorerPage() {
                 )}
               </p>
               <button
-                onClick={handleExportExcel}
+                onClick={handleExportCsv}
                 disabled={exporting}
                 className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 bg-ey-yellow text-ey-black rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-                title="Export this filtered cross-tabulation to Excel"
+                title="Export the filtered raw data to CSV"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>{exporting ? 'Exporting…' : 'Export Excel'}</span>
+                <span>{exporting ? 'Exporting…' : 'Export CSV'}</span>
               </button>
             </div>
 
@@ -555,4 +548,9 @@ export default function DataExplorerPage() {
 
 function formatMetricValue(value: number, metric: string): string {
   return metric === 'cost' ? formatCompactCurrency(value) : formatCompactNumber(value);
+}
+
+function escapeCsvValue(value: unknown): string {
+  const s = value === null || value === undefined ? '' : String(value);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
