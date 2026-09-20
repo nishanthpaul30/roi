@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
 import { generatePrescriptiveInferences, PrescriptiveInference } from '@/lib/metrics/prescriptiveEngine';
-import { useRawRows } from '@/hooks/useRawRows';
 
 interface ExecutiveInferencesPanelProps {
   summary?: TokenCostSummary;
@@ -34,14 +33,14 @@ const INFERENCE_ICONS: Record<string, React.ComponentType<{ className?: string }
 
 export function ExecutiveInferencesPanel({ summary, filters, onSelectInference }: ExecutiveInferencesPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
-  // Row-level data needed for the same-month tool-overlap check and the
-  // per-engagement non-billable-overrun grouping the Prescriptive Engine does.
-  const { rows: allRows } = useRawRows(filters);
 
   if (!summary) return null;
 
-  // Generate dynamic, prioritized inferences using the deterministic Prescriptive Engine
-  const inferences: PrescriptiveInference[] = generatePrescriptiveInferences(summary, allRows);
+  // The summary already carries pre-aggregated multiToolOverlap and byProjectCode
+  // data — the same values the engine uses when no row-level data is provided.
+  // Passing no rows here means all 6 inferences render immediately on first
+  // paint with stable, final values: no fetch delay, no re-sort glitch.
+  const inferences: PrescriptiveInference[] = generatePrescriptiveInferences(summary);
 
   const handleCardClick = (item: { id: string }) => {
     onSelectInference?.(item.id);
