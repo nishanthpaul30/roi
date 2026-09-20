@@ -1,10 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
-import { useRawRows } from '@/hooks/useRawRows';
+import { useState } from 'react';
+import { TokenCostSummary } from '@/lib/metrics/types';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
-import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 import {
   Layers,
   Zap,
@@ -12,8 +10,6 @@ import {
   DollarSign,
   TrendingUp,
   Sparkles,
-  AlertTriangle,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Cpu,
@@ -24,7 +20,6 @@ import {
 interface MultiToolComparisonPanelProps {
   summary: TokenCostSummary | null;
   onDrilldown?: (tool?: string, userMail?: string) => void;
-  filters?: GlobalFilterState;
 }
 
 const TOOL_CONFIG: Record<
@@ -75,19 +70,8 @@ const TOOL_CONFIG: Record<
   },
 };
 
-export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: MultiToolComparisonPanelProps) {
+export function MultiToolComparisonPanel({ summary, onDrilldown }: MultiToolComparisonPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [showOverlapUsers, setShowOverlapUsers] = useState(false);
-
-  // Raw CSV rows, needed to walk the mandated hierarchy before any overlap user is named.
-  const { rows: allRows } = useRawRows(filters);
-
-  const multiToolOverlap = summary?.multiToolOverlap;
-  const overlapHierarchyRows = useMemo(() => {
-    if (!multiToolOverlap?.multiToolUserList?.length) return [];
-    const allowedEmails = new Set(multiToolOverlap.multiToolUserList.map((u) => u.userMail.toLowerCase()));
-    return allRows.filter((r) => allowedEmails.has((r.userMail || '').toLowerCase()));
-  }, [allRows, multiToolOverlap]);
 
   if (!summary || !summary.byAiTool || summary.byAiTool.length === 0) {
     return null;
@@ -311,84 +295,6 @@ export function MultiToolComparisonPanel({ summary, onDrilldown, filters }: Mult
           </div>
         </div>
       </div>
-
-      {/* Multi-Tool License Overlap & Consolidation Box */}
-      {multiToolOverlap && (
-        <div className="border border-amber-500/30 bg-amber-500/5 rounded-xl p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-500/20 pb-3">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-amber-500/20 border border-amber-500/40 rounded-lg text-amber-400 shrink-0">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-ey-light tracking-tight flex items-center gap-2">
-                  <span>Multi-Tool License Overlap &amp; License Consolidation Alert</span>
-                </h3>
-                <p className="text-xs text-ey-muted">
-                  Users active across multiple AI platforms concurrently during this period.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-4 font-mono text-xs">
-              <div className="bg-ey-black border border-amber-500/30 px-3 py-1.5 rounded-lg text-right">
-                <span className="text-amber-400 font-extrabold text-sm block">
-                  {multiToolOverlap.dualToolUserCount} Users
-                </span>
-                <span className="text-[10px] text-ey-muted">Active on 2+ Tools</span>
-              </div>
-              <div className="bg-ey-black border border-amber-500/30 px-3 py-1.5 rounded-lg text-right">
-                <span className="text-emerald-400 font-extrabold text-sm block">
-                  {fmtCost(multiToolOverlap.totalDualToolSpend)}
-                </span>
-                <span className="text-[10px] text-ey-muted">Multi-License Spend</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-xs text-ey-muted space-y-2">
-            <div className="flex items-start space-x-2 bg-ey-black/60 p-3 rounded-lg border border-ey-border/60">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              <p>
-                <strong className="text-ey-light">Consolidation Insight:</strong> {multiToolOverlap.dualToolUserCount} power users generated active billable events on multiple AI tools (e.g., ChatGPT + Copilot or Claude + ChatGPT). Standardizing these users to a single primary Enterprise AI platform can eliminate redundant license costs while concentrating volume discounts.
-              </p>
-            </div>
-
-            {/* Collapsible Overlap User List */}
-            {multiToolOverlap.multiToolUserList.length > 0 && (
-              <div className="pt-2">
-                <button
-                  onClick={() => setShowOverlapUsers(!showOverlapUsers)}
-                  className="flex items-center space-x-2 text-xs font-mono font-bold text-ey-yellow hover:underline transition-all"
-                >
-                  {showOverlapUsers ? (
-                    <>
-                      <ChevronUp className="w-4 h-4" />
-                      <span>Hide {multiToolOverlap.multiToolUserList.length} Multi-Platform Users</span>
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="w-4 h-4" />
-                      <span>View {multiToolOverlap.multiToolUserList.length} Multi-Platform Users &amp; Spend Breakdown</span>
-                    </>
-                  )}
-                </button>
-
-                {showOverlapUsers && (
-                  <div className="mt-3">
-                    <HierarchyDrilldownPanel
-                      rows={overlapHierarchyRows}
-                      title="Multi-Platform License"
-                      subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
-                      onSelectUser={(email) => onDrilldown?.(undefined, email)}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
         </>
       )}
     </div>

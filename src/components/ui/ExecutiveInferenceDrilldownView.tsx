@@ -29,6 +29,8 @@ import {
   Award,
   Briefcase,
   BadgeDollarSign,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
@@ -167,11 +169,8 @@ export function ExecutiveInferenceDrilldownView({
   const [warningPage, setWarningPage] = useState(1);
   const warningPageSize = 10;
 
-  // Pagination for the Multi-Platform License Overlap table — paginated by
-  // Engagement Code group (not raw row) so a group's users never split
-  // across two pages, and the dataset can safely run to very large row counts.
-  const [overlapPage, setOverlapPage] = useState(1);
-  const overlapPageSize = 10;
+  // Toggle for revealing the Multi-Tool License Overlap user breakdown
+  const [showOverlapUsers, setShowOverlapUsers] = useState(false);
 
   // Listen for Escape key to go back intuitively
   React.useEffect(() => {
@@ -573,19 +572,6 @@ export function ExecutiveInferenceDrilldownView({
       region: string;
     }>();
 
-    // Same overlap detection as userToolMap above, but scoped per Engagement
-    // Code — the Multi-Platform License Overlap table groups by engagement,
-    // so a user who overlaps tools on two different engagements shows up as
-    // two separate rows (once per engagement), not blended into one total.
-    const userEngagementToolMap = new Map<string, {
-      displayName: string;
-      email: string;
-      projectCode: string;
-      tools: Set<string>;
-      totalCost: number;
-      totalTokens: number;
-    }>();
-
     for (const r of allRows) {
       const toolKey = (r.aiTool || '').toLowerCase().trim();
       if (!toolKey) continue;
@@ -678,23 +664,6 @@ export function ExecutiveInferenceDrilldownView({
           ut.tools.add(toolKey);
           ut.totalCost += r.cost;
           ut.totalTokens += r.tokenConsumption;
-
-          const engagementCode = r.projectCode || 'Unassigned';
-          const engagementKey = `${uEmail}|${engagementCode}`;
-          if (!userEngagementToolMap.has(engagementKey)) {
-            userEngagementToolMap.set(engagementKey, {
-              displayName: r.displayName || uEmail.split('@')[0],
-              email: uEmail,
-              projectCode: engagementCode,
-              tools: new Set(),
-              totalCost: 0,
-              totalTokens: 0,
-            });
-          }
-          const uet = userEngagementToolMap.get(engagementKey)!;
-          uet.tools.add(toolKey);
-          uet.totalCost += r.cost;
-          uet.totalTokens += r.tokenConsumption;
         }
       }
     }
@@ -752,47 +721,20 @@ export function ExecutiveInferenceDrilldownView({
 
     const dualToolSpend = dualToolUsers.reduce((sum, u) => sum + u.totalCost, 0);
 
-    // Flat overlap list (user × engagement, cost > 0 on 2+ tools within that
-    // engagement), ordered by total cost — the source for both the on-screen
-    // table and its CSV export.
-    const overlapRows = Array.from(userEngagementToolMap.values())
-      .filter((u) => u.tools.size > 1)
-      .map((u) => ({ ...u, tools: Array.from(u.tools).sort() }))
-      .sort((a, b) => b.totalCost - a.totalCost);
-
-    // Same rows grouped by Engagement Code for display, each group ordered by
-    // its own total cost and the users within it ordered by cost.
-    const overlapByEngagementMap = new Map<string, typeof overlapRows>();
-    for (const row of overlapRows) {
-      if (!overlapByEngagementMap.has(row.projectCode)) overlapByEngagementMap.set(row.projectCode, []);
-      overlapByEngagementMap.get(row.projectCode)!.push(row);
-    }
-    const overlapByEngagement = Array.from(overlapByEngagementMap.entries())
-      .map(([projectCode, users]) => ({
-        projectCode,
-        totalCost: users.reduce((s, u) => s + u.totalCost, 0),
-        users,
-      }))
-      .sort((a, b) => b.totalCost - a.totalCost);
-
     return {
       toolList,
       dualToolUsers,
       dualToolSpend,
-      overlapRows,
-      overlapByEngagement,
     };
   }, [allRows, totalOrgSpend]);
 
-  const overlapTotalPages = Math.ceil(multiToolData.overlapByEngagement.length / overlapPageSize) || 1;
-  // Filters/period changing reshuffles which engagements are flagged at all —
-  // clamp rather than land on a now out-of-range page (avoids a setState-in-effect
-  // just to reset to page 1).
-  const safeOverlapPage = Math.min(overlapPage, overlapTotalPages);
-  const paginatedOverlapGroups = multiToolData.overlapByEngagement.slice(
-    (safeOverlapPage - 1) * overlapPageSize,
-    safeOverlapPage * overlapPageSize
-  );
+  // Hierarchy rows scoped to the multi-tool overlap cohort, for the "View
+  // Multi-Platform Users" drilldown below.
+  const overlapHierarchyRows = useMemo(() => {
+    if (multiToolData.dualToolUsers.length === 0) return [];
+    const allowedEmails = new Set(multiToolData.dualToolUsers.map((u) => u.email.toLowerCase()));
+    return allRows.filter((r) => allowedEmails.has((r.userMail || '').toLowerCase()));
+  }, [allRows, multiToolData.dualToolUsers]);
 
   // Non-billable engagements (Engagement Code prefix I- rather than E-) whose
   // average cost per user exceeds the $100/month margin-drag threshold —
@@ -819,6 +761,16 @@ export function ExecutiveInferenceDrilldownView({
     const totalExposure = Number(flagged.reduce((s, e) => s + e.cost, 0).toFixed(2));
     return { all, flagged, totalExposure };
   }, [allRows]);
+
+  // Rows behind every flagged non-billable engagement, for the mandated
+  // CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1 -> Sub-Service
+  // Line 2 -> User hierarchy navigator used in place of a flat engagement table.
+  const nonBillableFlaggedRows = useMemo(() => {
+    const flaggedCodes = new Set(nonBillableEngagementStats.flagged.map((e) => e.code));
+    return allRows.filter(
+      (r) => r.calculationMethod === 'Usage' && flaggedCodes.has((r.projectCode || 'Unassigned Internal').trim())
+    );
+  }, [allRows, nonBillableEngagementStats]);
 
   // Compute enriched prescriptive intelligence for all inferences
   const prescriptiveInferences = useMemo(
@@ -1075,60 +1027,6 @@ export function ExecutiveInferenceDrilldownView({
 
   // Root-cause diagnostics for a single flagged engagement, computed once its
   // Level 3 focus banner scopes granularRows down to just that Engagement Code.
-  const nonBillableRootCause = useMemo(() => {
-    if (!(inferenceId === 'non_billable_overrun' && selectedEntity?.type === 'project_code')) return null;
-    const usageRows = granularRows.filter((r) => r.calculationMethod === 'Usage');
-    const userCost = new Map<string, number>();
-    const userTools = new Map<string, Set<string>>();
-    for (const r of usageRows) {
-      const email = (r.userMail || '').toLowerCase().trim();
-      if (!email) continue;
-      userCost.set(email, (userCost.get(email) || 0) + r.cost);
-      if (!userTools.has(email)) userTools.set(email, new Set());
-      userTools.get(email)!.add(r.aiTool);
-    }
-    const userCount = userCost.size;
-    const costs = Array.from(userCost.values());
-    const totalCost = costs.reduce((s, c) => s + c, 0);
-    const avgCostPerUser = userCount > 0 ? totalCost / userCount : 0;
-
-    // Diagnostic 1 — Multi-tool overlap
-    const totalToolInstances = Array.from(userTools.values()).reduce((s, set) => s + set.size, 0);
-    const avgToolsPerUser = userCount > 0 ? totalToolInstances / userCount : 0;
-
-    // Diagnostic 2 — Power-user concentration
-    const sortedCosts = [...costs].sort((a, b) => b - a);
-    const top20Count = Math.max(1, Math.round(userCount * 0.2));
-    const top20Cost = sortedCosts.slice(0, top20Count).reduce((s, c) => s + c, 0);
-    const top20Share = totalCost > 0 ? (top20Cost / totalCost) * 100 : 0;
-
-    // Diagnostic 3 — Broad heavy usage (low variance + high average)
-    const variance = userCount > 0 ? costs.reduce((s, c) => s + (c - avgCostPerUser) ** 2, 0) / userCount : 0;
-    const costDistributionCV = avgCostPerUser > 0 ? Math.sqrt(variance) / avgCostPerUser : 0;
-
-    let tag: string;
-    let tagDetail: string;
-    if (avgToolsPerUser > 1.5) {
-      tag = 'Multi-tool usage';
-      tagDetail = `Users on this engagement run ${avgToolsPerUser.toFixed(1)} AI products on average — this is redundant tool spend, not a usage-volume problem.`;
-    } else if (top20Share > 70) {
-      tag = 'Power-user concentration';
-      tagDetail = `The top 20% of users (${top20Count} of ${userCount}) drive ${top20Share.toFixed(1)}% of this engagement's cost — a small group is skewing the average, not the whole team.`;
-    } else if (costDistributionCV < 0.4 && avgCostPerUser > 100) {
-      tag = 'Broad heavy usage';
-      tagDetail = `Cost per user is consistently high across the team (CV ${costDistributionCV.toFixed(2)}, avg ${fmtCost(avgCostPerUser)}/user) — everyone is expensive, not just a few outliers.`;
-    } else {
-      tag = 'No dominant pattern';
-      tagDetail = 'None of the three root-cause thresholds were triggered for this engagement — investigate the per-user breakdown manually.';
-    }
-
-    const perUser = Array.from(userCost.entries())
-      .map(([email, cost]) => ({ email, cost, tools: userTools.get(email)?.size || 0 }))
-      .sort((a, b) => b.cost - a.cost);
-
-    return { userCount, totalCost, avgCostPerUser, avgToolsPerUser, top20Share, top20Count, costDistributionCV, tag, tagDetail, perUser };
-  }, [inferenceId, selectedEntity, granularRows]);
-
   // Search filter on granular rows
   const filteredGranularRows = useMemo(() => {
     if (!searchTerm.trim()) return granularRows;
@@ -1220,33 +1118,6 @@ export function ExecutiveInferenceDrilldownView({
     link.click();
     document.body.removeChild(link);
     handleTriggerAction('Audit trail exported successfully as CSV!');
-  };
-
-  // Exports the Multi-Platform License Overlap table exactly as grouped and
-  // sorted on screen: by Engagement Code, then by cost within each engagement.
-  const handleExportOverlapCsv = () => {
-    if (multiToolData.overlapByEngagement.length === 0) return;
-    const headers = ['Engagement Code', 'Display Name', 'User Email', 'Tools', 'Total Cost (USD)', 'Total Tokens'];
-    const rows = multiToolData.overlapByEngagement.flatMap((group) =>
-      group.users.map((u) => [
-        group.projectCode,
-        `"${u.displayName}"`,
-        u.email,
-        `"${u.tools.join(', ')}"`,
-        u.totalCost.toFixed(4),
-        u.totalTokens,
-      ])
-    );
-    const csvContent = [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'multi_tool_license_overlap.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    handleTriggerAction('Multi-tool overlap cohort exported successfully as CSV!');
   };
 
   if (rowsLoading) {
@@ -1821,55 +1692,15 @@ export function ExecutiveInferenceDrilldownView({
                 />
               </div>
 
-              {/* Flagged Engagement List — click one to run it through the root-cause diagnostics */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="border-b border-ey-border/60 pb-3">
-                  <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-400" />
-                    <span>Flagged Non-Billable Engagements — Click for Root-Cause Diagnostics</span>
-                  </h3>
-                  <p className="text-xs text-ey-muted mt-0.5">
-                    Engagements where average cost per user exceeds $100/month, with none of that spend offset by client billing.
-                  </p>
-                </div>
-                <div className="overflow-x-auto border border-ey-border rounded-xl">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-                      <tr>
-                        <th className="px-4 py-3">Engagement Code</th>
-                        <th className="px-4 py-3 text-right">Users</th>
-                        <th className="px-4 py-3 text-right">Avg Cost / User</th>
-                        <th className="px-4 py-3 text-right">Total Cost</th>
-                        <th className="px-4 py-3 text-center">Diagnose</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-ey-border">
-                      {nonBillableEngagementStats.flagged.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-ey-muted">No flagged engagements this period.</td>
-                        </tr>
-                      ) : (
-                        nonBillableEngagementStats.flagged.map((e) => (
-                          <tr
-                            key={e.code}
-                            onClick={() => setSelectedEntity({ type: 'project_code', name: e.code, label: e.code })}
-                            className="hover:bg-ey-card-hover/80 transition cursor-pointer group"
-                          >
-                            <td className="px-4 py-3 font-bold text-ey-light group-hover:text-ey-yellow flex items-center gap-1.5">
-                              {e.code}
-                              <ArrowLeft className="w-3 h-3 rotate-180 opacity-0 group-hover:opacity-100 text-ey-yellow transition-opacity" />
-                            </td>
-                            <td className="px-4 py-3 text-right">{e.userCount}</td>
-                            <td className="px-4 py-3 text-right font-bold text-amber-400">{fmtCost(e.avgCostPerUser)}</td>
-                            <td className="px-4 py-3 text-right text-ey-light">{fmtCost(e.cost)}</td>
-                            <td className="px-4 py-3 text-center text-ey-yellow font-bold">Diagnose</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {/* Mandated Hierarchy Navigator — CT/Non-CT -> Country -> Service Line ->
+                  Sub-Service Line 1 -> Sub-Service Line 2 -> Users, scoped to the rows
+                  behind every flagged non-billable engagement. */}
+              <HierarchyDrilldownPanel
+                rows={nonBillableFlaggedRows}
+                title="Level 1: CT / Non-CT"
+                subtitle="Drill down through the required org hierarchy to reach the users behind flagged non-billable engagements (avg cost/user > $100/mo)."
+                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+              />
             </div>
           )}
 
@@ -1917,106 +1748,71 @@ export function ExecutiveInferenceDrilldownView({
           {/* 4. MULTI-TOOL SPEND & EFFICIENCY COMPARISON */}
           {(inferenceId === 'vendor_spread' || inferenceId === 'multi_tool_comparison') && (
             <div className="space-y-6">
-              {/* Multi-Platform License Overlap & License Redundancy Cohort */}
-              <div className="bg-ey-card border border-amber-500/30 rounded-2xl p-5 shadow-sm space-y-4">
+              {/* Multi-Tool License Overlap & Consolidation Alert */}
+              <div className="border border-amber-500/30 bg-amber-500/5 rounded-xl p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-500/20 pb-3">
                   <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-amber-500/20 border border-amber-500/40 rounded-xl text-amber-400 shrink-0">
+                    <div className="p-2 bg-amber-500/20 border border-amber-500/40 rounded-lg text-amber-400 shrink-0">
                       <AlertTriangle className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider font-mono flex items-center gap-2">
-                        <span>Multi-Platform License Overlap &amp; License Redundancy Cohort</span>
+                      <h3 className="text-sm font-bold text-ey-light tracking-tight flex items-center gap-2">
+                        <span>Multi-Tool License Overlap &amp; License Consolidation Alert</span>
                       </h3>
-                      <p className="text-xs text-ey-muted mt-0.5 font-sans">
-                        {multiToolData.overlapRows.length} user{multiToolData.overlapRows.length === 1 ? '' : 's'} with paid usage (Cost USD &gt; 0) on 2+ AI tools, grouped by Engagement Code and ordered by total cost.
+                      <p className="text-xs text-ey-muted">
+                        Users active across multiple AI platforms concurrently during this period.
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={handleExportOverlapCsv}
-                    disabled={multiToolData.overlapRows.length === 0}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-ey-black border border-ey-border hover:border-ey-yellow text-ey-light hover:text-ey-yellow text-xs font-semibold rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-                    title="Export this overlap cohort to CSV"
-                  >
-                    <Download className="w-3.5 h-3.5 text-ey-yellow" />
-                    <span>Export CSV</span>
-                  </button>
+                  <div className="flex items-center space-x-4 font-mono text-xs">
+                    <div className="bg-ey-black border border-amber-500/30 px-3 py-1.5 rounded-lg text-right">
+                      <span className="text-amber-400 font-extrabold text-sm block">{multiToolData.dualToolUsers.length} Users</span>
+                      <span className="text-[10px] text-ey-muted">Active on 2+ Tools</span>
+                    </div>
+                    <div className="bg-ey-black border border-amber-500/30 px-3 py-1.5 rounded-lg text-right">
+                      <span className="text-emerald-400 font-extrabold text-sm block">{fmtCost(multiToolData.dualToolSpend)}</span>
+                      <span className="text-[10px] text-ey-muted">Multi-License Spend</span>
+                    </div>
+                  </div>
                 </div>
-
-                {multiToolData.overlapByEngagement.length === 0 ? (
-                  <p className="text-xs text-ey-muted text-center py-8">No users currently show paid usage on 2 or more AI tools.</p>
-                ) : (
-                  <div className="overflow-x-auto border border-ey-border rounded-xl">
-                    <table className="w-full text-left text-xs font-mono">
-                      <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-                        <tr>
-                          <th className="px-4 py-3">Engagement Code</th>
-                          <th className="px-4 py-3">User</th>
-                          <th className="px-4 py-3">Tools</th>
-                          <th className="px-4 py-3 text-right">Total Cost ($)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-ey-border">
-                        {paginatedOverlapGroups.map((group) => (
-                          <React.Fragment key={group.projectCode}>
-                            <tr className="bg-ey-black/40">
-                              <td colSpan={4} className="px-4 py-2 text-[11px] font-bold text-amber-300">
-                                {group.projectCode} <span className="text-ey-muted font-normal">— {fmtCost(group.totalCost)} across {group.users.length} user{group.users.length === 1 ? '' : 's'}</span>
-                              </td>
-                            </tr>
-                            {group.users.map((u) => (
-                              <tr
-                                key={`${group.projectCode}:${u.email}`}
-                                onClick={() => setSelectedEntity({ type: 'user', name: u.email, label: u.displayName })}
-                                className="hover:bg-ey-card-hover/80 transition cursor-pointer group"
-                              >
-                                <td className="px-4 py-3 text-ey-muted">{group.projectCode}</td>
-                                <td className="px-4 py-3 text-ey-light">
-                                  <div className="font-semibold group-hover:text-ey-yellow transition-colors">{u.displayName}</div>
-                                  <div className="text-[10px] text-ey-muted">{u.email}</div>
-                                </td>
-                                <td className="px-4 py-3 text-ey-muted">{u.tools.join(', ')}</td>
-                                <td className="px-4 py-3 text-right font-bold text-ey-yellow">{fmtCost(u.totalCost)}</td>
-                              </tr>
-                            ))}
-                          </React.Fragment>
-                        ))}
-                      </tbody>
-                    </table>
+                <div className="text-xs text-ey-muted space-y-2">
+                  <div className="flex items-start space-x-2 bg-ey-black/60 p-3 rounded-lg border border-ey-border/60">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <p>
+                      <strong className="text-ey-light">Consolidation Insight:</strong> {multiToolData.dualToolUsers.length} power users generated active billable events on multiple AI tools (e.g., ChatGPT + Copilot or Claude + ChatGPT). Standardizing these users to a single primary Enterprise AI platform can eliminate redundant license costs while concentrating volume discounts.
+                    </p>
                   </div>
-                )}
-
-                {/* Pagination — paginated by Engagement Code group; Export CSV
-                    below always covers the full, unpaginated dataset. */}
-                {overlapTotalPages > 1 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-ey-muted font-mono">
-                    <div>
-                      Showing engagements {(safeOverlapPage - 1) * overlapPageSize + 1} to{' '}
-                      {Math.min(safeOverlapPage * overlapPageSize, multiToolData.overlapByEngagement.length)} of{' '}
-                      {multiToolData.overlapByEngagement.length} ({multiToolData.overlapRows.length} users total)
-                    </div>
-                    <div className="flex items-center space-x-2">
+                  {multiToolData.dualToolUsers.length > 0 && (
+                    <div className="pt-2">
                       <button
-                        onClick={() => setOverlapPage((p) => Math.max(1, p - 1))}
-                        disabled={safeOverlapPage === 1}
-                        className="px-3 py-1 bg-ey-black border border-ey-border rounded-lg hover:bg-ey-card-hover disabled:opacity-40"
+                        onClick={() => setShowOverlapUsers(!showOverlapUsers)}
+                        className="flex items-center space-x-2 text-xs font-mono font-bold text-ey-yellow hover:underline transition-all"
                       >
-                        Previous
+                        {showOverlapUsers ? (
+                          <>
+                            <ChevronUp className="w-4 h-4" />
+                            <span>Hide {multiToolData.dualToolUsers.length} Multi-Platform Users</span>
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-4 h-4" />
+                            <span>View {multiToolData.dualToolUsers.length} Multi-Platform Users &amp; Spend Breakdown</span>
+                          </>
+                        )}
                       </button>
-                      <span>
-                        Page {safeOverlapPage} of {overlapTotalPages}
-                      </span>
-                      <button
-                        onClick={() => setOverlapPage((p) => Math.min(overlapTotalPages, p + 1))}
-                        disabled={safeOverlapPage === overlapTotalPages}
-                        className="px-3 py-1 bg-ey-black border border-ey-border rounded-lg hover:bg-ey-card-hover disabled:opacity-40"
-                      >
-                        Next
-                      </button>
+                      {showOverlapUsers && (
+                        <div className="mt-3">
+                          <HierarchyDrilldownPanel
+                            rows={overlapHierarchyRows}
+                            title="Multi-Platform License"
+                            subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
+                            onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+                          />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -2214,82 +2010,9 @@ export function ExecutiveInferenceDrilldownView({
       )}
 
       {/* ========================================================================= */}
-      {/* LEVEL 4: ROOT-CAUSE DIAGNOSTICS — Non-Billable Cost Overrun only          */}
-      {/* ========================================================================= */}
-      {nonBillableRootCause && (
-        <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-lg space-y-4">
-          <div className="border-b border-ey-border/60 pb-3">
-            <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-              <Target className="w-4 h-4 text-ey-yellow" />
-              <span>Root-Cause Diagnostics: {selectedEntity?.label || selectedEntity?.name}</span>
-            </h3>
-            <p className="text-xs text-ey-muted mt-0.5">
-              Runs this engagement through 3 diagnostic checks in sequence and auto-tags the most likely cause.
-            </p>
-          </div>
-
-          {/* Auto-tagged root cause */}
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-bold text-amber-300">Root Cause: {nonBillableRootCause.tag}</p>
-              <p className="text-xs text-ey-muted mt-0.5">{nonBillableRootCause.tagDetail}</p>
-            </div>
-          </div>
-
-          {/* The 3 diagnostic checks */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-xs">
-            <StatTile
-              label="Diagnostic 1: Multi-Tool Overlap"
-              value={`${nonBillableRootCause.avgToolsPerUser.toFixed(2)} tools/user`}
-              valueClassName={nonBillableRootCause.avgToolsPerUser > 1.5 ? 'text-amber-400' : 'text-ey-light'}
-              subtitle="Flagged when > 1.5 avg tools per user"
-              tooltip="Avg tools per user = COUNT(DISTINCT Product) ÷ COUNT(DISTINCT User Email) within this engagement."
-            />
-            <StatTile
-              label="Diagnostic 2: Power-User Concentration"
-              value={`${nonBillableRootCause.top20Share.toFixed(1)}%`}
-              valueClassName={nonBillableRootCause.top20Share > 70 ? 'text-amber-400' : 'text-ey-light'}
-              subtitle={`Top ${nonBillableRootCause.top20Count} of ${nonBillableRootCause.userCount} users · flagged when > 70% share`}
-              tooltip="Top 20% user cost share = SUM(Cost USD) for the top 20% of users by spend ÷ SUM(Cost USD) for the entire engagement × 100."
-            />
-            <StatTile
-              label="Diagnostic 3: Broad Heavy Usage"
-              value={`CV ${nonBillableRootCause.costDistributionCV.toFixed(2)}`}
-              valueClassName={nonBillableRootCause.costDistributionCV < 0.4 && nonBillableRootCause.avgCostPerUser > 100 ? 'text-amber-400' : 'text-ey-light'}
-              subtitle={`Avg ${fmtCost(nonBillableRootCause.avgCostPerUser)}/user · flagged when CV < 0.4 and avg > $100`}
-              tooltip="Cost distribution CV = STDEV(cost per user) ÷ AVG(cost per user) within this engagement. Low variance + high average means everyone is expensive, not a concentration issue."
-            />
-          </div>
-
-          {/* Per-user cost breakdown backing the diagnostics above */}
-          <div className="overflow-x-auto border border-ey-border rounded-xl">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-                <tr>
-                  <th className="px-4 py-3">User</th>
-                  <th className="px-4 py-3 text-right">Distinct Tools</th>
-                  <th className="px-4 py-3 text-right">Cost</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ey-border">
-                {nonBillableRootCause.perUser.map((u) => (
-                  <tr key={u.email} onClick={() => setSelectedEntity({ type: 'user', name: u.email, label: u.email })} className="hover:bg-ey-card-hover/80 transition cursor-pointer">
-                    <td className="px-4 py-3 text-ey-light">{u.email}</td>
-                    <td className="px-4 py-3 text-right">{u.tools}</td>
-                    <td className="px-4 py-3 text-right font-bold text-ey-yellow">{fmtCost(u.cost)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
       {/* LEVEL 4: THE CORE / LAST LEVEL — ROW-LEVEL USAGE LOGS FROM CSV             */}
       {/* ========================================================================= */}
-      {selectedEntity && selectedEntity.type !== 'user' && !nonBillableRootCause && (
+      {selectedEntity && selectedEntity.type !== 'user' && (
         <HierarchyDrilldownPanel
           rows={granularRows}
           title={`Level 4: ${selectedEntity.label || selectedEntity.name}`}
