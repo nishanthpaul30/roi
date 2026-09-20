@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import {
   Users,
-  UserCheck,
   ChevronDown,
   ChevronUp,
   Sparkles,
@@ -12,31 +11,37 @@ import {
   ShieldAlert,
   CheckCircle2,
   BadgeDollarSign,
+  AlertTriangle,
 } from 'lucide-react';
-import { TokenCostSummary } from '@/lib/metrics/types';
-import { formatCompactCurrency as fmtCost } from '@/lib/format';
+import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
 import { generatePrescriptiveInferences, PrescriptiveInference } from '@/lib/metrics/prescriptiveEngine';
+import { useRawRows } from '@/hooks/useRawRows';
 
 interface ExecutiveInferencesPanelProps {
   summary?: TokenCostSummary;
+  filters?: GlobalFilterState;
   onSelectInference?: (inferenceId: string) => void;
 }
 
 const INFERENCE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  seat_utilization: UserCheck,
   license_reclamation: BadgeDollarSign,
   project_billability: Layers,
   pareto_risk: ShieldAlert,
   habitual_retention: Users,
+  multi_tool_comparison: Layers,
+  non_billable_overrun: AlertTriangle,
 };
 
-export function ExecutiveInferencesPanel({ summary, onSelectInference }: ExecutiveInferencesPanelProps) {
+export function ExecutiveInferencesPanel({ summary, filters, onSelectInference }: ExecutiveInferencesPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  // Row-level data needed for the same-month tool-overlap check and the
+  // per-engagement non-billable-overrun grouping the Prescriptive Engine does.
+  const { rows: allRows } = useRawRows(filters);
 
   if (!summary) return null;
 
   // Generate dynamic, prioritized inferences using the deterministic Prescriptive Engine
-  const inferences: PrescriptiveInference[] = generatePrescriptiveInferences(summary);
+  const inferences: PrescriptiveInference[] = generatePrescriptiveInferences(summary, allRows);
 
   const handleCardClick = (item: { id: string }) => {
     onSelectInference?.(item.id);

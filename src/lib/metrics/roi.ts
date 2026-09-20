@@ -26,6 +26,31 @@ function groupBy<T>(rows: T[], key: (r: T) => string): Map<string, T[]> {
   return m;
 }
 
+// Distinct users who appear in a Usage row but recorded 0 GenAI Tool
+// Consumption — a provisioned/tracked seat with literally no usage.
+function countZeroConsumptionUsers(rows: CsvUsageRow[]): number {
+  return new Set(
+    rows
+      .filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption === 0)
+      .map((r) => r.userMail.toLowerCase())
+  ).size;
+}
+
+// Distinct users whose summed Usage-row cost exceeds a dollar threshold.
+function countHighSpendUsers(rows: CsvUsageRow[], threshold: number): number {
+  const costByUser = new Map<string, number>();
+  for (const r of rows) {
+    if (r.calculationMethod !== 'Usage') continue;
+    const email = r.userMail.toLowerCase();
+    costByUser.set(email, (costByUser.get(email) || 0) + r.cost);
+  }
+  let count = 0;
+  for (const cost of costByUser.values()) {
+    if (cost > threshold) count++;
+  }
+  return count;
+}
+
 /**
  * Per-tool free-dollar limit (the monthly free-tier allowance each AI tool
  * grants), hardcoded per explicit product guidance rather than derived from
@@ -193,8 +218,12 @@ export async function calculateTokenCostSummary(
   const activeUserCount = new Set(usageRows.map(r => r.userMail.toLowerCase())).size;
   // Unutilized Licenses: distinct users who appear in a Usage row but with
   // GenAI Tool Consumption = 0 (provisioned seat, zero recorded consumption).
-  const unutilizedUsageRows = currentRows.filter(r => r.calculationMethod === 'Usage' && r.tokenConsumption === 0);
-  const inactiveUserCount = new Set(unutilizedUsageRows.map(r => r.userMail.toLowerCase())).size;
+  const inactiveUserCount = countZeroConsumptionUsers(currentRows);
+  const prevInactiveUserCount = countZeroConsumptionUsers(previousRows);
+  // Token & Spend ROI "high spend" tile: distinct users whose total Usage-row
+  // cost this period exceeds $100.
+  const highSpendUserCount = countHighSpendUsers(currentRows, 100);
+  const prevHighSpendUserCount = countHighSpendUsers(previousRows, 100);
 
   // Core aggregates
   const totalTokenConsumption = usageRows.reduce((s, r) => s + r.tokenConsumption, 0);
@@ -634,5 +663,8 @@ export async function calculateTokenCostSummary(
     totalRosterUserCount,
     activeUserCount,
     inactiveUserCount,
+    prevInactiveUserCount,
+    highSpendUserCount,
+    prevHighSpendUserCount,
   };
 }

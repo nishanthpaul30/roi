@@ -214,6 +214,7 @@ export default function ExecutiveOverviewPage() {
                 {/* Executive Strategic Leadership Inferences Panel */}
                 <ExecutiveInferencesPanel
                   summary={data.tokenCostSummary}
+                  filters={filters}
                   onSelectInference={(infId) => {
                     setInferenceInitialEntity(null);
                     setActiveInferenceDrilldown(infId);

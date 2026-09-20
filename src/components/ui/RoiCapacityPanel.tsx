@@ -1,58 +1,25 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { UserCapacityRow, GlobalFilterState } from '@/lib/metrics/types';
 import { useRawRows } from '@/hooks/useRawRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
-import { TrendingDown, TrendingUp, AlertCircle, ShieldAlert, UserX } from 'lucide-react';
-import { formatCompactCurrency as fmtCost } from '@/lib/format';
 
 interface RoiCapacityPanelProps {
   userCapacityBreakdown: UserCapacityRow[];
-  totalWasteCost: number;
-  totalOverageCost: number;
-  licenseEfficiencyRate: number;
-  ceilingRiskCount: number;
-  hardCeiling: number;
-  totalLicenseCost: number;
-  licenseRoiPercent: number;
-  licenseUnderutilizedCost?: number;
-  licenseOverutilizedValue: number;
-  inactiveUserCount?: number;
-  pageSize?: number;
   onSelectUser?: (user: UserCapacityRow) => void;
-  onSelectZone?: (zone: 'zone1_under' | 'zone2_over' | 'ceiling_risk') => void;
   filters?: GlobalFilterState;
 }
 
+// The "Financial Governance & Capacity Optimization" summary banner (zone
+// tabs, quick-insight tiles) that used to wrap this was removed — those
+// figures already surface as their own KPI cards on the ROI page. This is
+// now just the mandated hierarchy navigator over the full license roster.
 export function RoiCapacityPanel({
   userCapacityBreakdown,
-  totalWasteCost,
-  totalOverageCost,
-  licenseEfficiencyRate,
-  ceilingRiskCount,
-  hardCeiling,
-  totalLicenseCost,
-  licenseRoiPercent,
-  licenseUnderutilizedCost,
-  licenseOverutilizedValue,
-  inactiveUserCount,
   onSelectUser,
-  onSelectZone,
   filters,
 }: RoiCapacityPanelProps) {
-  const [activeTab, setActiveTab] = useState<'underutilized' | 'overage' | 'all'>('all');
-
-  const zone1List = userCapacityBreakdown.filter((u) => u.zone === 'zone1_under');
-  const zone2List = userCapacityBreakdown.filter((u) => u.zone === 'zone2_over');
-
-  const displayedList =
-    activeTab === 'underutilized' ? zone1List : activeTab === 'overage' ? zone2List : userCapacityBreakdown;
-
-  const handleTabChange = (tab: 'underutilized' | 'overage' | 'all') => {
-    setActiveTab(tab);
-  };
-
   // Raw CSV rows, needed to walk the mandated hierarchy before any user is named.
   const { rows: allRows } = useRawRows(filters);
 
@@ -62,157 +29,19 @@ export function RoiCapacityPanel({
     return map;
   }, [userCapacityBreakdown]);
 
-  // Scope raw rows down to the same set of seats currently shown in the tab (all / underutilized / overage)
   const hierarchyRows = useMemo(() => {
-    const allowedEmails = new Set(displayedList.map((u) => u.userMail.toLowerCase()));
+    const allowedEmails = new Set(userCapacityBreakdown.map((u) => u.userMail.toLowerCase()));
     return allRows.filter((r) => allowedEmails.has((r.userMail || '').toLowerCase()));
-  }, [allRows, displayedList]);
-
-  const zeroConsumptionCount = useMemo(() => {
-    if (typeof inactiveUserCount === 'number') return inactiveUserCount;
-    const zeroUsageEmails = new Set<string>();
-    for (const r of allRows) {
-      if (r.calculationMethod === 'Usage' && r.tokenConsumption === 0) {
-        zeroUsageEmails.add((r.userMail || '').toLowerCase().trim());
-      }
-    }
-    return zeroUsageEmails.size;
-  }, [inactiveUserCount, allRows]);
+  }, [allRows, userCapacityBreakdown]);
 
   return (
-    <div className="space-y-6">
-      {/* Strategic Capacity Summary Banner */}
-      <div className="bg-ey-card border border-ey-border rounded-xl p-5 shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-ey-border pb-4">
-          <div>
-            <h2 className="text-base font-bold text-ey-light tracking-wide flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-ey-yellow" />
-              <span>Financial Governance &amp; Capacity Optimization</span>
-            </h2>
-            <p className="text-xs text-ey-muted mt-0.5">
-              Bifurcated analysis of unconsumed license quotas (Under-Utilized) vs usage limit breaches (Overage).
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handleTabChange('all')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition ${
-                activeTab === 'all'
-                  ? 'bg-ey-yellow/20 text-ey-yellow border-ey-yellow/40 shadow-sm'
-                  : 'bg-ey-black text-ey-muted border-ey-border hover:text-ey-light'
-              }`}
-            >
-              All Licenses — Mixed Data ({userCapacityBreakdown.length})
-            </button>
-
-            <button
-              onClick={() => handleTabChange('underutilized')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition ${
-                activeTab === 'underutilized'
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
-                  : 'bg-ey-black text-ey-muted border-ey-border hover:text-ey-light'
-              }`}
-            >
-              Under-Utilized ({zone1List.length})
-            </button>
-
-            <button
-              onClick={() => handleTabChange('overage')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition ${
-                activeTab === 'overage'
-                  ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm'
-                  : 'bg-ey-black text-ey-muted border-ey-border hover:text-ey-light'
-              }`}
-            >
-              Over-Utilized ({zone2List.length})
-            </button>
-          </div>
-        </div>
-
-        {/* Quick Insights Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 flex items-start space-x-3">
-            <TrendingDown className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-amber-300 font-bold">AI Cost Optimization Opportunity</p>
-              <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-amber-200">{fmtCost(totalWasteCost)}</strong> of license quotas went unconsumed across {zone1List.length} users.
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3.5 flex items-start space-x-3">
-            <TrendingUp className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-purple-300 font-bold">Overage Spend Exposure</p>
-              <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-purple-200">{fmtCost(totalOverageCost)}</strong> in additional usage billed beyond standard limits for {zone2List.length} users.
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3.5 flex items-start space-x-3">
-            <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-red-300 font-bold">Hard Dollar Cap Warning</p>
-              <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-red-200">{ceilingRiskCount} users</strong> have reached or exceeded 90% of their per-tool spend ceiling.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* License Cost ROI Insight */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-          <div className="bg-sky-500/10 border border-sky-500/20 rounded-xl p-3.5 flex items-start space-x-3">
-            <TrendingUp className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sky-300 font-bold">Usage vs License Cost</p>
-              <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-sky-200">{licenseRoiPercent}%</strong> of total per-license Cost in USD ({fmtCost(totalLicenseCost)}) was actually consumed as usage.
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 flex items-start space-x-3">
-            <UserX className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-amber-300 font-bold">Zero-Consumption Users</p>
-              <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-amber-200">{zeroConsumptionCount} users</strong> with 0 GenAI Tool Consumption while filtered by &apos;Usage&apos; in &apos;Calculation Method&apos; column.
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3.5 flex items-start space-x-3">
-            <TrendingUp className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-purple-300 font-bold">Usage Beyond License Cost</p>
-              <p className="text-[11px] text-ey-muted mt-0.5">
-                <strong className="text-purple-200">{fmtCost(licenseOverutilizedValue)}</strong> of usage cost exceeded what was paid in License Cost in USD.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Mandated Hierarchy Drilldown — named seats only surface at the final level */}
-      <HierarchyDrilldownPanel
-        rows={hierarchyRows}
-        title={
-          activeTab === 'underutilized'
-            ? 'Unused AI License View'
-            : activeTab === 'overage'
-            ? 'Budget Breach & Overage View'
-            : 'All User Licenses — Capacity View'
-        }
-        onSelectUser={(email) => {
-          const row = capacityByEmail.get(email.toLowerCase());
-          if (row) onSelectUser?.(row);
-        }}
-      />
-    </div>
+    <HierarchyDrilldownPanel
+      rows={hierarchyRows}
+      title="All User Licenses — Capacity View"
+      onSelectUser={(email) => {
+        const row = capacityByEmail.get(email.toLowerCase());
+        if (row) onSelectUser?.(row);
+      }}
+    />
   );
 }
-

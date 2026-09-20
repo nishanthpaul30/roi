@@ -61,7 +61,7 @@ export interface RoiDrilldownTarget {
     | 'sub_service_line'
     | 'region'
     | 'country';
-  id: string; // 'waste' | 'overage' | 'efficiency' | 'ceiling' | user email | project code | tool name | serviceLine | subServiceLine | region | country
+  id: string; // 'waste' | 'overage' | 'efficiency' | user email | project code | tool name | serviceLine | subServiceLine | region | country
   title: string;
   subtitle?: string;
   badge?: string;
@@ -69,7 +69,7 @@ export interface RoiDrilldownTarget {
     userEmail?: string;
     projectCode?: string;
     aiTool?: string;
-    zone?: 'zone1_under' | 'zone2_over' | 'ceiling_risk';
+    zone?: 'zone1_under' | 'zone2_over';
     billable?: 'True' | 'False';
     serviceLine?: string;
     subServiceLine?: string;
@@ -135,7 +135,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
     return Array.from(new Set(allRows.map((r) => (r.aiTool || '').toLowerCase().trim()).filter(Boolean))).sort();
   }, [allRows]);
 
-  // Compute map of active user capacity breakdown (under-utilized vs overage vs ceiling risk)
+  // Compute map of active user capacity breakdown (under-utilized vs overage)
   const userCapacityMap = useMemo(() => {
     const map = new Map<string, UserCapacityRow>();
     if (summary?.userCapacityBreakdown) {
@@ -230,10 +230,6 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
         if (id === 'overage' || id === 'zone2_over') {
           const cap = userCapacityMap.get(email);
           return cap ? cap.zone === 'zone2_over' : false;
-        }
-        if (id === 'ceiling') {
-          const cap = userCapacityMap.get(email);
-          return cap ? cap.ceilingPercent >= 90 : false;
         }
         if (id === 'efficiency') {
           // Licensed-but-unused (0-token) seats aren't part of "active roster"
@@ -727,18 +723,14 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
         {!selectedSubEntity && ctNonCtBreakdown.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {ctNonCtBreakdown.map((c) => {
-              // 100K Cap Risk telemetry is fundamentally a headcount story (how many
-              // users are near the ceiling), so lead with user count there instead of
-              // spend; Usage vs License Cost leads with each segment's own ratio;
+              // Usage vs License Cost leads with each segment's own ratio;
               // Zone 1/2 lead with the actual unused/overage $ amount (not raw spend,
               // which is a different number); every other drilldown is a plain
               // cost story, so spend leads.
-              const isUserCentric = id === 'ceiling';
               const isRoiCentric = id === 'efficiency';
               const isWasteCentric = id === 'waste' || id === 'zone1_under';
               const isOverageCentric = id === 'overage' || id === 'zone2_over';
               const pct = totalSliceCost > 0 ? ((c.cost / totalSliceCost) * 100).toFixed(1) : '0.0';
-              const userPct = uniqueUsers > 0 ? ((c.userCount / uniqueUsers) * 100).toFixed(1) : '0.0';
               const wastePct = sliceWasteAndOverage.wasteCost > 0 ? ((c.wasteCost / sliceWasteAndOverage.wasteCost) * 100).toFixed(1) : '0.0';
               const overagePct = sliceWasteAndOverage.overageCost > 0 ? ((c.overageCost / sliceWasteAndOverage.overageCost) * 100).toFixed(1) : '0.0';
               return (
@@ -755,19 +747,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
                         Click to drill down
                       </span>
                     </div>
-                    {isUserCentric ? (
-                      <>
-                        <div className="flex items-baseline gap-2 mt-1">
-                          <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
-                            {c.userCount} users
-                          </span>
-                          <span className="text-xs text-cyan-300 font-bold">{userPct}% of slice</span>
-                        </div>
-                        <p className="text-[11px] text-ey-muted mt-0.5">
-                          {fmtCost(c.cost)} spend · {formatCompactNumber(c.tokens)} tokens
-                        </p>
-                      </>
-                    ) : isRoiCentric ? (
+                    {isRoiCentric ? (
                       <>
                         <div className="flex items-baseline gap-2 mt-1">
                           <span className="text-2xl font-extrabold text-ey-light font-mono group-hover:text-cyan-200 transition-colors">
