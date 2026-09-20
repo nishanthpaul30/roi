@@ -163,6 +163,11 @@ export interface TokenCostSummary {
   totalRosterUserCount: number;
   activeUserCount: number;
   inactiveUserCount: number;
+  prevInactiveUserCount: number;
+  // Token & Spend ROI "high spend" tile: distinct users whose total Usage-row
+  // cost this period exceeds $100.
+  highSpendUserCount: number;
+  prevHighSpendUserCount: number;
 }
 
 export interface MonthlyTrendPoint {

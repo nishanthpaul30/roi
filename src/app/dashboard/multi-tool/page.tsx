@@ -46,7 +46,6 @@ export default function MultiToolComparisonPage() {
             ) : (
               <MultiToolComparisonPanel
                 summary={data.tokenCostSummary}
-                filters={filters}
                 onDrilldown={(tool, userMail) => {
                   if (userMail) {
                     setInferenceInitialEntity({ type: 'user', name: userMail, label: userMail });

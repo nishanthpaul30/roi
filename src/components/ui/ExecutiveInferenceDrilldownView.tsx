@@ -6,7 +6,6 @@ import {
   ChevronRight,
   TrendingUp,
   AlertTriangle,
-  Building2,
   Users,
   UserCheck,
   UserX,
@@ -24,13 +23,14 @@ import {
   RefreshCw,
   DollarSign,
   PieChart as PieChartIcon,
-  BarChart3,
   X,
   Eye,
   Check,
   Award,
   Briefcase,
   BadgeDollarSign,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
@@ -168,6 +168,9 @@ export function ExecutiveInferenceDrilldownView({
   // Pagination for the License Reclamation "Usage Below Free Limit" warning table
   const [warningPage, setWarningPage] = useState(1);
   const warningPageSize = 10;
+
+  // Toggle for revealing the Multi-Tool License Overlap user breakdown
+  const [showOverlapUsers, setShowOverlapUsers] = useState(false);
 
   // Listen for Escape key to go back intuitively
   React.useEffect(() => {
@@ -505,61 +508,6 @@ export function ExecutiveInferenceDrilldownView({
     return Array.from(map.values()).sort((a, b) => b.cost - a.cost);
   }, [usageRows]);
 
-  // Service Line Comparative Usage & Cost Breakdown
-  const serviceLineComparisonData = useMemo(() => {
-    const map = new Map<string, {
-      name: string;
-      cost: number;
-      tokens: number;
-      users: Set<string>;
-      rows: number;
-      externalCost: number;
-      internalCost: number;
-      subServices: Map<string, number>;
-      tools: Map<string, number>;
-    }>();
-
-    for (const r of usageRows) {
-      const s = r.orgServiceLine || 'General';
-      if (!map.has(s)) {
-        map.set(s, {
-          name: s,
-          cost: 0,
-          tokens: 0,
-          users: new Set(),
-          rows: 0,
-          externalCost: 0,
-          internalCost: 0,
-          subServices: new Map(),
-          tools: new Map(),
-        });
-      }
-      const item = map.get(s)!;
-      item.cost += r.cost;
-      item.tokens += r.tokenConsumption;
-      item.rows += 1;
-      if (r.userMail) item.users.add(r.userMail.toLowerCase());
-      const isExt = (r.projectType || '').toLowerCase() === 'external' || (r.projectCode || '').startsWith('E-');
-      if (isExt) item.externalCost += r.cost;
-      else item.internalCost += r.cost;
-      const sub = r.subServiceLine1 || 'General';
-      item.subServices.set(sub, (item.subServices.get(sub) || 0) + r.cost);
-      const tool = (r.aiTool || '').toLowerCase();
-      item.tools.set(tool, (item.tools.get(tool) || 0) + r.cost);
-    }
-
-    return Array.from(map.values())
-      .map((item) => ({
-        ...item,
-        unitCostPerM: item.tokens > 0 ? (item.cost / item.tokens) * 1000000 : 0,
-        avgCostPerUser: item.users.size > 0 ? item.cost / item.users.size : 0,
-        avgTokensPerUser: item.users.size > 0 ? item.tokens / item.users.size : 0,
-        externalRatio: item.cost > 0 ? (item.externalCost / item.cost) * 100 : 0,
-        topSubService: Array.from(item.subServices.entries()).sort((a, b) => b[1] - a[1])[0] || ['General', 0],
-      }))
-      .sort((a, b) => b.cost - a.cost);
-  }, [usageRows]);
-
   // Regional & Service Line Breakdown
   const regionBreakdown = useMemo(() => {
     const map = new Map<string, { region: string; cost: number; tokens: number; users: Set<string> }>();
@@ -780,12 +728,49 @@ export function ExecutiveInferenceDrilldownView({
     };
   }, [allRows, totalOrgSpend]);
 
-  // Raw rows for the multi-platform overlap cohort, scoped for the mandated hierarchy panel below.
-  const dualToolHierarchyRows = useMemo(() => {
+  // Hierarchy rows scoped to the multi-tool overlap cohort, for the "View
+  // Multi-Platform Users" drilldown below.
+  const overlapHierarchyRows = useMemo(() => {
     if (multiToolData.dualToolUsers.length === 0) return [];
     const allowedEmails = new Set(multiToolData.dualToolUsers.map((u) => u.email.toLowerCase()));
     return allRows.filter((r) => allowedEmails.has((r.userMail || '').toLowerCase()));
-  }, [allRows, multiToolData]);
+  }, [allRows, multiToolData.dualToolUsers]);
+
+  // Non-billable engagements (Engagement Code prefix I- rather than E-) whose
+  // average cost per user exceeds the $100/month margin-drag threshold —
+  // Level 1 list for the Non-Billable Cost Overrun inference.
+  const nonBillableEngagementStats = useMemo(() => {
+    const engagementMap = new Map<string, { cost: number; users: Set<string> }>();
+    for (const r of allRows) {
+      if (r.calculationMethod !== 'Usage') continue;
+      const code = (r.projectCode || 'Unassigned Internal').trim();
+      if (code.startsWith('E-')) continue;
+      if (!engagementMap.has(code)) engagementMap.set(code, { cost: 0, users: new Set() });
+      const entry = engagementMap.get(code)!;
+      entry.cost += r.cost;
+      const email = (r.userMail || '').toLowerCase().trim();
+      if (email) entry.users.add(email);
+    }
+    const all = Array.from(engagementMap.entries()).map(([code, e]) => ({
+      code,
+      cost: Number(e.cost.toFixed(2)),
+      userCount: e.users.size,
+      avgCostPerUser: e.users.size > 0 ? e.cost / e.users.size : 0,
+    }));
+    const flagged = all.filter((e) => e.avgCostPerUser > 100).sort((a, b) => b.cost - a.cost);
+    const totalExposure = Number(flagged.reduce((s, e) => s + e.cost, 0).toFixed(2));
+    return { all, flagged, totalExposure };
+  }, [allRows]);
+
+  // Rows behind every flagged non-billable engagement, for the mandated
+  // CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1 -> Sub-Service
+  // Line 2 -> User hierarchy navigator used in place of a flat engagement table.
+  const nonBillableFlaggedRows = useMemo(() => {
+    const flaggedCodes = new Set(nonBillableEngagementStats.flagged.map((e) => e.code));
+    return allRows.filter(
+      (r) => r.calculationMethod === 'Usage' && flaggedCodes.has((r.projectCode || 'Unassigned Internal').trim())
+    );
+  }, [allRows, nonBillableEngagementStats]);
 
   // Compute enriched prescriptive intelligence for all inferences
   const prescriptiveInferences = useMemo(
@@ -957,9 +942,38 @@ export function ExecutiveInferenceDrilldownView({
         ),
       };
     })(),
+    non_billable_overrun: (() => {
+      const p = prescriptiveMap.get('non_billable_overrun');
+      const { flagged, all, totalExposure } = nonBillableEngagementStats;
+      const percentAtRisk = all.length > 0 ? (flagged.length / all.length) * 100 : 0;
+      return {
+        id: 'non_billable_overrun',
+        title: 'Non-Billable Cost Overrun',
+        tag: 'Margin Risk',
+        tagColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+        icon: AlertTriangle,
+        stat: `${percentAtRisk.toFixed(1)}% Non-Billable at Risk`,
+        statSub: `${flagged.length} of ${all.length} engagements · ${fmtCost(totalExposure)}/mo exposure`,
+        finding: p?.finding || (
+          flagged.length > 0
+            ? `${percentAtRisk.toFixed(1)}% of non-billable engagements (${flagged.length} of ${all.length}) have an average cost per user above $100/month, together accounting for ${fmtCost(totalExposure)}/mo (${fmtCost(totalExposure * 12)} annualised) in unrecovered spend. This is pure margin drag — none of it is offset by client billing.`
+            : 'No non-billable engagements are currently running above the $100/user/month threshold.'
+        ),
+        actionableInsight: p?.actionableInsight || (
+          flagged.length > 0
+            ? 'Open the root-cause diagnostic for each flagged engagement below to see whether the overrun is driven by multi-tool overlap, power-user concentration, or broad heavy usage.'
+            : 'No remediation required this period.'
+        ),
+        benefitOutcome: p?.benefitOutcome || (
+          flagged.length > 0
+            ? `Recovers up to ${fmtCost(totalExposure)}/mo (${fmtCost(totalExposure * 12)}/yr) in unrecovered internal spend once root causes are addressed, protecting practice margin without cutting legitimate client-billable usage.`
+            : 'Non-billable spend is currently within a healthy per-user range.'
+        ),
+      };
+    })(),
   };
 
-  const currentMeta = inferencesMeta[inferenceId] || inferencesMeta.seat_utilization;
+  const currentMeta = inferencesMeta[inferenceId] || inferencesMeta.license_reclamation;
   const IconComponent = currentMeta.icon;
 
   // Level 4 Granular Rows Filtered to the Selected Entity / Dimension
@@ -1011,6 +1025,8 @@ export function ExecutiveInferenceDrilldownView({
     });
   }, [allRows, selectedEntity, activeUserMap, totalMonthsInWindow]);
 
+  // Root-cause diagnostics for a single flagged engagement, computed once its
+  // Level 3 focus banner scopes granularRows down to just that Engagement Code.
   // Search filter on granular rows
   const filteredGranularRows = useMemo(() => {
     if (!searchTerm.trim()) return granularRows;
@@ -1647,6 +1663,47 @@ export function ExecutiveInferenceDrilldownView({
             </div>
           )}
 
+          {/* 2c. NON-BILLABLE COST OVERRUN DECOMPOSITION */}
+          {inferenceId === 'non_billable_overrun' && (
+            <div className="space-y-6">
+              {/* Level 2 KPI Tiles */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-xs">
+                <StatTile
+                  label="Non-Billable Engagements"
+                  value={`${nonBillableEngagementStats.all.length}`}
+                  subtitle="Engagement Codes with an 'I-' (Internal) prefix"
+                  tooltip="Distinct Engagement Codes with at least one Usage row this period, excluding E- (client-billable) codes."
+                />
+                <StatTile
+                  label="Flagged (Avg Cost/User > $100/mo)"
+                  value={`${nonBillableEngagementStats.flagged.length}`}
+                  valueClassName="text-amber-400"
+                  subtitle={`${(nonBillableEngagementStats.all.length > 0 ? (nonBillableEngagementStats.flagged.length / nonBillableEngagementStats.all.length) * 100 : 0).toFixed(1)}% of non-billable engagements at risk`}
+                  subtitleClassName="text-amber-300/80"
+                  tooltip="Engagement avg cost/user = SUM(Cost USD) ÷ COUNT(DISTINCT User Email), grouped by Engagement Code. Flagged when that average exceeds $100/month."
+                />
+                <StatTile
+                  label="Total $ Exposure"
+                  value={fmtCost(nonBillableEngagementStats.totalExposure)}
+                  valueClassName="text-rose-400"
+                  subtitle={`${fmtCost(nonBillableEngagementStats.totalExposure * 12)}/yr annualised`}
+                  subtitleClassName="text-rose-300/80"
+                  tooltip="SUM(Cost USD) across every flagged engagement — unrecovered spend not offset by any client billing."
+                />
+              </div>
+
+              {/* Mandated Hierarchy Navigator — CT/Non-CT -> Country -> Service Line ->
+                  Sub-Service Line 1 -> Sub-Service Line 2 -> Users, scoped to the rows
+                  behind every flagged non-billable engagement. */}
+              <HierarchyDrilldownPanel
+                rows={nonBillableFlaggedRows}
+                title="Level 1: CT / Non-CT"
+                subtitle="Drill down through the required org hierarchy to reach the users behind flagged non-billable engagements (avg cost/user > $100/mo)."
+                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+              />
+            </div>
+          )}
+
           {/* 3. PARETO 80/20 COST CONCENTRATION DECOMPOSITION */}
           {inferenceId === 'pareto_risk' && (
             <div className="space-y-6">
@@ -1691,183 +1748,74 @@ export function ExecutiveInferenceDrilldownView({
           {/* 4. MULTI-TOOL SPEND & EFFICIENCY COMPARISON */}
           {(inferenceId === 'vendor_spread' || inferenceId === 'multi_tool_comparison') && (
             <div className="space-y-6">
-              {/* Cross-Platform Unit Economics & Efficiency Benchmark Matrix */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-ey-border/60 pb-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider font-mono flex items-center gap-2">
-                      <BarChart3 className="w-4 h-4 text-ey-yellow" />
-                      <span>Cross-Platform Unit Economics &amp; Efficiency Benchmark Matrix</span>
-                    </h3>
-                    <p className="text-xs text-ey-muted mt-0.5 font-sans">
-                      Comparative multi-vendor efficiency, developer adoption density, and workload capitalization spread.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto border border-ey-border rounded-xl">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-                      <tr>
-                        <th className="px-4 py-3">Platform</th>
-                        <th className="px-4 py-3 text-right">Volume (Tokens)</th>
-                        <th className="px-4 py-3 text-right">Expenditure ($)</th>
-                        <th className="px-4 py-3 text-right">Usage Cost ($)</th>
-                        <th className="px-4 py-3 text-right">Active Devs</th>
-                        <th className="px-4 py-3 text-right">Avg / Dev</th>
-                        <th className="px-4 py-3 text-center">Billable %</th>
-                        <th className="px-4 py-3 text-center">Telemetry</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-ey-border">
-                      {multiToolData.toolList.map((t) => {
-                        const expenditure = summary?.byAiTool?.find((bt) => bt.tool === t.tool)?.cost || 0;
-                        const avgExpenditurePerDev = t.userCount > 0 ? expenditure / t.userCount : 0;
-                        return (
-                          <tr
-                            key={t.tool}
-                            onClick={() => setSelectedEntity({ type: 'tool', name: t.tool, label: t.label })}
-                            className="hover:bg-ey-card-hover transition cursor-pointer group"
-                          >
-                            <td className="px-4 py-3 font-semibold text-ey-light">
-                              <div className="flex items-center gap-2">
-                                <span className={`w-2 h-2 rounded-full ${t.barBg}`} />
-                                <span className="group-hover:text-ey-yellow transition-colors">{t.label}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-right text-ey-light">
-                              {formatCompactNumber(t.tokens)}
-                            </td>
-                            <td className="px-4 py-3 text-right font-bold text-ey-light">
-                              {fmtCost(expenditure)}
-                            </td>
-                            <td className="px-4 py-3 text-right font-bold text-ey-yellow">
-                              {fmtCost(t.cost)}
-                            </td>
-                            <td className="px-4 py-3 text-right text-ey-light font-bold">
-                              {t.userCount}
-                            </td>
-                            <td className="px-4 py-3 text-right text-emerald-400 font-bold">
-                              {fmtCost(avgExpenditurePerDev)}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                                {t.billableRatio.toFixed(1)}%
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className="inline-flex items-center gap-1 text-[10px] text-ey-yellow font-bold group-hover:underline">
-                                <span>Drill to Logs</span>
-                                <ChevronRight className="w-3 h-3" />
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Multi-Tool Seat Overlap & License Redundancy Cohort Ledger */}
-              {multiToolData.dualToolUsers.length > 0 && (
-                <div className="bg-ey-card border border-amber-500/30 rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-500/20 pb-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-amber-500/20 border border-amber-500/40 rounded-xl text-amber-400">
-                        <AlertTriangle className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider font-mono flex items-center gap-2">
-                          <span>Multi-Platform License Overlap &amp; License Redundancy Cohort</span>
-                        </h3>
-                        <p className="text-xs text-ey-muted mt-0.5 font-sans">
-                          {multiToolData.dualToolUsers.length} developers active on multiple AI tools concurrently, generating redundant fixed license fees.
-                        </p>
-                      </div>
+              {/* Multi-Tool License Overlap & Consolidation Alert */}
+              <div className="border border-amber-500/30 bg-amber-500/5 rounded-xl p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-500/20 pb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-amber-500/20 border border-amber-500/40 rounded-lg text-amber-400 shrink-0">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-ey-light tracking-tight flex items-center gap-2">
+                        <span>Multi-Tool License Overlap &amp; License Consolidation Alert</span>
+                      </h3>
+                      <p className="text-xs text-ey-muted">
+                        Users active across multiple AI platforms concurrently during this period.
+                      </p>
                     </div>
                   </div>
-
-                  <HierarchyDrilldownPanel
-                    rows={dualToolHierarchyRows}
-                    title="Level 3: Multi-Platform License"
-                    subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
-                    onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
-                  />
+                  <div className="flex items-center space-x-4 font-mono text-xs">
+                    <div className="bg-ey-black border border-amber-500/30 px-3 py-1.5 rounded-lg text-right">
+                      <span className="text-amber-400 font-extrabold text-sm block">{multiToolData.dualToolUsers.length} Users</span>
+                      <span className="text-[10px] text-ey-muted">Active on 2+ Tools</span>
+                    </div>
+                    <div className="bg-ey-black border border-amber-500/30 px-3 py-1.5 rounded-lg text-right">
+                      <span className="text-emerald-400 font-extrabold text-sm block">{fmtCost(multiToolData.dualToolSpend)}</span>
+                      <span className="text-[10px] text-ey-muted">Multi-License Spend</span>
+                    </div>
+                  </div>
                 </div>
-              )}
-
-              {/* Practice Adoption & Tool Preference Distribution */}
-              <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                <div>
-                  <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider font-mono flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-cyan-400" />
-                    <span>Practice Adoption &amp; Model Preference Distribution</span>
-                  </h3>
-                  <p className="text-xs text-ey-muted mt-0.5">
-                    Service line expenditure spread across all active AI tools. Click any service line to filter logs.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {serviceLineComparisonData.map((sl) => {
-                    const totalSpend = sl.cost || 1;
-                    const toolBreakdown = Array.from(sl.tools.entries())
-                      .filter(([, cost]) => cost > 0)
-                      .map(([tool, cost]) => ({ tool, cost, ...getToolStyle(tool) }))
-                      .sort((a, b) => b.cost - a.cost);
-
-                    return (
-                      <div
-                        key={sl.name}
-                        onClick={() => setSelectedEntity({ type: 'service_line', name: sl.name, label: `${sl.name} Practice` })}
-                        className="bg-ey-black/60 border border-ey-border hover:border-cyan-400/80 p-4 rounded-xl space-y-3 cursor-pointer transition group"
-                        title={`Click to inspect ${sl.name} telemetry logs`}
+                <div className="text-xs text-ey-muted space-y-2">
+                  <div className="flex items-start space-x-2 bg-ey-black/60 p-3 rounded-lg border border-ey-border/60">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <p>
+                      <strong className="text-ey-light">Consolidation Insight:</strong> {multiToolData.dualToolUsers.length} power users generated active billable events on multiple AI tools (e.g., ChatGPT + Copilot or Claude + ChatGPT). Standardizing these users to a single primary Enterprise AI platform can eliminate redundant license costs while concentrating volume discounts.
+                    </p>
+                  </div>
+                  {multiToolData.dualToolUsers.length > 0 && (
+                    <div className="pt-2">
+                      <button
+                        onClick={() => setShowOverlapUsers(!showOverlapUsers)}
+                        className="flex items-center space-x-2 text-xs font-mono font-bold text-ey-yellow hover:underline transition-all"
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-sm text-ey-light group-hover:text-cyan-400 transition-colors">
-                            {sl.name}
-                          </span>
-                          <span className="text-xs font-mono font-bold text-ey-yellow">{fmtCost(sl.cost)}</span>
+                        {showOverlapUsers ? (
+                          <>
+                            <ChevronUp className="w-4 h-4" />
+                            <span>Hide {multiToolData.dualToolUsers.length} Multi-Platform Users</span>
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-4 h-4" />
+                            <span>View {multiToolData.dualToolUsers.length} Multi-Platform Users &amp; Spend Breakdown</span>
+                          </>
+                        )}
+                      </button>
+                      {showOverlapUsers && (
+                        <div className="mt-3">
+                          <HierarchyDrilldownPanel
+                            rows={overlapHierarchyRows}
+                            title="Multi-Platform License"
+                            subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
+                            onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+                          />
                         </div>
-
-                        {/* Multi-Tool Share Mini Bar */}
-                        <div className="w-full bg-ey-card h-2.5 rounded-full overflow-hidden flex gap-0.5 p-0.5">
-                          {toolBreakdown.map(({ tool, cost, barBg, shortLabel }) => (
-                            <div
-                              key={tool}
-                              className={`${barBg} h-full rounded-full`}
-                              style={{ width: `${(cost / totalSpend) * 100}%` }}
-                              title={`${shortLabel}: ${fmtCost(cost)} (${((cost / totalSpend) * 100).toFixed(0)}%)`}
-                            />
-                          ))}
-                        </div>
-
-                        {/* Legend text */}
-                        <div
-                          className="grid gap-1 text-[10px] font-mono text-ey-muted pt-1"
-                          style={{ gridTemplateColumns: `repeat(${toolBreakdown.length || 1}, minmax(0, 1fr))` }}
-                        >
-                          {toolBreakdown.map(({ tool, cost, color, shortLabel }) => (
-                            <div key={tool}>
-                              <span className={`${color} font-bold block`}>${cost.toFixed(1)}</span>
-                              <span>{shortLabel}</span>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="pt-2 border-t border-ey-border/40 text-[10px] text-cyan-400 font-bold flex items-center justify-between">
-                          <span>Inspect {sl.name} Practice Logs</span>
-                          <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                        </div>
-                      </div>
-                    );
-                  })}
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           )}
-
 
           {/* 6. CLIENT BILLABILITY & PROJECT TELEMETRY ALIGNMENT */}
           {inferenceId === 'project_billability' && (

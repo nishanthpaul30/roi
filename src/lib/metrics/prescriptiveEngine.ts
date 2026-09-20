@@ -30,67 +30,13 @@ export function generatePrescriptiveInferences(
 
   const totalCost = summary.totalCost || 0;
   const activeUserCount = summary.activeUserCount || 0;
-  const inactiveUserCount = summary.inactiveUserCount || 0;
-  const rosterSeats = summary.totalRosterUserCount || (activeUserCount + inactiveUserCount) || 1;
-  const activeSeatPercent = rosterSeats > 0 ? (activeUserCount / rosterSeats) * 100 : 0;
   const avgLicenseCostPerSeat = activeUserCount > 0 ? summary.totalLicenseCost / activeUserCount : 100;
-  const inactiveLeakageCost = Math.round(inactiveUserCount * avgLicenseCostPerSeat);
-  const annualizedInactiveLeakage = inactiveLeakageCost * 12;
 
   // Shared user capacity breakdown
   const capacityBreakdown: UserCapacityRow[] = summary.userCapacityBreakdown || [];
   const dormantSeats = capacityBreakdown.filter(
     (u) => u.licenseCost > 0 && u.tokenConsumption === 0
   );
-
-  // ---------------------------------------------------------------------------
-  // 1. SEAT UTILIZATION & TELEMETRY
-  // ---------------------------------------------------------------------------
-  // Aggregate dormant seats by Service Line
-  const slDormantMap = new Map<string, { count: number; cost: number }>();
-  if (allRows && allRows.length > 0) {
-    const periodActive = new Set(
-      allRows.filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0)
-        .map((r) => (r.userMail || '').toLowerCase().trim())
-    );
-    const seenDormant = new Set<string>();
-    for (const r of allRows) {
-      const email = (r.userMail || '').toLowerCase().trim();
-      if (!email || periodActive.has(email) || seenDormant.has(email)) continue;
-      seenDormant.add(email);
-      const sl = r.orgServiceLine || 'General';
-      const entry = slDormantMap.get(sl) || { count: 0, cost: 0 };
-      entry.count += 1;
-      entry.cost += avgLicenseCostPerSeat;
-      slDormantMap.set(sl, entry);
-    }
-  }
-
-  const topDormantSL = Array.from(slDormantMap.entries()).sort((a, b) => b[1].count - a[1].count)[0];
-  const topDormantSLName = topDormantSL ? topDormantSL[0] : 'core service lines';
-  const topDormantSLCount = topDormantSL ? topDormantSL[1].count : dormantSeats.length;
-
-  const seatInference: PrescriptiveInference = {
-    id: 'seat_utilization',
-    title: 'Active / Inactive Users Telemetry (License Utilization)',
-    tag: 'User Engagement Telemetry',
-    tagColor: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-    leverageScore: annualizedInactiveLeakage,
-    stat: `${activeSeatPercent.toFixed(1)}% Active Utilization`,
-    statSub: `${activeUserCount} Active vs ${inactiveUserCount} Inactive Licenses (${fmtCost(inactiveLeakageCost)}/mo Leakage)`,
-    finding:
-      inactiveUserCount > 0
-        ? `Out of ${rosterSeats} provisioned enterprise licenses, ${activeUserCount} users (${activeSeatPercent.toFixed(1)}%) recorded prompt activity, while ${inactiveUserCount} licenses remained completely inactive, resulting in ${fmtCost(inactiveLeakageCost)}/mo in unutilized fixed software costs.`
-        : `All ${rosterSeats} provisioned licenses recorded active prompt consumption, achieving 100% active engagement with zero idle license overhead.`,
-    actionableInsight:
-      inactiveUserCount > 0
-        ? `Automate a 30-day inactivity reclamation policy focused on ${topDormantSLName} (${topDormantSLCount} dormant seats). Reallocate reclaimed seats to waitlisted teams rather than purchasing new licenses.`
-        : 'Maintain active monitoring and expand license capacity only as verified new engineering cohorts onboard.',
-    benefitOutcome:
-      inactiveUserCount > 0
-        ? `Recovers up to ${fmtCost(inactiveLeakageCost)}/mo (${fmtCost(annualizedInactiveLeakage)}/yr) in license spend. Frees ${inactiveUserCount} seats for waitlisted teams at $0 incremental budget.`
-        : `Protects the full ${fmtCost(summary.totalLicenseCost)} license investment from idle-seat leakage.`,
-  };
 
   // ---------------------------------------------------------------------------
   // 2. LICENSE RECLAMATION INTELLIGENCE
@@ -235,16 +181,149 @@ export function generatePrescriptiveInferences(
   };
 
   // ---------------------------------------------------------------------------
-  // Compile inferences array with:
-  // 1. Active / Inactive Users Telemetry (#1)
-  // 2. License Reclamation Intelligence (#2)
-  // Remaining strategic cards sorted dynamically by financial leverage score
+  // 6. TOOL OVERLAP COST — users paying for redundant capabilities
+  // ---------------------------------------------------------------------------
+  // Overlap user count = COUNT(DISTINCT User Email) WHERE user has Cost USD > 0
+  // for 2+ Products in the SAME MONTH (concurrent redundant spend, not just
+  // "used two tools at some point across the whole period").
+  let overlapUserCount = 0;
+  let overlapCost = 0;
+  if (allRows && allRows.length > 0) {
+    const userMonthTools = new Map<string, Set<string>>(); // `${email}|${monthId}` -> tools
+    for (const r of allRows) {
+      if (r.calculationMethod !== 'Usage' || !(r.cost > 0)) continue;
+      const email = (r.userMail || '').toLowerCase().trim();
+      if (!email) continue;
+      const key = `${email}|${r.monthId}`;
+      if (!userMonthTools.has(key)) userMonthTools.set(key, new Set());
+      userMonthTools.get(key)!.add(r.aiTool);
+    }
+    const overlapEmails = new Set<string>();
+    for (const [key, tools] of userMonthTools.entries()) {
+      if (tools.size >= 2) overlapEmails.add(key.split('|')[0]);
+    }
+    overlapUserCount = overlapEmails.size;
+    for (const r of allRows) {
+      if (r.calculationMethod !== 'Usage') continue;
+      const email = (r.userMail || '').toLowerCase().trim();
+      if (overlapEmails.has(email)) overlapCost += r.cost;
+    }
+    overlapCost = Number(overlapCost.toFixed(2));
+  } else {
+    // No row-level data available yet — fall back to the period-wide overlap
+    // already computed for the Multi-Tool Comparison page (users who used 2+
+    // tools at any point in the period, not necessarily the same month).
+    overlapUserCount = summary.multiToolOverlap?.dualToolUserCount || 0;
+    overlapCost = summary.multiToolOverlap?.totalDualToolSpend || 0;
+  }
+  const annualizedOverlapCost = overlapCost * 12;
+
+  const toolOverlapInference: PrescriptiveInference = {
+    // Reuses the existing Multi-Tool Comparison drilldown (same page the
+    // Multi-Tool Comparison tab's "Deep Dive" button opens) instead of a new
+    // bespoke view, since it already shows exactly this: per-tool unit
+    // economics, the overlap user count/spend, and a hierarchy drilldown
+    // scoped to just the overlapping users.
+    id: 'multi_tool_comparison',
+    title: 'Tool Overlap Cost',
+    tag: 'Redundant Capability Spend',
+    tagColor: 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20',
+    leverageScore: annualizedOverlapCost,
+    stat: `${overlapUserCount} Users Paying for Overlap`,
+    statSub: `${fmtCost(overlapCost)}/mo across redundant tools`,
+    finding:
+      overlapUserCount > 0
+        ? `${overlapUserCount} users incurred Cost USD > 0 on 2 or more AI products in the same month, together generating ${fmtCost(overlapCost)}/mo (${fmtCost(annualizedOverlapCost)} annualised) in overlapping tool spend — capability that's effectively being paid for twice.`
+        : 'No users currently show concurrent paid usage across two or more AI products in the same month.',
+    actionableInsight:
+      overlapUserCount > 0
+        ? `Open the Multi-Tool Comparison view to see which tool pairs overlap most, then standardize each overlapping user onto a single primary tool that covers their workload.`
+        : 'No tool consolidation opportunity identified this period.',
+    benefitOutcome:
+      overlapUserCount > 0
+        ? `Eliminates up to ${fmtCost(overlapCost)}/mo (${fmtCost(annualizedOverlapCost)}/yr) in redundant spend by consolidating overlapping users onto one tool. Also simplifies vendor management and reduces support overhead.`
+        : 'Tool portfolio is already lean — no redundant concurrent spend to recover.',
+  };
+
+  // ---------------------------------------------------------------------------
+  // 7. NON-BILLABLE COST OVERRUN — engagements burning margin with no revenue offset
+  // ---------------------------------------------------------------------------
+  // Engagement Code prefix is the app-wide billability signal (E- = billable/
+  // External, I- = Internal/Non-Billable) — see isBillableCode elsewhere.
+  const isBillableCode = (code: string) => code.startsWith('E-');
+  let nonBillableEngagementCount = 0;
+  let flaggedEngagementCount = 0;
+  let totalExposure = 0;
+  if (allRows && allRows.length > 0) {
+    const engagementMap = new Map<string, { cost: number; users: Set<string> }>();
+    for (const r of allRows) {
+      if (r.calculationMethod !== 'Usage') continue;
+      const code = (r.projectCode || 'Unassigned Internal').trim();
+      if (isBillableCode(code)) continue;
+      if (!engagementMap.has(code)) engagementMap.set(code, { cost: 0, users: new Set() });
+      const entry = engagementMap.get(code)!;
+      entry.cost += r.cost;
+      const email = (r.userMail || '').toLowerCase().trim();
+      if (email) entry.users.add(email);
+    }
+    nonBillableEngagementCount = engagementMap.size;
+    for (const { cost, users } of engagementMap.values()) {
+      const avgCostPerUser = users.size > 0 ? cost / users.size : 0;
+      if (avgCostPerUser > 100) {
+        flaggedEngagementCount++;
+        totalExposure += cost;
+      }
+    }
+  } else {
+    // Fall back to the pre-aggregated per-Engagement-Code totals already on
+    // the summary (mixes Usage + License cost, so slightly less precise, but
+    // avoids requiring a raw-row fetch just for the headline card).
+    const nonBillableCodes = (summary.byProjectCode || []).filter(
+      (p) => !isBillableCode(p.projectCode) && p.userCount > 0
+    );
+    nonBillableEngagementCount = nonBillableCodes.length;
+    const flagged = nonBillableCodes.filter((p) => p.cost / p.userCount > 100);
+    flaggedEngagementCount = flagged.length;
+    totalExposure = flagged.reduce((s, p) => s + p.cost, 0);
+  }
+  totalExposure = Number(totalExposure.toFixed(2));
+  const percentNonBillableAtRisk = nonBillableEngagementCount > 0 ? (flaggedEngagementCount / nonBillableEngagementCount) * 100 : 0;
+  const annualizedExposure = totalExposure * 12;
+
+  const nonBillableOverrunInference: PrescriptiveInference = {
+    id: 'non_billable_overrun',
+    title: 'Non-Billable Cost Overrun',
+    tag: 'Margin Risk',
+    tagColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    leverageScore: annualizedExposure,
+    stat: `${fmtPct(percentNonBillableAtRisk)} Non-Billable at Risk`,
+    statSub: `${flaggedEngagementCount} of ${nonBillableEngagementCount} engagements · ${fmtCost(totalExposure)}/mo exposure`,
+    finding:
+      flaggedEngagementCount > 0
+        ? `${fmtPct(percentNonBillableAtRisk)} of non-billable engagements (${flaggedEngagementCount} of ${nonBillableEngagementCount}) have an average cost per user above $100/month, together accounting for ${fmtCost(totalExposure)}/mo (${fmtCost(annualizedExposure)} annualised) in unrecovered spend. This is pure margin drag — none of it is offset by client billing.`
+        : `No non-billable engagements are currently running above the $100/user/month threshold.`,
+    actionableInsight:
+      flaggedEngagementCount > 0
+        ? `Open the root-cause diagnostic for each flagged engagement to determine whether the overrun is driven by multi-tool overlap, a small group of power users, or broad heavy usage across the whole team — then apply the matching remediation.`
+        : 'No remediation required this period.',
+    benefitOutcome:
+      flaggedEngagementCount > 0
+        ? `Recovers up to ${fmtCost(totalExposure)}/mo (${fmtCost(annualizedExposure)}/yr) in unrecovered internal spend once root causes are addressed, protecting practice margin without cutting legitimate client-billable usage.`
+        : 'Non-billable spend is currently within a healthy per-user range.',
+  };
+
+  // ---------------------------------------------------------------------------
+  // Compile inferences array with License Reclamation Intelligence pinned
+  // first (#1); the remaining strategic cards are sorted dynamically by
+  // financial leverage score.
   // ---------------------------------------------------------------------------
   const otherInferences = [
     billabilityInference,
     paretoInference,
     retentionInference,
+    toolOverlapInference,
+    nonBillableOverrunInference,
   ].sort((a, b) => b.leverageScore - a.leverageScore);
 
-  return [seatInference, reclamationInference, ...otherInferences];
+  return [reclamationInference, ...otherInferences];
 }

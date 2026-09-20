@@ -7,6 +7,7 @@ import { KpiCard } from '@/components/ui/KpiCard';
 import { MetricChart } from '@/components/ui/MetricChart';
 import { RoiCapacityPanel } from '@/components/ui/RoiCapacityPanel';
 import { ProjectBillabilityPanel } from '@/components/ui/ProjectBillabilityPanel';
+import { UserThresholdDrilldownView } from '@/components/ui/UserThresholdDrilldownView';
 import { RoiDrilldownView, RoiDrilldownTarget } from '@/components/ui/RoiDrilldownView';
 import { ExecutiveMetricDrilldownView } from '@/components/ui/ExecutiveMetricDrilldownView';
 import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
@@ -22,6 +23,16 @@ export default function RoiPage() {
   // Overview page (that KPI card was replaced with AI Adoption). Reuses the
   // same ExecutiveMetricDrilldownView component and calculations as before.
   const [tokenDrilldown, setTokenDrilldown] = useState<DrilldownMetricData | null>(null);
+  // Simple per-user threshold drilldowns (Zero-Consumption Users / High-Spend
+  // Users) — deliberately separate from RoiDrilldownView's richer, multi-facet
+  // target model since these two are plain counts, not a dimension to explore.
+  const [simpleDrilldown, setSimpleDrilldown] = useState<{
+    criteria: 'zero_consumption' | 'high_spend';
+    threshold?: number;
+    title: string;
+    subtitle: string;
+    badge: string;
+  } | null>(null);
 
   const summary: TokenCostSummary | null = data?.tokenCostSummary ?? null;
 
@@ -35,9 +46,8 @@ export default function RoiPage() {
     previous === 0 ? (current > 0 ? 100 : 0) : ((current - previous) / previous) * 100;
 
   const overallUtilizationDelta = Number(((summary?.overallUtilizationPercent || 0) - (summary?.prevOverallUtilizationPercent || 0)).toFixed(2));
-  const wasteDelta = Number(((summary?.totalWasteCost || 0) - (summary?.prevTotalWasteCost || 0)).toFixed(2));
-  const overageDelta = Number(((summary?.totalOverageCost || 0) - (summary?.prevTotalOverageCost || 0)).toFixed(2));
-  const ceilingRiskDelta = (summary?.ceilingRiskCount || 0) - (summary?.prevCeilingRiskCount || 0);
+  const zeroConsumptionDelta = (summary?.inactiveUserCount || 0) - (summary?.prevInactiveUserCount || 0);
+  const highSpendDelta = (summary?.highSpendUserCount || 0) - (summary?.prevHighSpendUserCount || 0);
 
   const openDrilldown = (target: RoiDrilldownTarget) => {
     setActiveDrilldown(target);
@@ -71,6 +81,16 @@ export default function RoiPage() {
             onBack={() => setTokenDrilldown(null)}
             filters={filters}
             parentTitle="ROI Dashboard"
+          />
+        ) : simpleDrilldown ? (
+          <UserThresholdDrilldownView
+            criteria={simpleDrilldown.criteria}
+            threshold={simpleDrilldown.threshold}
+            title={simpleDrilldown.title}
+            subtitle={simpleDrilldown.subtitle}
+            badge={simpleDrilldown.badge}
+            filters={filters}
+            onBack={() => setSimpleDrilldown(null)}
           />
         ) : activeDrilldown ? (
           <RoiDrilldownView
@@ -106,7 +126,7 @@ export default function RoiPage() {
           <>
             {/* Financial ROI Governance KPI Cards with Drilldown Handlers -- Total Token
                 Consumption relocated here from the Executive Overview page */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <KpiCard
                 title="Total Token Consumption"
                 delta={data.metrics.tokenConsumption.summary}
@@ -151,73 +171,48 @@ export default function RoiPage() {
               />
 
               <KpiCard
-                title="Unutilized AI Capacity"
+                title="Zero-Consumption Users"
                 delta={{
-                  current: summary.totalWasteCost,
-                  previous: summary.prevTotalWasteCost,
-                  absoluteDelta: wasteDelta,
-                  percentageDelta: Number(pctDeltaFor(summary.totalWasteCost, summary.prevTotalWasteCost).toFixed(2)),
-                  trend: trendFor(wasteDelta),
-                  previousDataAvailable,
-                }}
-                formatType="currency"
-                description="The free-dollar allowance that went unused across under-utilized licenses this month (limit minus gross cost). Click to drill down to raw usage logs."
-                meta={`${(summary.userCapacityBreakdown || []).filter((u) => u.zone === 'zone1_under').length} users · Zone 1 Unused`}
-                onClick={() =>
-                  openDrilldown({
-                    type: 'zone',
-                    id: 'waste',
-                    title: 'Zone 1: Unused Capacity',
-                    subtitle: 'Under-utilized employee licenses with unconsumed free-dollar limit (per-tool free limit - gross usage cost).',
-                    badge: 'Zone 1 Unused',
-                  })
-                }
-              />
-
-              <KpiCard
-                title="Overage Spend Exposure"
-                delta={{
-                  current: summary.totalOverageCost,
-                  previous: summary.prevTotalOverageCost,
-                  absoluteDelta: overageDelta,
-                  percentageDelta: Number(pctDeltaFor(summary.totalOverageCost, summary.prevTotalOverageCost).toFixed(2)),
-                  trend: trendFor(overageDelta),
-                  previousDataAvailable,
-                }}
-                formatType="currency"
-                description="Usage that was billed because it went over each tool's free-dollar limit. Click to drill down to raw usage logs."
-                meta={`${(summary.userCapacityBreakdown || []).filter((u) => u.zone === 'zone2_over').length} users · Zone 2 Overage`}
-                onClick={() =>
-                  openDrilldown({
-                    type: 'zone',
-                    id: 'overage',
-                    title: 'Zone 2: Overage Spend Exposure',
-                    subtitle: 'Excess usage and fees billed beyond each tool\'s free allocation.',
-                    badge: 'Zone 2 Overage',
-                  })
-                }
-              />
-
-              <KpiCard
-                title="Users at Usage Ceiling"
-                delta={{
-                  current: summary.ceilingRiskCount,
-                  previous: summary.prevCeilingRiskCount,
-                  absoluteDelta: ceilingRiskDelta,
-                  percentageDelta: Number(pctDeltaFor(summary.ceilingRiskCount, summary.prevCeilingRiskCount).toFixed(2)),
-                  trend: trendFor(ceilingRiskDelta),
+                  current: summary.inactiveUserCount,
+                  previous: summary.prevInactiveUserCount,
+                  absoluteDelta: zeroConsumptionDelta,
+                  percentageDelta: Number(pctDeltaFor(summary.inactiveUserCount, summary.prevInactiveUserCount).toFixed(2)),
+                  trend: trendFor(zeroConsumptionDelta),
                   previousDataAvailable,
                 }}
                 unit="users"
-                description={`Users who have reached or exceeded 90% of the ${fmtCost(summary.hardCeiling)} spend ceiling. Click to inspect power users.`}
-                meta={`${fmtCost(summary.hardCeiling)} hard ceiling · 90% threshold`}
+                description="Distinct users with 0 GenAI Tool Consumption on a Usage row this period. Click to see the full list."
+                meta={`of ${summary.totalRosterUserCount} roster users`}
                 onClick={() =>
-                  openDrilldown({
-                    type: 'zone',
-                    id: 'ceiling',
-                    title: 'Dollar Ceiling Risk Telemetry',
-                    subtitle: `High-volume power users who have reached or exceeded 90% (${fmtCost(summary.hardCeiling * 0.9)}+) of the spend cap.`,
-                    badge: 'Cap Risk Telemetry',
+                  setSimpleDrilldown({
+                    criteria: 'zero_consumption',
+                    title: 'Zero-Consumption Users',
+                    subtitle: 'Users with 0 GenAI Tool Consumption on a Usage row this period.',
+                    badge: 'Zero Consumption',
+                  })
+                }
+              />
+
+              <KpiCard
+                title="High-Spend Users"
+                delta={{
+                  current: summary.highSpendUserCount,
+                  previous: summary.prevHighSpendUserCount,
+                  absoluteDelta: highSpendDelta,
+                  percentageDelta: Number(pctDeltaFor(summary.highSpendUserCount, summary.prevHighSpendUserCount).toFixed(2)),
+                  trend: trendFor(highSpendDelta),
+                  previousDataAvailable,
+                }}
+                unit="users"
+                description="Distinct users whose total usage cost this period exceeds $100. Click to see the full list."
+                meta="cost > $100"
+                onClick={() =>
+                  setSimpleDrilldown({
+                    criteria: 'high_spend',
+                    threshold: 100,
+                    title: 'High-Spend Users',
+                    subtitle: 'Users whose total usage cost this period exceeds $100.',
+                    badge: 'Cost > $100',
                   })
                 }
               />
@@ -226,15 +221,6 @@ export default function RoiPage() {
             {/* Bifurcated User Capacity & Waste Panel */}
             <RoiCapacityPanel
               userCapacityBreakdown={summary.userCapacityBreakdown || []}
-              totalWasteCost={summary.totalWasteCost}
-              totalOverageCost={summary.totalOverageCost}
-              licenseEfficiencyRate={summary.licenseEfficiencyRate}
-              ceilingRiskCount={summary.ceilingRiskCount}
-              hardCeiling={summary.hardCeiling}
-              totalLicenseCost={summary.totalLicenseCost}
-              licenseRoiPercent={summary.licenseRoiPercent}
-              licenseUnderutilizedCost={summary.licenseUnderutilizedCost}
-              licenseOverutilizedValue={summary.licenseOverutilizedValue}
               filters={filters}
               onSelectUser={(u) =>
                 openDrilldown({
@@ -244,20 +230,6 @@ export default function RoiPage() {
                   subtitle: `Full raw telemetry records, license limits, and activity logs for ${u.displayName} (${u.userMail}).`,
                   badge: u.zone === 'zone1_under' ? 'Zone 1: Under-Utilized' : 'Zone 2: Over-Utilized',
                   filterCriteria: { userEmail: u.userMail },
-                })
-              }
-              onSelectZone={(zone) =>
-                openDrilldown({
-                  type: 'zone',
-                  id: zone === 'zone1_under' ? 'waste' : zone === 'zone2_over' ? 'overage' : 'ceiling',
-                  title:
-                    zone === 'zone1_under'
-                      ? 'Zone 1: Under-Utilized Capacity'
-                      : zone === 'zone2_over'
-                      ? 'Zone 2: Over-Utilized Licenses'
-                      : 'Dollar Ceiling Risk',
-                  subtitle: 'Detailed employee breakdown and live CSV log telemetry.',
-                  badge: zone.toUpperCase(),
                 })
               }
             />
