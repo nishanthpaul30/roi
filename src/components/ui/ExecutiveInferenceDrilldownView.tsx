@@ -1301,7 +1301,7 @@ export function ExecutiveInferenceDrilldownView({
                   label="Total Provisioned Licenses"
                   value={`${totalRosterSeats} Licenses`}
                   subtitle="Real per-license Cost in USD"
-                  tooltip="Count of distinct users across all rows (License + Usage) in the selected period — every provisioned seat regardless of activity."
+                  tooltip="Count of distinct users across every License and Usage entry in the selected period — every provisioned seat regardless of activity."
                 />
                 <StatTile
                   label="Active Engaged Licenses"

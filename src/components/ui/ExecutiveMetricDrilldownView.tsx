@@ -632,7 +632,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
                   label="Total Roster"
                   value={summaryData?.totalRosterUserCount ?? 0}
                   subtitle="Every provisioned user this period"
-                  tooltip="Count of distinct users across all rows (License + Usage) in the selected period — every provisioned seat regardless of activity."
+                  tooltip="Count of distinct users across every License and Usage entry in the selected period — every provisioned seat regardless of activity."
                 />
               </div>
 
