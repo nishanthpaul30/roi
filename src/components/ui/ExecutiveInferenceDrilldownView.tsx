@@ -350,10 +350,26 @@ export function ExecutiveInferenceDrilldownView({
     return map;
   }, [allRows]);
 
+  // Literal per-row rule (Calculation Method = 'Usage' AND GenAI Tool
+  // Consumption = 0), matching summary.dormantLicenseSeatCount computed
+  // server-side in roi.ts -- not userCapacityBreakdown's aggregate
+  // Usage-token SUM = 0, which also (incorrectly) matches users with no
+  // Usage row at all.
+  const zeroConsumptionUsageEmails = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of allRows) {
+      if (r.calculationMethod === 'Usage' && r.tokenConsumption === 0) {
+        const email = (r.userMail || '').toLowerCase().trim();
+        if (email) set.add(email);
+      }
+    }
+    return set;
+  }, [allRows]);
+
   const reclamationUsers = useMemo(() => {
     const breakdown = summary?.userCapacityBreakdown || [];
     return breakdown
-      .filter((u) => u.licenseCost > 0 && u.tokenConsumption === 0)
+      .filter((u) => u.licenseCost > 0 && zeroConsumptionUsageEmails.has(u.userMail.toLowerCase().trim()))
       .map((u) => ({
         email: u.userMail.toLowerCase().trim(),
         displayName: u.displayName,
@@ -362,7 +378,7 @@ export function ExecutiveInferenceDrilldownView({
         recoverableAmount: u.licenseCost,
       }))
       .sort((a, b) => b.recoverableAmount - a.recoverableAmount);
-  }, [summary]);
+  }, [summary, zeroConsumptionUsageEmails]);
 
   const usageWarningUsers = useMemo(() => {
     const breakdown = summary?.userCapacityBreakdown || [];
@@ -1429,7 +1445,7 @@ export function ExecutiveInferenceDrilldownView({
                   valueClassName="text-rose-400"
                   subtitle={`${reclamationDormantCount} Seats (${recoverablePercentOfLicenseCost}% of total)`}
                   subtitleClassName="text-rose-300/80"
-                  tooltip="Total recoverable license cost from confirmed dormant seats (0 token consumption recorded). These are the seats reclaimed under Rule 1."
+                  tooltip="Filter Calculation Method = 'Usage' AND GenAI Tool Consumption = 0, restricted to users with a real License Cost > 0. Sum of License Cost across those confirmed dormant seats -- reclaimed under Rule 1."
                 />
                 <StatTile
                   label="Below Free Limit (Warning)"

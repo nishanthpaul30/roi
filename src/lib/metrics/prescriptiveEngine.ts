@@ -32,17 +32,27 @@ export function generatePrescriptiveInferences(
   const activeUserCount = summary.activeUserCount || 0;
   const avgLicenseCostPerSeat = activeUserCount > 0 ? summary.totalLicenseCost / activeUserCount : 100;
 
+  // Whether the current filter selection resolves to exactly one calendar
+  // month. Dollar figures below (license cost, spend, etc.) are sums over
+  // every row in the selected range -- when that range spans multiple months
+  // (e.g. "All Months"), the total is a period total, not a monthly rate, so
+  // "/mo" wording and a x12 annualized projection would misrepresent it.
+  const isSingleMonth = (summary.monthlyTrend?.length || 0) === 1;
+  const moSuffix = isSingleMonth ? '/mo' : '';
+
   // Shared user capacity breakdown
   const capacityBreakdown: UserCapacityRow[] = summary.userCapacityBreakdown || [];
-  const dormantSeats = capacityBreakdown.filter(
-    (u) => u.licenseCost > 0 && u.tokenConsumption === 0
-  );
 
   // ---------------------------------------------------------------------------
   // 2. LICENSE RECLAMATION INTELLIGENCE
   // ---------------------------------------------------------------------------
-  const reclamationDormantCount = dormantSeats.length;
-  const totalRecoverableAmount = dormantSeats.reduce((s, u) => s + u.licenseCost, 0);
+  // Dormant Seats rule: literal per-row filter (Calculation Method = 'Usage'
+  // AND GenAI Tool Consumption = 0), computed server-side in roi.ts and
+  // reused here as-is so this card always matches the License Reclamation
+  // drilldown -- not userCapacityBreakdown's aggregate Usage-token SUM = 0,
+  // which also (incorrectly) catches users with no Usage row at all.
+  const reclamationDormantCount = summary.dormantLicenseSeatCount ?? 0;
+  const totalRecoverableAmount = summary.dormantLicenseRecoverableCost ?? 0;
   const annualizedRecoverable = totalRecoverableAmount * 12;
   const usageWarningUsers = capacityBreakdown.filter(
     (u) => u.tokenConsumption > 0 && u.zone === 'zone1_under'
@@ -60,15 +70,15 @@ export function generatePrescriptiveInferences(
     statSub: `${reclamationDormantCount} Dormant Seats to Reclaim · ${usageWarningCount} Below Free Limit (Warning)`,
     finding:
       reclamationDormantCount > 0 || usageWarningCount > 0
-        ? `${reclamationDormantCount} seat${reclamationDormantCount === 1 ? '' : 's'} recorded 0 usage against paid license fees, totaling ${fmtCost(totalRecoverableAmount)}/mo in clear, recoverable savings. An additional ${usageWarningCount} active seat${usageWarningCount === 1 ? '' : 's'} consume below their included free allowance (${fmtCost(totalWarningWaste)} prepaid capacity unused).`
+        ? `${reclamationDormantCount} seat${reclamationDormantCount === 1 ? '' : 's'} recorded 0 usage against paid license fees, totaling ${fmtCost(totalRecoverableAmount)}${moSuffix} in clear, recoverable savings. An additional ${usageWarningCount} active seat${usageWarningCount === 1 ? '' : 's'} consume below their included free allowance (${fmtCost(totalWarningWaste)} prepaid capacity unused).`
         : 'Zero dormant seats identified; all provisioned licenses generated legitimate token consumption.',
     actionableInsight:
       reclamationDormantCount > 0
-        ? `Deprovision the ${reclamationDormantCount} zero-consumption seats immediately via IT manifest to capture ${fmtCost(totalRecoverableAmount)}/mo. Issue automated enablement nudges to the ${usageWarningCount} under-the-free-limit seats.`
+        ? `Deprovision the ${reclamationDormantCount} zero-consumption seats immediately via IT manifest to capture ${fmtCost(totalRecoverableAmount)}${moSuffix}. Issue automated enablement nudges to the ${usageWarningCount} under-the-free-limit seats.`
         : 'No licenses require reclamation this period. Review capacity allocation quarterly.',
     benefitOutcome:
       reclamationDormantCount > 0
-        ? `Captures ${fmtCost(totalRecoverableAmount)}/mo (${fmtCost(annualizedRecoverable)}/yr) in net expense reduction with zero operational friction, while safeguarding all active seats.`
+        ? `Captures ${fmtCost(totalRecoverableAmount)}${moSuffix}${isSingleMonth ? ` (${fmtCost(annualizedRecoverable)}/yr)` : ''} in net expense reduction with zero operational friction, while safeguarding all active seats.`
         : 'License investment is operating at peak financial efficiency.',
   };
 
@@ -118,7 +128,7 @@ export function generatePrescriptiveInferences(
     statSub: `${fmtCost(billableSpend)} Billable vs ${fmtCost(nonBillableSpend)} Non-Billable (${fmtPct(nonBillablePct)})`,
     finding: `${fmtPct(billableSpendPercent)} of total AI spend (${fmtCost(billableSpend)}) is directly tied to revenue-generating client engagement codes (E-prefix). Non-billable internal overhead accounts for ${fmtCost(nonBillableSpend)} (${fmtPct(nonBillablePct)}).`,
     actionableInsight: `Conduct a targeted audit of ${topNonBillableSL} and engagement code ${topNonBillableProject}. Enforce client billing codes on IDE prompts to reclassify qualifying work and lift billable ratio to ≥75%.`,
-    benefitOutcome: `Recovers estimated ${fmtCost(nonBillableSpend * 0.35)}/mo in billable client pass-through revenue. Solidifies audit defensibility and prevents AI spend from eroding internal practice margins.`,
+    benefitOutcome: `Recovers estimated ${fmtCost(nonBillableSpend * 0.35)}${moSuffix} in billable client pass-through revenue. Solidifies audit defensibility and prevents AI spend from eroding internal practice margins.`,
   };
 
   // ---------------------------------------------------------------------------
@@ -147,7 +157,7 @@ export function generatePrescriptiveInferences(
     statSub: `${top20Count} power users drive majority cost (${fmtCost(top20Spend)})`,
     finding: `Spend is highly concentrated: the top 10% of active users (${top10Count} people) drive ${fmtPct(top10Percent)} of spend (${fmtCost(top10Spend)}), and the top 20% (${top20Count} people) account for ${fmtPct(top20Percent)} of all consumption (${fmtCost(top20Spend)}).`,
     actionableInsight: `Avoid broad org-wide cuts that disrupt normal users. Implement prompt caching, batching reviews, and tiered volume commitments specifically for the top ${top20Count} power users led by ${topUserName}.`,
-    benefitOutcome: `Leverages the highest-impact cost lever: a 25% optimization on the top ${top20Count} users yields ${fmtCost(top20Spend * 0.25)}/mo (${fmtCost(potentialParetoVolumeSavings)}/yr) without disrupting 80% of staff.`,
+    benefitOutcome: `Leverages the highest-impact cost lever: a 25% optimization on the top ${top20Count} users yields ${fmtCost(top20Spend * 0.25)}${moSuffix}${isSingleMonth ? ` (${fmtCost(potentialParetoVolumeSavings)}/yr)` : ''} without disrupting 80% of staff.`,
   };
 
   // ---------------------------------------------------------------------------
@@ -177,7 +187,7 @@ export function generatePrescriptiveInferences(
       dropoutPct > 15
         ? `Investigate onboarding friction in the ${dropoutCount}-user Dropout cohort before expanding license commitments. Deploy targeted coaching to convert Occasional users to Regular.`
         : 'Active user cohorts demonstrate strong habitual retention. Transition focus from basic onboarding to specialized advanced prompt engineering.',
-    benefitOutcome: `Protects up to ${fmtCost(atRiskLicenseCost)}/mo in license spend from customer churn, while compounding organizational productivity as users move from occasional to embedded workflows.`,
+    benefitOutcome: `Protects up to ${fmtCost(atRiskLicenseCost)}${moSuffix} in license spend from customer churn, while compounding organizational productivity as users move from occasional to embedded workflows.`,
   };
 
   // ---------------------------------------------------------------------------
@@ -230,10 +240,10 @@ export function generatePrescriptiveInferences(
     tagColor: 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20',
     leverageScore: annualizedOverlapCost,
     stat: `${overlapUserCount} Users Paying for Overlap`,
-    statSub: `${fmtCost(overlapCost)}/mo across redundant tools`,
+    statSub: `${fmtCost(overlapCost)}${moSuffix} across redundant tools`,
     finding:
       overlapUserCount > 0
-        ? `${overlapUserCount} users incurred Cost USD > 0 on 2 or more AI products in the same month, together generating ${fmtCost(overlapCost)}/mo (${fmtCost(annualizedOverlapCost)} annualised) in overlapping tool spend — capability that's effectively being paid for twice.`
+        ? `${overlapUserCount} users incurred Cost USD > 0 on 2 or more AI products in the same month, together generating ${fmtCost(overlapCost)}${moSuffix}${isSingleMonth ? ` (${fmtCost(annualizedOverlapCost)} annualised)` : ''} in overlapping tool spend — capability that's effectively being paid for twice.`
         : 'No users currently show concurrent paid usage across two or more AI products in the same month.',
     actionableInsight:
       overlapUserCount > 0
@@ -241,7 +251,7 @@ export function generatePrescriptiveInferences(
         : 'No tool consolidation opportunity identified this period.',
     benefitOutcome:
       overlapUserCount > 0
-        ? `Eliminates up to ${fmtCost(overlapCost)}/mo (${fmtCost(annualizedOverlapCost)}/yr) in redundant spend by consolidating overlapping users onto one tool. Also simplifies vendor management and reduces support overhead.`
+        ? `Eliminates up to ${fmtCost(overlapCost)}${moSuffix}${isSingleMonth ? ` (${fmtCost(annualizedOverlapCost)}/yr)` : ''} in redundant spend by consolidating overlapping users onto one tool. Also simplifies vendor management and reduces support overhead.`
         : 'Tool portfolio is already lean — no redundant concurrent spend to recover.',
   };
 
@@ -297,10 +307,10 @@ export function generatePrescriptiveInferences(
     tagColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
     leverageScore: annualizedExposure,
     stat: `${fmtPct(percentNonBillableAtRisk)} Non-Billable at Risk`,
-    statSub: `${flaggedEngagementCount} of ${nonBillableEngagementCount} engagements · ${fmtCost(totalExposure)}/mo exposure`,
+    statSub: `${flaggedEngagementCount} of ${nonBillableEngagementCount} engagements · ${fmtCost(totalExposure)}${moSuffix} exposure`,
     finding:
       flaggedEngagementCount > 0
-        ? `${fmtPct(percentNonBillableAtRisk)} of non-billable engagements (${flaggedEngagementCount} of ${nonBillableEngagementCount}) have an average cost per user above $100/month, together accounting for ${fmtCost(totalExposure)}/mo (${fmtCost(annualizedExposure)} annualised) in unrecovered spend. This is pure margin drag — none of it is offset by client billing.`
+        ? `${fmtPct(percentNonBillableAtRisk)} of non-billable engagements (${flaggedEngagementCount} of ${nonBillableEngagementCount}) have an average cost per user above $100/month, together accounting for ${fmtCost(totalExposure)}${moSuffix}${isSingleMonth ? ` (${fmtCost(annualizedExposure)} annualised)` : ''} in unrecovered spend. This is pure margin drag — none of it is offset by client billing.`
         : `No non-billable engagements are currently running above the $100/user/month threshold.`,
     actionableInsight:
       flaggedEngagementCount > 0
@@ -308,7 +318,7 @@ export function generatePrescriptiveInferences(
         : 'No remediation required this period.',
     benefitOutcome:
       flaggedEngagementCount > 0
-        ? `Recovers up to ${fmtCost(totalExposure)}/mo (${fmtCost(annualizedExposure)}/yr) in unrecovered internal spend once root causes are addressed, protecting practice margin without cutting legitimate client-billable usage.`
+        ? `Recovers up to ${fmtCost(totalExposure)}${moSuffix}${isSingleMonth ? ` (${fmtCost(annualizedExposure)}/yr)` : ''} in unrecovered internal spend once root causes are addressed, protecting practice margin without cutting legitimate client-billable usage.`
         : 'Non-billable spend is currently within a healthy per-user range.',
   };
 

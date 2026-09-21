@@ -164,6 +164,14 @@ export interface TokenCostSummary {
   activeUserCount: number;
   inactiveUserCount: number;
   prevInactiveUserCount: number;
+  // License Reclamation "Dormant Seats" rule: distinct users with a real
+  // License Cost who appear in a Usage row with GenAI Tool Consumption = 0
+  // (same literal per-row rule as inactiveUserCount above, filtered further
+  // to only those actually holding a paid license) -- not every user with an
+  // aggregate Usage-token sum of 0, which would also include users with no
+  // Usage row at all.
+  dormantLicenseSeatCount: number;
+  dormantLicenseRecoverableCost: number;
   // Token & Spend ROI "high spend" tile: distinct users whose total Usage-row
   // cost this period exceeds $100.
   highSpendUserCount: number;
