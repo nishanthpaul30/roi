@@ -485,19 +485,22 @@ export async function calculateTokenCostSummary(
   const prevCapacity = computeCapacityAggregates(previousRows, hardCeiling, toolFreeLimits);
   const prevTotalCostForCapacity = previousUsageRows.reduce((s, r) => s + r.cost, 0);
 
-  // License Reclamation "Dormant Seats": distinct users holding a real
-  // License Cost who also appear in a Usage row with GenAI Tool Consumption
-  // = 0 -- the same literal per-row rule as inactiveUserCount/Unutilized
-  // Licenses (countZeroConsumptionUsers), not userCapacityBreakdown's
-  // aggregate Usage-token SUM = 0 (which also matches users with no Usage
-  // row at all, over-counting seats that were simply never tracked as Usage).
+  // License Reclamation "Dormant Seats": the exact same population as
+  // inactiveUserCount/Unutilized Licenses (countZeroConsumptionUsers) --
+  // distinct users appearing in a Usage row with GenAI Tool Consumption = 0
+  // -- so this count never drifts from that figure elsewhere on the app
+  // (e.g. the Total AI Investment card's own "N inactive users" meta).
+  // Deliberately NOT additionally filtered by licenseCost > 0: doing so
+  // dropped users whose License Cost happened to compute to 0 in a narrower
+  // filtered period, silently under-counting dormant seats relative to
+  // inactiveUserCount for the same filters.
   const zeroConsumptionUsageEmails = new Set(
     currentRows
       .filter(r => r.calculationMethod === 'Usage' && r.tokenConsumption === 0)
       .map(r => r.userMail.toLowerCase())
   );
   const dormantLicenseSeats = userCapacityBreakdown.filter(
-    u => u.licenseCost > 0 && zeroConsumptionUsageEmails.has(u.userMail.toLowerCase())
+    u => zeroConsumptionUsageEmails.has(u.userMail.toLowerCase())
   );
   const dormantLicenseSeatCount = dormantLicenseSeats.length;
   const dormantLicenseRecoverableCost = Number(

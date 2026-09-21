@@ -385,7 +385,7 @@ export function ExecutiveInferenceDrilldownView({
   const reclamationUsers = useMemo(() => {
     const breakdown = summary?.userCapacityBreakdown || [];
     return breakdown
-      .filter((u) => u.licenseCost > 0 && zeroConsumptionUsageEmails.has(u.userMail.toLowerCase().trim()))
+      .filter((u) => zeroConsumptionUsageEmails.has(u.userMail.toLowerCase().trim()))
       .map((u) => ({
         email: u.userMail.toLowerCase().trim(),
         displayName: u.displayName,
