@@ -132,7 +132,7 @@ export default function RoiPage() {
                 delta={data.metrics.tokenConsumption.summary}
                 unit="tokens"
                 formatType="compact"
-                description="SUM(GenAI Tool Consumption) across all Usage rows in the period."
+                description="SUM(GenAI Tool Consumption) across all Usage entries in the period."
                 comparisonLabel="vs prev period"
                 meta={`${summary.byAiTool?.length ?? 0} AI tools · $${summary.costPer1kTokens.toFixed(4)} per 1K tokens`}
                 onClick={openTokenDrilldown}
@@ -181,7 +181,7 @@ export default function RoiPage() {
                   previousDataAvailable,
                 }}
                 unit="users"
-                description="Distinct users with 0 GenAI Tool Consumption on a Usage row this period. Click to see the full list."
+                description="Distinct users with 0 GenAI Tool Consumption on a Usage entry this period. Click to see the full list."
                 meta={`of ${summary.totalRosterUserCount} roster users`}
                 onClick={() =>
                   setSimpleDrilldown({

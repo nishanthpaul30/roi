@@ -68,8 +68,13 @@ export default function ExecutiveOverviewPage() {
 
   // Total AI Investment drilldown subtitle: license seat adoption in plain
   // terms, matching the AI Adoption card's math -- "licenses" here means
-  // distinct user-tool pairs (aiTools per user), not raw License CSV rows,
-  // since a held tool recurs as a License row every month.
+  // distinct user-tool pairs (aiTools per user), not raw License CSV entries,
+  // since a held tool recurs as a License entry every month. The dormant
+  // count reuses summary.inactiveUserCount (the literal Calculation Method =
+  // 'Usage' AND GenAI Tool Consumption = 0 rule) so this stays consistent
+  // with the same figure shown in this card's own meta line and on the
+  // License Reclamation Dormant Seats tile -- not a separately recomputed
+  // aggregate that can drift from it.
   const licenseAdoptionSubtitle = (() => {
     const s = data?.tokenCostSummary;
     if (!s) return 'Financial spend distribution across billable projects, external clients, and regions';
@@ -77,9 +82,8 @@ export default function ExecutiveOverviewPage() {
     const totalLicenses = breakdown.reduce((sum: number, u: UserCapacityRow) => sum + (u.aiTools?.length || 0), 0);
     const activeBreakdown = breakdown.filter((u: UserCapacityRow) => u.tokenConsumption > 0);
     const usedLicenses = activeBreakdown.reduce((sum: number, u: UserCapacityRow) => sum + (u.aiTools?.length || 0), 0);
-    const dormantLicenses = totalLicenses - usedLicenses;
     const avgLicensesPerActiveUser = activeBreakdown.length > 0 ? usedLicenses / activeBreakdown.length : 0;
-    return `Out of ${s.totalRosterUserCount} number of resources where ${totalLicenses} AI license of various sort are present, however only ${s.activeUserCount} members are actively using it each possess ${avgLicensesPerActiveUser.toFixed(1)} licenses and there are ${dormantLicenses} dormant licenses.`;
+    return `Out of ${s.totalRosterUserCount} number of resources where ${totalLicenses} AI license of various sort are present, however only ${s.activeUserCount} members are actively using it each possess ${avgLicensesPerActiveUser.toFixed(1)} licenses and there are ${s.inactiveUserCount} dormant licenses.`;
   })();
 
   return (
@@ -180,7 +184,7 @@ export default function ExecutiveOverviewPage() {
                   title="Total AI Investment"
                   delta={data.metrics.cost.summary}
                   formatType="currency"
-                  description="Usage Cost + License Cost, summed across all rows in the period."
+                  description="Usage Cost + License Cost, summed across all entries in the period."
                   comparisonLabel="vs prev period"
                   meta={`${data.tokenCostSummary?.activeUserCount ?? 0} active users · ${data.tokenCostSummary?.inactiveUserCount ?? 0} inactive users`}
                   onClick={() =>

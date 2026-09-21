@@ -160,7 +160,7 @@ export default function HierarchyDrilldownPage() {
             label="Active Users"
             value={formatCompactNumber(overallTotals.users)}
             subtitle="With metered activity"
-            tooltip="Users with at least one metered Usage row. Held licenses with no activity are excluded."
+            tooltip="Users with at least one metered Usage entry. Held licenses with no activity are excluded."
             loading={rowsLoading}
           />
           <StatTile

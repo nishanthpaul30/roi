@@ -1315,7 +1315,7 @@ export function ExecutiveInferenceDrilldownView({
                   label="Unutilized Licenses"
                   value={`${inactiveUserCount} Licenses`}
                   valueClassName="text-rose-400"
-                  subtitle="No Usage-row activity recorded"
+                  subtitle="No Usage activity recorded"
                   subtitleClassName="text-rose-300/80"
                   tooltip="Filter Calculation Method = 'Usage' AND GenAI Tool Consumption = 0. Count of distinct users — provisioned seats with zero recorded consumption."
                 />
@@ -1732,7 +1732,7 @@ export function ExecutiveInferenceDrilldownView({
                   label="Non-Billable Engagements"
                   value={`${nonBillableEngagementStats.all.length}`}
                   subtitle="Engagement Codes with an 'I-' (Internal) prefix"
-                  tooltip="Distinct Engagement Codes with at least one Usage row this period, excluding E- (client-billable) codes."
+                  tooltip="Distinct Engagement Codes with at least one Usage entry this period, excluding E- (client-billable) codes."
                 />
                 <StatTile
                   label="Flagged (Avg Cost/User > $100/mo)"
@@ -1874,7 +1874,7 @@ export function ExecutiveInferenceDrilldownView({
                   valueClassName="text-emerald-400"
                   subtitle="Billable Client Engagements"
                   subtitleClassName="text-emerald-300/80"
-                  tooltip="Billable Spend ÷ Total Spend × 100. Billable = Usage rows whose Engagement Code starts with 'E-' (client-billable), summed as a share of all Usage-row cost this period."
+                  tooltip="Billable Spend ÷ Total Spend × 100. Billable = Usage entries whose Engagement Code starts with 'E-' (client-billable), summed as a share of all Usage cost this period."
                 />
                 <StatTile
                   label="Non-Billable Investment"
@@ -1882,13 +1882,13 @@ export function ExecutiveInferenceDrilldownView({
                   valueClassName="text-cyan-400"
                   subtitle="Internal R&D & Innovation Spend"
                   subtitleClassName="text-cyan-300/80"
-                  tooltip="100% − Client Billable Spend. Engagement Codes with an 'I-' (Internal) prefix, as a share of all Usage-row cost this period."
+                  tooltip="100% − Client Billable Spend. Engagement Codes with an 'I-' (Internal) prefix, as a share of all Usage cost this period."
                 />
                 <StatTile
                   label="Total Engagement Codes"
                   value={projectCodeBreakdown.length}
                   subtitle="Active Work Orders Tracked"
-                  tooltip="Count of distinct Engagement Codes with at least one Usage row in the selected period."
+                  tooltip="Count of distinct Engagement Codes with at least one Usage entry in the selected period."
                 />
               </div>
 
@@ -2119,7 +2119,7 @@ export function ExecutiveInferenceDrilldownView({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-ey-black/50 p-3 rounded-xl border border-ey-border/60 text-xs font-mono">
             <div>
               <span className="text-[10px] text-ey-muted uppercase">Matched Log Entries</span>
-              <p className="text-base font-bold text-ey-light">{filteredGranularRows.length} rows</p>
+              <p className="text-base font-bold text-ey-light">{filteredGranularRows.length} entries</p>
             </div>
             <div>
               <span className="text-[10px] text-ey-muted uppercase">Slice Total Spend</span>
