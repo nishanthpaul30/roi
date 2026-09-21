@@ -188,9 +188,6 @@ export function ExecutiveInferenceDrilldownView({
   // Collapsed by default -- this table is a lower-priority warning, not an actionable ledger.
   const [isWarningSectionExpanded, setIsWarningSectionExpanded] = useState(false);
 
-  // Toggle for revealing the Multi-Tool License Overlap user breakdown
-  const [showOverlapUsers, setShowOverlapUsers] = useState(false);
-
   // Listen for Escape key to go back intuitively
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1485,24 +1482,26 @@ export function ExecutiveInferenceDrilldownView({
 
               {/* Rule 1: Reclamation Action Ledger -- dormant (0 usage) seats only, drilled CT/Non-CT -> Service Line -> Employee */}
               <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ey-border/60 pb-3">
-                  <div>
+                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3 border-b border-ey-border/60 pb-3">
+                  <div className="min-w-0">
                     <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
-                      <BadgeDollarSign className="w-4 h-4 text-rose-400" />
+                      <BadgeDollarSign className="w-4 h-4 text-rose-400 shrink-0" />
                       <span>License Reclamation Action Ledger (1-Click Reclamation)</span>
                     </h3>
                     <p className="text-xs text-ey-muted mt-0.5">
-                      Rule 1: only fully dormant seats (0 usage) are reclaimed. Drill down CT / Non-CT &rarr; Country &rarr; Service Line &rarr; Sub-Service Line 1 &rarr; Sub-Service Line 2 &rarr; Users.
+                      Rule 1: only fully dormant seats (0 usage) are reclaimed.
+                      <span className="hidden sm:inline"> Drill down CT / Non-CT &rarr; Country &rarr; Service Line &rarr; Sub-Service Line 1 &rarr; Sub-Service Line 2 &rarr; Users.</span>
+                      <span className="sm:hidden"> Drill down through the org hierarchy to Users.</span>
                     </p>
                   </div>
-                  <div className="flex items-center gap-2.5 self-start sm:self-center">
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs font-mono">
+                  <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs font-mono whitespace-nowrap">
                       <span className="text-ey-muted font-sans font-medium">Savings:</span>
                       <span className="font-bold text-emerald-400">{fmtCost(totalRecoverableAmount)}</span>
                     </div>
                     <button
                       onClick={() => handleTriggerAction(`Automated Reclamation Workflow dispatched to ${reclamationDormantCount} dormant seat${reclamationDormantCount === 1 ? '' : 's'}.`)}
-                      className="px-3 py-1.5 bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 cursor-pointer shrink-0"
+                      className="px-3 py-1.5 bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center space-x-1.5 cursor-pointer whitespace-nowrap"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
                       <span>Reclaim All Dormant Licenses</span>
@@ -1768,18 +1767,12 @@ export function ExecutiveInferenceDrilldownView({
           {/* 3. PARETO 80/20 COST CONCENTRATION DECOMPOSITION */}
           {inferenceId === 'pareto_risk' && (
             <div className="space-y-6">
-              {/* Mandated Hierarchy Navigator — always shown first, at the top, scoped to the top-20% power users' rows */}
-              <HierarchyDrilldownPanel
-                rows={allRows.filter((r) => top20Users.some((u) => u.email === (r.userMail || '').toLowerCase().trim()))}
-                title={`Level 3: Top 20% Power User View (${top20Users.length} Key Accounts)`}
-                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
-              />
-
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
                 <StatTile
                   label="Total Organization Spend"
                   value={fmtCost(totalOrgSpend)}
                   subtitle={`Across ${activeUserList.length} Active Employees`}
+                  tooltip="SUM(Cost) across every active user (Calculation Method = 'Usage' AND GenAI Tool Consumption > 0) this period."
                 />
                 <StatTile
                   label="Top 10% Spend Share"
@@ -1787,6 +1780,7 @@ export function ExecutiveInferenceDrilldownView({
                   valueClassName="text-rose-400"
                   subtitle={`${top10PercentCount} Users (${((top10Spend / totalOrgSpend) * 100).toFixed(1)}% of Budget)`}
                   subtitleClassName="text-rose-300/80"
+                  tooltip="Sort active users by their own total spend, descending. Sum the top 10% of that list (by user count) and divide by Total Organization Spend."
                 />
                 <StatTile
                   label="Top 20% Spend Share"
@@ -1794,6 +1788,7 @@ export function ExecutiveInferenceDrilldownView({
                   valueClassName="text-amber-400"
                   subtitle={`${top20PercentCount} Users (${top20SpendPercent}% of Budget)`}
                   subtitleClassName="text-amber-300/80"
+                  tooltip="Sort active users by their own total spend, descending. Sum the top 20% of that list (by user count) and divide by Total Organization Spend."
                 />
                 <StatTile
                   label="Remaining 80% Pool"
@@ -1801,8 +1796,16 @@ export function ExecutiveInferenceDrilldownView({
                   valueClassName="text-emerald-400"
                   subtitle={`${activeUserList.length - top20PercentCount} Users (${(100 - parseFloat(top20SpendPercent)).toFixed(1)}%)`}
                   subtitleClassName="text-emerald-300/80"
+                  tooltip="Total Organization Spend minus the Top 20% Spend Share -- the remaining spend and user count outside the top 20% of spenders."
                 />
               </div>
+
+              {/* Mandated Hierarchy Navigator, scoped to the top-20% power users' rows */}
+              <HierarchyDrilldownPanel
+                rows={allRows.filter((r) => top20Users.some((u) => u.email === (r.userMail || '').toLowerCase().trim()))}
+                title={`Top 20% Power User View (${top20Users.length} Key Accounts)`}
+                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+              />
             </div>
           )}
 
@@ -1845,32 +1848,15 @@ export function ExecutiveInferenceDrilldownView({
                   </div>
                   {multiToolData.dualToolUsers.length > 0 && (
                     <div className="pt-2">
-                      <button
-                        onClick={() => setShowOverlapUsers(!showOverlapUsers)}
-                        className="flex items-center space-x-2 text-xs font-mono font-bold text-ey-yellow hover:underline transition-all"
-                      >
-                        {showOverlapUsers ? (
-                          <>
-                            <ChevronUp className="w-4 h-4" />
-                            <span>Hide {multiToolData.dualToolUsers.length} Multi-Platform Users</span>
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="w-4 h-4" />
-                            <span>View {multiToolData.dualToolUsers.length} Multi-Platform Users &amp; Spend Breakdown</span>
-                          </>
-                        )}
-                      </button>
-                      {showOverlapUsers && (
-                        <div className="mt-3">
-                          <HierarchyDrilldownPanel
-                            rows={overlapHierarchyRows}
-                            title="Multi-Platform License"
-                            subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
-                            onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
-                          />
-                        </div>
-                      )}
+                      <p className="text-xs font-mono font-bold text-ey-yellow mb-3">
+                        {multiToolData.dualToolUsers.length} Multi-Platform Users &amp; Spend Breakdown
+                      </p>
+                      <HierarchyDrilldownPanel
+                        rows={overlapHierarchyRows}
+                        title="Multi-Platform License"
+                        subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
+                        onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+                      />
                     </div>
                   )}
                 </div>
@@ -1881,21 +1867,14 @@ export function ExecutiveInferenceDrilldownView({
           {/* 6. CLIENT BILLABILITY & PROJECT TELEMETRY ALIGNMENT */}
           {inferenceId === 'project_billability' && (
             <div className="space-y-6">
-              {/* Mandated Hierarchy Navigator — always shown first, at the top */}
-              <HierarchyDrilldownPanel
-                rows={allRows}
-                title="Level 3: Billability & Org"
-                subtitle="Drill CT/Non-CT down to Sub-Service Line 2 to reach the users behind billable and non-billable spend. Engagement-code detail is in the table below."
-                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
-              />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 font-mono text-xs">
                 <StatTile
                   label="Client Billable Spend"
                   value={`${(summary?.billableSpendPercent || 0).toFixed(1)}%`}
                   valueClassName="text-emerald-400"
                   subtitle="Billable Client Engagements"
                   subtitleClassName="text-emerald-300/80"
+                  tooltip="Billable Spend ÷ Total Spend × 100. Billable = Usage rows whose Engagement Code starts with 'E-' (client-billable), summed as a share of all Usage-row cost this period."
                 />
                 <StatTile
                   label="Non-Billable Investment"
@@ -1903,20 +1882,23 @@ export function ExecutiveInferenceDrilldownView({
                   valueClassName="text-cyan-400"
                   subtitle="Internal R&D & Innovation Spend"
                   subtitleClassName="text-cyan-300/80"
+                  tooltip="100% − Client Billable Spend. Engagement Codes with an 'I-' (Internal) prefix, as a share of all Usage-row cost this period."
                 />
                 <StatTile
                   label="Total Engagement Codes"
                   value={projectCodeBreakdown.length}
                   subtitle="Active Work Orders Tracked"
-                />
-                <StatTile
-                  label="Non-Billable Cost Leakage"
-                  value="0.0% Unassigned"
-                  valueClassName="text-emerald-400"
-                  subtitle="100% Code Compliance"
-                  subtitleClassName="text-emerald-300/80"
+                  tooltip="Count of distinct Engagement Codes with at least one Usage row in the selected period."
                 />
               </div>
+
+              {/* Mandated Hierarchy Navigator, scoped to all rows */}
+              <HierarchyDrilldownPanel
+                rows={allRows}
+                title="Billability & Org"
+                subtitle="Drill CT/Non-CT down to Sub-Service Line 2 to reach the users behind billable and non-billable spend. Engagement-code detail is in the table below."
+                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+              />
             </div>
           )}
 
