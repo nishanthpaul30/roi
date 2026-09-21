@@ -106,6 +106,19 @@ function getToolStyle(toolKey: string) {
   return { label: `${shortLabel} Enterprise`, shortLabel, ...FALLBACK_TOOL_STYLE };
 }
 
+// The mandated application-wide hierarchy (same order as HierarchyDrilldownPanel):
+// CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1 -> Sub-Service
+// Line 2 -> Users. Used to drill the License Reclamation Action Ledger down
+// to individual employees with license-specific columns/actions at the end,
+// which the generic HierarchyDrilldownPanel doesn't expose.
+const RECLAMATION_LEVELS: { key: keyof CsvUsageRow; label: string }[] = [
+  { key: 'ctNonCt', label: 'CT / Non-CT' },
+  { key: 'country', label: 'Country' },
+  { key: 'orgServiceLine', label: 'Service Line' },
+  { key: 'subServiceLine1', label: 'Sub-Service Line 1' },
+  { key: 'subServiceLine2', label: 'Sub-Service Line 2' },
+];
+
 export interface InferenceDefinition {
   id: string;
   title: string;
@@ -157,6 +170,10 @@ export function ExecutiveInferenceDrilldownView({
   // Dormant Seats Action Ledger: which Service Line row (if any) is expanded
   // to show its individual dormant employees.
   const [expandedDormantServiceLine, setExpandedDormantServiceLine] = useState<string | null>(null);
+  // License Reclamation Action Ledger: the mandated hierarchy path drilled
+  // into so far (CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1
+  // -> Sub-Service Line 2), empty = top level.
+  const [ledgerPath, setLedgerPath] = useState<{ key: keyof CsvUsageRow; label: string; value: string }[]>([]);
 
   // Level 4 Search, Pagination & Modal Record Inspector State
   const [searchTerm, setSearchTerm] = useState('');
@@ -168,6 +185,8 @@ export function ExecutiveInferenceDrilldownView({
   // Pagination for the License Reclamation "Usage Below Free Limit" warning table
   const [warningPage, setWarningPage] = useState(1);
   const warningPageSize = 10;
+  // Collapsed by default -- this table is a lower-priority warning, not an actionable ledger.
+  const [isWarningSectionExpanded, setIsWarningSectionExpanded] = useState(false);
 
   // Toggle for revealing the Multi-Tool License Overlap user breakdown
   const [showOverlapUsers, setShowOverlapUsers] = useState(false);
@@ -404,14 +423,6 @@ export function ExecutiveInferenceDrilldownView({
     warningPage * warningPageSize
   );
 
-  const reclamationEmailSet = useMemo(
-    () => new Set([...reclamationUsers.map((u) => u.email), ...usageWarningUsers.map((u) => u.email)]),
-    [reclamationUsers, usageWarningUsers]
-  );
-  const reclamationRows = useMemo(
-    () => allRows.filter((r) => reclamationEmailSet.has((r.userMail || '').toLowerCase().trim())),
-    [allRows, reclamationEmailSet]
-  );
   const totalRecoverableAmount = useMemo(() => reclamationUsers.reduce((s, u) => s + u.recoverableAmount, 0), [reclamationUsers]);
   const reclamationDormantCount = reclamationUsers.length;
   const usageWarningCount = usageWarningUsers.length;
@@ -419,17 +430,32 @@ export function ExecutiveInferenceDrilldownView({
   const recoverablePercentOfLicenseCost =
     summary && summary.totalLicenseCost > 0 ? ((totalRecoverableAmount / summary.totalLicenseCost) * 100).toFixed(1) : '0.0';
 
-  const reclamationByServiceLine = useMemo(() => {
-    const map = new Map<string, { serviceLine: string; count: number; recoverableAmount: number }>();
-    for (const u of reclamationUsers) {
-      const serviceLine = emailToRow.get(u.email)?.orgServiceLine || 'General';
-      if (!map.has(serviceLine)) map.set(serviceLine, { serviceLine, count: 0, recoverableAmount: 0 });
-      const entry = map.get(serviceLine)!;
+  // License Reclamation Action Ledger hierarchy: the full mandated hierarchy
+  // (RECLAMATION_LEVELS) drilled down to individual employees, entirely
+  // within the ledger card itself.
+  const ledgerFilteredUsers = useMemo(() => {
+    return reclamationUsers.filter((u) => {
+      const row = emailToRow.get(u.email);
+      return ledgerPath.every((p) => (String(row?.[p.key] ?? '').trim() || 'Unknown') === p.value);
+    });
+  }, [reclamationUsers, emailToRow, ledgerPath]);
+
+  const currentLedgerLevel = RECLAMATION_LEVELS[ledgerPath.length];
+  const isLedgerUserLevel = !currentLedgerLevel;
+
+  const ledgerGroups = useMemo(() => {
+    if (!currentLedgerLevel) return [];
+    const map = new Map<string, { value: string; count: number; recoverableAmount: number }>();
+    for (const u of ledgerFilteredUsers) {
+      const row = emailToRow.get(u.email);
+      const val = String(row?.[currentLedgerLevel.key] ?? '').trim() || 'Unknown';
+      if (!map.has(val)) map.set(val, { value: val, count: 0, recoverableAmount: 0 });
+      const entry = map.get(val)!;
       entry.count += 1;
       entry.recoverableAmount = Number((entry.recoverableAmount + u.recoverableAmount).toFixed(4));
     }
     return Array.from(map.values()).sort((a, b) => b.recoverableAmount - a.recoverableAmount);
-  }, [reclamationUsers, emailToRow]);
+  }, [ledgerFilteredUsers, currentLedgerLevel, emailToRow]);
 
   // Compute Power Users (Pareto Analysis: Top 20%)
   const sortedUsersBySpend = useMemo(() => {
@@ -1457,15 +1483,7 @@ export function ExecutiveInferenceDrilldownView({
                 />
               </div>
 
-              {/* Mandated Hierarchy Navigator, scoped to dormant + below-free-limit seats */}
-              <HierarchyDrilldownPanel
-                rows={reclamationRows}
-                title={`Flagged License View (${reclamationDormantCount + usageWarningCount} Seats)`}
-                subtitle="Drill down through the org structure to the seats below -- dormant (reclaimable) and below-free-limit (warning only) seats."
-                onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
-              />
-
-              {/* Rule 1: Reclamation Action Ledger -- dormant (0 usage) seats only */}
+              {/* Rule 1: Reclamation Action Ledger -- dormant (0 usage) seats only, drilled CT/Non-CT -> Service Line -> Employee */}
               <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ey-border/60 pb-3">
                   <div>
@@ -1474,7 +1492,7 @@ export function ExecutiveInferenceDrilldownView({
                       <span>License Reclamation Action Ledger (1-Click Reclamation)</span>
                     </h3>
                     <p className="text-xs text-ey-muted mt-0.5">
-                      Rule 1: only fully dormant seats (0 usage) are reclaimed, grouped by Service Line.
+                      Rule 1: only fully dormant seats (0 usage) are reclaimed. Drill down CT / Non-CT &rarr; Country &rarr; Service Line &rarr; Sub-Service Line 1 &rarr; Sub-Service Line 2 &rarr; Users.
                     </p>
                   </div>
                   <div className="flex items-center gap-2.5 self-start sm:self-center">
@@ -1492,107 +1510,130 @@ export function ExecutiveInferenceDrilldownView({
                   </div>
                 </div>
 
-                <div className="overflow-x-auto border border-ey-border rounded-xl">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-                      <tr>
-                        <th className="px-4 py-3">Service Line</th>
-                        <th className="px-4 py-3 text-center">Dormant Seats</th>
-                        <th className="px-4 py-3 text-right">Recoverable ($)</th>
-                        <th className="px-4 py-3 text-center">Action Trigger</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-ey-border">
-                      {reclamationByServiceLine.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">No dormant licenses at this time.</td>
-                        </tr>
-                      ) : reclamationByServiceLine.map((sl) => {
-                        const isExpanded = expandedDormantServiceLine === `reclamation:${sl.serviceLine}`;
-                        return (
-                          <React.Fragment key={sl.serviceLine}>
-                            <tr
-                              onClick={() => setExpandedDormantServiceLine(isExpanded ? null : `reclamation:${sl.serviceLine}`)}
-                              className="hover:bg-ey-card-hover/80 transition cursor-pointer"
-                              title={`Click to ${isExpanded ? 'hide' : 'view'} individual dormant seats in ${sl.serviceLine}`}
-                            >
-                              <td className="px-4 py-3 font-medium text-ey-light">
-                                <span className="flex items-center gap-1.5">
-                                  <ChevronRight className={`w-3.5 h-3.5 text-ey-muted transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                                  {sl.serviceLine}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
-                                  {sl.count} seat{sl.count === 1 ? '' : 's'}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-right font-bold text-emerald-400">{fmtCost(sl.recoverableAmount)}</td>
-                              <td className="px-4 py-3 text-center">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleTriggerAction(`${sl.count} dormant license${sl.count === 1 ? '' : 's'} in ${sl.serviceLine} reclaimed and returned to pool.`);
-                                  }}
-                                  className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
-                                >
-                                  Reclaim {sl.count} License{sl.count === 1 ? '' : 's'}
-                                </button>
-                              </td>
-                            </tr>
-                            {isExpanded && (
-                              <tr>
-                                <td colSpan={4} className="p-0 bg-ey-black/40">
-                                  <table className="w-full text-left text-xs font-mono">
-                                    <thead className="text-ey-muted uppercase tracking-wider border-b border-ey-border/60">
-                                      <tr>
-                                        <th className="px-4 py-2 pl-10">Provisioned Employee</th>
-                                        <th className="px-4 py-2 text-right">License Cost</th>
-                                        <th className="px-4 py-2 text-right">Recoverable</th>
-                                        <th className="px-4 py-2 text-center">Action Trigger</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-ey-border/40">
-                                      {reclamationUsers
-                                        .filter((u) => (emailToRow.get(u.email)?.orgServiceLine || 'General') === sl.serviceLine)
-                                        .map((u) => (
-                                          <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
-                                            <td className="px-4 py-2.5 pl-10 font-medium text-ey-light">
-                                              <div>{u.displayName}</div>
-                                              <div className="text-[10px] text-ey-muted">{u.email}</div>
-                                            </td>
-                                            <td className="px-4 py-2.5 text-right">{fmtCost(u.licenseCost)}</td>
-                                            <td className="px-4 py-2.5 text-right font-bold text-emerald-400">{fmtCost(u.recoverableAmount)}</td>
-                                            <td className="px-4 py-2.5 text-center">
-                                              <button
-                                                onClick={() => handleTriggerAction(`License for ${u.displayName} reclaimed and returned to pool.`)}
-                                                className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
-                                              >
-                                                Reclaim License
-                                              </button>
-                                            </td>
-                                          </tr>
-                                        ))}
-                                    </tbody>
-                                  </table>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                {/* Breadcrumb */}
+                <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono">
+                  <button
+                    onClick={() => setLedgerPath([])}
+                    className={`px-2 py-1 rounded-md font-semibold transition ${
+                      ledgerPath.length === 0 ? 'bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/40' : 'text-ey-muted hover:text-ey-light'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {ledgerPath.map((p, idx) => (
+                    <span key={idx} className="flex items-center gap-1.5">
+                      <ChevronRight className="w-3 h-3 text-ey-muted" />
+                      <button
+                        onClick={() => setLedgerPath((prev) => prev.slice(0, idx + 1))}
+                        title={p.label}
+                        className={`px-2 py-1 rounded-md font-semibold transition ${
+                          idx === ledgerPath.length - 1 ? 'bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/40' : 'text-ey-muted hover:text-ey-light'
+                        }`}
+                      >
+                        {p.value}
+                      </button>
+                    </span>
+                  ))}
                 </div>
+
+                {!isLedgerUserLevel ? (
+                  /* Levels 1-5: CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1 -> Sub-Service Line 2 */
+                  <div className="overflow-x-auto border border-ey-border rounded-xl">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
+                        <tr>
+                          <th className="px-4 py-3">{currentLedgerLevel.label}</th>
+                          <th className="px-4 py-3 text-center">Dormant Seats</th>
+                          <th className="px-4 py-3 text-right">Recoverable ($)</th>
+                          <th className="px-4 py-3" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-ey-border">
+                        {ledgerGroups.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">No dormant licenses at this level.</td>
+                          </tr>
+                        ) : ledgerGroups.map((g) => (
+                          <tr
+                            key={g.value}
+                            onClick={() => setLedgerPath((prev) => [...prev, { key: currentLedgerLevel.key, label: currentLedgerLevel.label, value: g.value }])}
+                            className="hover:bg-ey-card-hover/80 transition cursor-pointer"
+                            title={`Click to drill down into ${g.value}`}
+                          >
+                            <td className="px-4 py-3 font-medium text-ey-light">
+                              <span className="flex items-center gap-1.5">
+                                <ChevronRight className="w-3.5 h-3.5 text-ey-muted" />
+                                {g.value}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                                {g.count} seat{g.count === 1 ? '' : 's'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold text-emerald-400">{fmtCost(g.recoverableAmount)}</td>
+                            <td className="px-4 py-3 text-right text-[10px] text-ey-muted">Drill Down &rarr;</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  /* Level 6: Users -- end of the mandated hierarchy */
+                  <div className="overflow-x-auto border border-ey-border rounded-xl">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
+                        <tr>
+                          <th className="px-4 py-3">Provisioned Employee</th>
+                          <th className="px-4 py-3 text-right">License Cost</th>
+                          <th className="px-4 py-3 text-right">Recoverable</th>
+                          <th className="px-4 py-3 text-center">Action Trigger</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-ey-border">
+                        {ledgerFilteredUsers.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">No dormant licenses at this level.</td>
+                          </tr>
+                        ) : ledgerFilteredUsers.map((u) => (
+                          <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
+                            <td className="px-4 py-3 font-medium text-ey-light">
+                              <div>{u.displayName}</div>
+                              <div className="text-[10px] text-ey-muted">{u.email}</div>
+                            </td>
+                            <td className="px-4 py-3 text-right">{fmtCost(u.licenseCost)}</td>
+                            <td className="px-4 py-3 text-right font-bold text-emerald-400">{fmtCost(u.recoverableAmount)}</td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                onClick={() => handleTriggerAction(`License for ${u.displayName} reclaimed and returned to pool.`)}
+                                className="px-2.5 py-1 bg-ey-yellow/10 hover:bg-ey-yellow/20 text-ey-yellow border border-ey-yellow/30 rounded text-[10px] font-bold transition"
+                              >
+                                Reclaim License
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
               {/* Rule 2: Usage-Below-Free-Limit Warning -- flagged only, never reclaimed */}
               <div className="bg-ey-card border border-amber-500/30 rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ey-border/60 pb-3">
+                <div
+                  onClick={() => setIsWarningSectionExpanded((v) => !v)}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ey-border/60 pb-3 cursor-pointer"
+                >
                   <div>
                     <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-amber-400" />
                       <span>Usage Below Free Limit (Warning Only)</span>
+                      {isWarningSectionExpanded ? (
+                        <ChevronUp className="w-4 h-4 text-ey-muted" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-ey-muted" />
+                      )}
                     </h3>
                     <p className="text-xs text-ey-muted mt-0.5">
                       Rule 2: these seats are active but consuming less than their included free limit. No reclamation action is taken -- shown as a warning only.
@@ -1611,69 +1652,73 @@ export function ExecutiveInferenceDrilldownView({
                   </div>
                 </div>
 
-                <div className="overflow-x-auto border border-ey-border rounded-xl">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
-                      <tr>
-                        <th className="px-4 py-3">Employee</th>
-                        <th className="px-4 py-3 text-right">Usage Cost</th>
-                        <th className="px-4 py-3 text-right">Free Limit</th>
-                        <th className="px-4 py-3 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-ey-border">
-                      {paginatedWarningUsers.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">No seats currently under their free limit.</td>
-                        </tr>
-                      ) : paginatedWarningUsers.map((u) => (
-                        <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
-                          <td className="px-4 py-3 font-medium text-ey-light">
-                            <div>{u.displayName}</div>
-                            <div className="text-[10px] text-ey-muted">{u.email}</div>
-                          </td>
-                          <td className="px-4 py-3 text-right">{fmtCost(u.actualCost)}</td>
-                          <td className="px-4 py-3 text-right text-ey-muted">{fmtCost(u.usageFreeTokenLimit)}</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                              <AlertTriangle className="w-3 h-3" />
-                              Warning
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                {isWarningSectionExpanded && (
+                  <>
+                    <div className="overflow-x-auto border border-ey-border rounded-xl">
+                      <table className="w-full text-left text-xs font-mono">
+                        <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
+                          <tr>
+                            <th className="px-4 py-3">Employee</th>
+                            <th className="px-4 py-3 text-right">Usage Cost</th>
+                            <th className="px-4 py-3 text-right">Free Limit</th>
+                            <th className="px-4 py-3 text-center">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-ey-border">
+                          {paginatedWarningUsers.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">No seats currently under their free limit.</td>
+                            </tr>
+                          ) : paginatedWarningUsers.map((u) => (
+                            <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
+                              <td className="px-4 py-3 font-medium text-ey-light">
+                                <div>{u.displayName}</div>
+                                <div className="text-[10px] text-ey-muted">{u.email}</div>
+                              </td>
+                              <td className="px-4 py-3 text-right">{fmtCost(u.actualCost)}</td>
+                              <td className="px-4 py-3 text-right text-ey-muted">{fmtCost(u.usageFreeTokenLimit)}</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Warning
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
 
-                {/* Pagination */}
-                {warningTotalPages > 1 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-ey-muted font-mono">
-                    <div>
-                      Showing {(warningPage - 1) * warningPageSize + 1} to{' '}
-                      {Math.min(warningPage * warningPageSize, usageWarningUsers.length)} of{' '}
-                      {usageWarningUsers.length} seats
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => setWarningPage((p) => Math.max(1, p - 1))}
-                        disabled={warningPage === 1}
-                        className="px-3 py-1 bg-ey-black border border-ey-border rounded-lg hover:bg-ey-card-hover disabled:opacity-40"
-                      >
-                        Previous
-                      </button>
-                      <span>
-                        Page {warningPage} of {warningTotalPages}
-                      </span>
-                      <button
-                        onClick={() => setWarningPage((p) => Math.min(warningTotalPages, p + 1))}
-                        disabled={warningPage === warningTotalPages}
-                        className="px-3 py-1 bg-ey-black border border-ey-border rounded-lg hover:bg-ey-card-hover disabled:opacity-40"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
+                    {/* Pagination */}
+                    {warningTotalPages > 1 && (
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-ey-muted font-mono">
+                        <div>
+                          Showing {(warningPage - 1) * warningPageSize + 1} to{' '}
+                          {Math.min(warningPage * warningPageSize, usageWarningUsers.length)} of{' '}
+                          {usageWarningUsers.length} seats
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => setWarningPage((p) => Math.max(1, p - 1))}
+                            disabled={warningPage === 1}
+                            className="px-3 py-1 bg-ey-black border border-ey-border rounded-lg hover:bg-ey-card-hover disabled:opacity-40"
+                          >
+                            Previous
+                          </button>
+                          <span>
+                            Page {warningPage} of {warningTotalPages}
+                          </span>
+                          <button
+                            onClick={() => setWarningPage((p) => Math.min(warningTotalPages, p + 1))}
+                            disabled={warningPage === warningTotalPages}
+                            className="px-3 py-1 bg-ey-black border border-ey-border rounded-lg hover:bg-ey-card-hover disabled:opacity-40"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
