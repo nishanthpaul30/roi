@@ -485,6 +485,25 @@ export async function calculateTokenCostSummary(
   const prevCapacity = computeCapacityAggregates(previousRows, hardCeiling, toolFreeLimits);
   const prevTotalCostForCapacity = previousUsageRows.reduce((s, r) => s + r.cost, 0);
 
+  // License Reclamation "Dormant Seats": distinct users holding a real
+  // License Cost who also appear in a Usage row with GenAI Tool Consumption
+  // = 0 -- the same literal per-row rule as inactiveUserCount/Unutilized
+  // Licenses (countZeroConsumptionUsers), not userCapacityBreakdown's
+  // aggregate Usage-token SUM = 0 (which also matches users with no Usage
+  // row at all, over-counting seats that were simply never tracked as Usage).
+  const zeroConsumptionUsageEmails = new Set(
+    currentRows
+      .filter(r => r.calculationMethod === 'Usage' && r.tokenConsumption === 0)
+      .map(r => r.userMail.toLowerCase())
+  );
+  const dormantLicenseSeats = userCapacityBreakdown.filter(
+    u => u.licenseCost > 0 && zeroConsumptionUsageEmails.has(u.userMail.toLowerCase())
+  );
+  const dormantLicenseSeatCount = dormantLicenseSeats.length;
+  const dormantLicenseRecoverableCost = Number(
+    dormantLicenseSeats.reduce((s, u) => s + u.licenseCost, 0).toFixed(2)
+  );
+
   // totalUsageLimitsSum is a per-user MONTHLY free-dollar capacity figure
   // (see the comment on usageFreeTokenLimit above), while totalCost spans
   // every month in the selected range — so the capacity side must be scaled
@@ -664,6 +683,8 @@ export async function calculateTokenCostSummary(
     activeUserCount,
     inactiveUserCount,
     prevInactiveUserCount,
+    dormantLicenseSeatCount,
+    dormantLicenseRecoverableCost,
     highSpendUserCount,
     prevHighSpendUserCount,
   };
