@@ -67,20 +67,30 @@ export function UserThresholdDrilldownView({
     let result: UserHierarchyRow[];
 
     if (criteria === 'zero_consumption') {
-      // Row-level qualification: each zero-consumption Usage row already
-      // carries its own hierarchy context, so a user with two such rows
-      // under two different engagements legitimately appears twice below —
-      // once per place it happened.
-      const seenUserLeaf = new Set<string>();
-      result = [];
+      // User-level qualification: total GenAI Tool Consumption across every
+      // Usage row in the period is zero -- including users with no Usage
+      // row at all -- matching summary.inactiveUserCount's roster-gap
+      // definition (Total Roster minus Active Licenses), not a per-row
+      // check that would also catch a user who was active in one month and
+      // idle in another (they'd wrongly appear here too).
+      const totalsByUser = new Map<string, { displayName: string; tokenConsumption: number; cost: number }>();
+      const leafByUser = new Map<string, (typeof allRows)[number]>();
       for (const r of allRows) {
-        if (r.calculationMethod !== 'Usage' || r.tokenConsumption !== 0) continue;
         const email = (r.userMail || '').toLowerCase().trim();
         if (!email) continue;
-        const leafKey = `${email}|${r.ctNonCt}|${r.orgServiceLine}|${r.subServiceLine1}|${r.subServiceLine2}|${r.projectCode}`;
-        if (seenUserLeaf.has(leafKey)) continue;
-        seenUserLeaf.add(leafKey);
-        result.push(toRow(r, r.displayName || email, 0, r.cost));
+        if (!totalsByUser.has(email)) totalsByUser.set(email, { displayName: r.displayName || email, tokenConsumption: 0, cost: 0 });
+        if (!leafByUser.has(email)) leafByUser.set(email, r);
+        if (r.calculationMethod === 'Usage') {
+          const t = totalsByUser.get(email)!;
+          t.tokenConsumption += r.tokenConsumption;
+          t.cost += r.cost;
+        }
+      }
+      result = [];
+      for (const [email, totals] of totalsByUser.entries()) {
+        if (totals.tokenConsumption !== 0) continue;
+        const leaf = leafByUser.get(email)!;
+        result.push(toRow(leaf, totals.displayName, 0, totals.cost));
       }
     } else {
       // User-level qualification (total cost > threshold across the whole

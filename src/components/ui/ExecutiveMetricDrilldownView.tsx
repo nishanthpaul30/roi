@@ -615,7 +615,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
               {/* Roster Summary */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
                 <StatTile
-                  label="Active Users"
+                  label="Active Licenses"
                   value={summaryData?.activeUserCount ?? 0}
                   valueClassName="text-emerald-400"
                   subtitle="Recorded at least 1 token of usage"
@@ -626,7 +626,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
                   value={summaryData?.inactiveUserCount ?? 0}
                   valueClassName="text-amber-400"
                   subtitle="Provisioned, zero usage this period"
-                  tooltip="Filter Calculation Method = 'Usage' AND GenAI Tool Consumption = 0. Count of distinct users — provisioned seats with zero recorded consumption."
+                  tooltip="Total Roster minus Active Licenses. Count of distinct users with zero total GenAI Tool Consumption across every Usage entry in the selected period — provisioned seats that never recorded any real usage."
                 />
                 <StatTile
                   label="Total Roster"

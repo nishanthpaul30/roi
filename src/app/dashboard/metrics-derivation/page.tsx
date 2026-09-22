@@ -328,12 +328,12 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
   },
   {
     name: 'Zero-Consumption Users',
-    csvField: 'tokenConsumption (Calculation Method = "Usage" rows only)',
-    formula: 'COUNT(DISTINCT userMail) where any Usage row has tokenConsumption = 0',
-    sampleInput: 'Usage rows with a recorded GenAI Tool Consumption of exactly 0',
-    workedCalculation: 'Distinct users with at least one such row (a user active in one month and idle in another still counts)',
+    csvField: 'tokenConsumption (Calculation Method = "Usage" rows), userMail (all rows)',
+    formula: 'Total Roster − Active Licenses, i.e. COUNT(DISTINCT userMail) whose SUM(tokenConsumption) over all their Usage rows in the period is 0 (including users with no Usage row at all)',
+    sampleInput: 'Every user in the filtered period, summed Usage-row consumption per user',
+    workedCalculation: 'Filter to users whose period-wide total is exactly 0 — a user active in one month and idle in another does NOT count, since their total is positive',
     derivedOutput: '25 users',
-    notes: 'Row-level qualification, not a user-total check: a user whose overall consumption sums to a positive number can still count here if any single month recorded 0. Powers the ROI page "Zero-Consumption Users" KPI card and its drilldown table',
+    notes: 'User-level aggregate qualification, matching inactiveUserCount everywhere else in the app (Total AI Investment card, License Reclamation Dormant Seats). Powers the ROI page "Zero-Consumption Users" KPI card and its drilldown table',
     category: 'Governance',
   },
   {
@@ -343,7 +343,7 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     sampleInput: '399 active users, Usage-row cost summed per user across the whole period',
     workedCalculation: 'Filter to users whose total exceeds the $100 threshold',
     derivedOutput: '14 users',
-    notes: 'User-level aggregate qualification (unlike Zero-Consumption Users\' row-level check) — the whole period\'s cost must exceed the threshold, not any single row. Powers the ROI page "High-Spend Users" KPI card and its drilldown table',
+    notes: 'User-level aggregate qualification (same style as Zero-Consumption Users) — the whole period\'s cost must exceed the threshold, not any single row. Powers the ROI page "High-Spend Users" KPI card and its drilldown table',
     category: 'Governance',
   },
   {

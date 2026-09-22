@@ -181,13 +181,13 @@ export default function RoiPage() {
                   previousDataAvailable,
                 }}
                 unit="users"
-                description="Distinct users with 0 GenAI Tool Consumption on a Usage entry this period. Click to see the full list."
+                description="Total Roster minus Active Licenses. Distinct users with 0 total GenAI Tool Consumption across the entire period. Click to see the full list."
                 meta={`of ${summary.totalRosterUserCount} roster users`}
                 onClick={() =>
                   setSimpleDrilldown({
                     criteria: 'zero_consumption',
                     title: 'Zero-Consumption Users',
-                    subtitle: 'Users with 0 GenAI Tool Consumption on a Usage row this period.',
+                    subtitle: 'Users with 0 total GenAI Tool Consumption across the entire selected period.',
                     badge: 'Zero Consumption',
                   })
                 }

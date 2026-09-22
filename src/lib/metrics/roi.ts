@@ -26,14 +26,20 @@ function groupBy<T>(rows: T[], key: (r: T) => string): Map<string, T[]> {
   return m;
 }
 
-// Distinct users who appear in a Usage row but recorded 0 GenAI Tool
-// Consumption — a provisioned/tracked seat with literally no usage.
+// Distinct users who consumed zero tokens across the ENTIRE selected period
+// -- every provisioned user minus every user with at least one Usage row
+// recording real consumption. Deliberately roster-based (not "has a single
+// Usage row equal to 0"), so selecting a wider range like "All Months" still
+// only counts someone here if they truly never touched the tool in any of
+// those months, and Active + Unutilized always sums to the full roster.
 function countZeroConsumptionUsers(rows: CsvUsageRow[]): number {
-  return new Set(
+  const allUsers = new Set(rows.map((r) => r.userMail.toLowerCase()));
+  const activeUsers = new Set(
     rows
-      .filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption === 0)
+      .filter((r) => r.calculationMethod === 'Usage' && r.tokenConsumption > 0)
       .map((r) => r.userMail.toLowerCase())
-  ).size;
+  );
+  return Math.max(0, allUsers.size - activeUsers.size);
 }
 
 // Distinct users whose summed Usage-row cost exceeds a dollar threshold.
@@ -487,17 +493,21 @@ export async function calculateTokenCostSummary(
 
   // License Reclamation "Dormant Seats": the exact same population as
   // inactiveUserCount/Unutilized Licenses (countZeroConsumptionUsers) --
-  // distinct users appearing in a Usage row with GenAI Tool Consumption = 0
-  // -- so this count never drifts from that figure elsewhere on the app
-  // (e.g. the Total AI Investment card's own "N inactive users" meta).
-  // Deliberately NOT additionally filtered by licenseCost > 0: doing so
-  // dropped users whose License Cost happened to compute to 0 in a narrower
-  // filtered period, silently under-counting dormant seats relative to
-  // inactiveUserCount for the same filters.
-  const zeroConsumptionUsageEmails = new Set(
+  // every user in the period minus every user with at least one Usage row
+  // recording real consumption -- so this count never drifts from that
+  // figure elsewhere on the app (e.g. the Total AI Investment card's own
+  // "N inactive users" meta). Deliberately NOT additionally filtered by
+  // licenseCost > 0: doing so dropped users whose License Cost happened to
+  // compute to 0 in a narrower filtered period, silently under-counting
+  // dormant seats relative to inactiveUserCount for the same filters.
+  const allUsageEmails = new Set(currentRows.map(r => r.userMail.toLowerCase()));
+  const activeUsageEmails = new Set(
     currentRows
-      .filter(r => r.calculationMethod === 'Usage' && r.tokenConsumption === 0)
+      .filter(r => r.calculationMethod === 'Usage' && r.tokenConsumption > 0)
       .map(r => r.userMail.toLowerCase())
+  );
+  const zeroConsumptionUsageEmails = new Set(
+    Array.from(allUsageEmails).filter(email => !activeUsageEmails.has(email))
   );
   const dormantLicenseSeats = userCapacityBreakdown.filter(
     u => zeroConsumptionUsageEmails.has(u.userMail.toLowerCase())

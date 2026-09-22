@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useMetricsData } from '@/hooks/useMetricsData';
 import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { KpiCard } from '@/components/ui/KpiCard';
@@ -15,7 +15,12 @@ import { UserCapacityRow } from '@/lib/metrics/types';
 
 export default function ExecutiveOverviewPage() {
   const { filters, setFilters, data, loading } = useMetricsData();
-  const [activeDrilldown, setActiveDrilldown] = useState<DrilldownMetricData | null>(null);
+  // Only the metric id is kept in state -- the rest of the drilldown payload
+  // (currentValue, delta, series, summaryData) is re-derived live from `data`
+  // on every render below, so changing the month/tool/etc. filters while a
+  // drilldown is open actually updates it instead of showing a stale
+  // snapshot captured at the moment it was clicked open.
+  const [activeDrilldownId, setActiveDrilldownId] = useState<DrilldownMetricData['id'] | null>(null);
   const [activeInferenceDrilldown, setActiveInferenceDrilldown] = useState<string | null>(null);
   const [inferenceInitialEntity, setInferenceInitialEntity] = useState<{
     type: 'user' | 'tool' | 'region' | 'country' | 'service_line' | 'project_code' | 'cohort' | 'month';
@@ -26,12 +31,12 @@ export default function ExecutiveOverviewPage() {
   // Save scroll position before entering drilldown so we can restore it on return
   const savedScrollY = useRef<number>(0);
 
-  const isDrilldownActive = !!(activeInferenceDrilldown || activeDrilldown);
+  const isDrilldownActive = !!(activeInferenceDrilldown || activeDrilldownId);
 
   const handleBackToOverview = () => {
     setActiveInferenceDrilldown(null);
     setInferenceInitialEntity(null);
-    setActiveDrilldown(null);
+    setActiveDrilldownId(null);
     // Restore scroll in the next paint — the overview div is already mounted,
     // so it's available immediately, no layout recalculation needed.
     requestAnimationFrame(() => {
@@ -43,26 +48,9 @@ export default function ExecutiveOverviewPage() {
     window.location.href = `/api/metrics/export?type=daily&startDate=${filters.startDate}&endDate=${filters.endDate}`;
   };
 
-  const openDrilldown = (
-    id: DrilldownMetricData['id'],
-    title: string,
-    subtitle: string,
-    currentValue: string,
-    delta: any,
-    series: { date: string; value: number }[]
-  ) => {
+  const openDrilldown = (id: DrilldownMetricData['id']) => {
     savedScrollY.current = window.scrollY;
-    setActiveDrilldown({
-      id,
-      title,
-      subtitle,
-      currentValue,
-      deltaText: delta?.percentageDelta ? `${delta.percentageDelta > 0 ? '+' : ''}${delta.percentageDelta}%` : '0%',
-      trend: delta?.trend || 'neutral',
-      series: series || [],
-      summaryData: data?.tokenCostSummary,
-    });
-
+    setActiveDrilldownId(id);
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
@@ -85,6 +73,74 @@ export default function ExecutiveOverviewPage() {
     const avgLicensesPerActiveUser = activeBreakdown.length > 0 ? usedLicenses / activeBreakdown.length : 0;
     return `Out of ${s.totalRosterUserCount} number of resources where ${totalLicenses} AI license of various sort are present, however only ${s.activeUserCount} members are actively using it each possess ${avgLicensesPerActiveUser.toFixed(1)} licenses and there are ${s.inactiveUserCount} dormant licenses.`;
   })();
+
+  // Rebuilds the full drilldown payload from whatever `data` currently is,
+  // keyed only by which card was clicked -- recomputed every render, so it
+  // always reflects the current filters instead of the snapshot taken at
+  // the moment the drilldown was opened.
+  const activeDrilldown: DrilldownMetricData | null = useMemo(() => {
+    if (!activeDrilldownId || !data) return null;
+    const toDeltaText = (delta: any) =>
+      delta?.percentageDelta ? `${delta.percentageDelta > 0 ? '+' : ''}${delta.percentageDelta}%` : '0%';
+    const summaryData = data.tokenCostSummary;
+
+    switch (activeDrilldownId) {
+      case 'ai_adoption': {
+        const delta = data.metrics.aiAdoptionRate.summary;
+        return {
+          id: 'ai_adoption',
+          title: 'AI Adoption',
+          subtitle: 'Active vs dormant licence adoption, and per-tool adoption share & wastage',
+          currentValue: `${(delta.current || 0).toFixed(1)}%`,
+          deltaText: toDeltaText(delta),
+          trend: delta?.trend || 'neutral',
+          series: data.metrics.aiAdoptionRate.series || [],
+          summaryData,
+        };
+      }
+      case 'total_investment': {
+        const delta = data.metrics.cost.summary;
+        return {
+          id: 'total_investment',
+          title: 'Total AI Investment',
+          subtitle: licenseAdoptionSubtitle,
+          currentValue: formatCompactCurrency(delta.current || 0),
+          deltaText: toDeltaText(delta),
+          trend: delta?.trend || 'neutral',
+          series: data.metrics.cost.series || [],
+          summaryData,
+        };
+      }
+      case 'avg_monthly_cost': {
+        const delta = data.metrics.avgMonthlyCost.summary;
+        return {
+          id: 'avg_monthly_cost',
+          title: 'Avg Monthly AI Cost',
+          subtitle: 'Monthly spending volatility and active calendar month run-rate analysis',
+          currentValue: `${formatCompactCurrency(delta.current || 0)} / month`,
+          deltaText: toDeltaText(delta),
+          trend: delta?.trend || 'neutral',
+          series: data.metrics.avgMonthlyCost.series || [],
+          summaryData,
+        };
+      }
+      case 'cost_per_user': {
+        const delta = data.metrics.costPerActiveUser?.summary;
+        return {
+          id: 'cost_per_user',
+          title: 'Cost per Active User',
+          subtitle: 'Per-user license expenditure and developer adoption rankings',
+          currentValue: `${formatCompactCurrency(delta?.current || 0)} / user`,
+          deltaText: toDeltaText(delta),
+          trend: delta?.trend || 'neutral',
+          series: data.metrics.cost.series || [],
+          summaryData,
+        };
+      }
+      default:
+        return null;
+    }
+  }, [activeDrilldownId, data, licenseAdoptionSubtitle]);
 
   return (
     <div className="flex-1 flex flex-col">
@@ -168,16 +224,7 @@ export default function ExecutiveOverviewPage() {
                   description="Active users ÷ total licensed roster × 100."
                   comparisonLabel="vs prev period"
                   meta={`${data.tokenCostSummary?.activeUserCount ?? 0} of ${data.tokenCostSummary?.totalRosterUserCount ?? 0} resources · ${data.tokenCostSummary?.byAiTool?.length ?? 0} tools`}
-                  onClick={() =>
-                    openDrilldown(
-                      'ai_adoption',
-                      'AI Adoption',
-                      'Active vs dormant licence adoption, and per-tool adoption share & wastage',
-                      `${(data.metrics.aiAdoptionRate.summary.current || 0).toFixed(1)}%`,
-                      data.metrics.aiAdoptionRate.summary,
-                      data.metrics.aiAdoptionRate.series
-                    )
-                  }
+                  onClick={() => openDrilldown('ai_adoption')}
                 />
 
                 <KpiCard
@@ -187,16 +234,7 @@ export default function ExecutiveOverviewPage() {
                   description="Usage Cost + License Cost, summed across all entries in the period."
                   comparisonLabel="vs prev period"
                   meta={`${data.tokenCostSummary?.activeUserCount ?? 0} active users · ${data.tokenCostSummary?.inactiveUserCount ?? 0} inactive users`}
-                  onClick={() =>
-                    openDrilldown(
-                      'total_investment',
-                      'Total AI Investment',
-                      licenseAdoptionSubtitle,
-                      formatCompactCurrency(data.metrics.cost.summary.current || 0),
-                      data.metrics.cost.summary,
-                      data.metrics.cost.series
-                    )
-                  }
+                  onClick={() => openDrilldown('total_investment')}
                 />
 
                 <KpiCard
@@ -206,16 +244,7 @@ export default function ExecutiveOverviewPage() {
                   description="Total spend per calendar month, averaged across months in the period."
                   comparisonLabel="vs prev period"
                   meta={`${data.tokenCostSummary?.monthlyTrend?.length ?? 0} months tracked · ${formatCompactCurrency(data.metrics.cost.summary.current || 0)} total AI cost`}
-                  onClick={() =>
-                    openDrilldown(
-                      'avg_monthly_cost',
-                      'Avg Monthly AI Cost',
-                      'Monthly spending volatility and active calendar month run-rate analysis',
-                      `${formatCompactCurrency(data.metrics.avgMonthlyCost.summary.current || 0)} / month`,
-                      data.metrics.avgMonthlyCost.summary,
-                      data.metrics.avgMonthlyCost.series
-                    )
-                  }
+                  onClick={() => openDrilldown('avg_monthly_cost')}
                 />
 
                 <KpiCard
@@ -225,16 +254,7 @@ export default function ExecutiveOverviewPage() {
                   description="Total spend ÷ number of active users (users with usage > 0)."
                   comparisonLabel="vs prev period"
                   meta={`${data.tokenCostSummary?.activeUserCount ?? 0} active users · Across ${data.tokenCostSummary?.byServiceLine?.length ?? 0} service lines`}
-                  onClick={() =>
-                    openDrilldown(
-                      'cost_per_user',
-                      'Cost per Active User',
-                      'Per-user license expenditure and developer adoption rankings',
-                      `${formatCompactCurrency(data.metrics.costPerActiveUser?.summary?.current || 0)} / user`,
-                      data.metrics.costPerActiveUser?.summary,
-                      data.metrics.cost.series
-                    )
-                  }
+                  onClick={() => openDrilldown('cost_per_user')}
                 />
               </div>
 

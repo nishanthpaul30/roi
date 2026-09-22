@@ -296,17 +296,11 @@ export function ExecutiveInferenceDrilldownView({
     () => allRows.filter((r) => periodActiveEmails.size === 0 || periodActiveEmails.has((r.userMail || '').toLowerCase().trim())),
     [allRows, periodActiveEmails]
   );
-  // Unutilized Licenses: distinct users who have a Usage row with GenAI Tool Consumption = 0
-  // in the current filtered period (provisioned seat, zero recorded consumption).
-  const inactiveUserCount = useMemo(() => {
-    const unutilizedEmails = new Set<string>();
-    for (const r of allRows) {
-      if (r.calculationMethod === 'Usage' && r.tokenConsumption === 0) {
-        unutilizedEmails.add((r.userMail || '').toLowerCase().trim());
-      }
-    }
-    return unutilizedEmails.size;
-  }, [allRows]);
+  // Unutilized Licenses: Total Roster minus Active Licenses -- users who
+  // consumed zero tokens across the entire current filtered period, not just
+  // "has a single Usage row equal to 0" (which would double-count users who
+  // were active in one month and idle in another).
+  const inactiveUserCount = Math.max(0, totalRosterSeats - activeUserCount);
   const activeSeatPercent = totalRosterSeats > 0 ? ((activeUserCount / totalRosterSeats) * 100).toFixed(1) : '0.0';
   const avgLicenseCostPerSeat = summary && activeUserCount > 0 ? summary.totalLicenseCost / activeUserCount : 100;
   const inactiveLeakageCost = Math.round(inactiveUserCount * avgLicenseCostPerSeat);
@@ -366,18 +360,27 @@ export function ExecutiveInferenceDrilldownView({
     return map;
   }, [allRows]);
 
-  // Literal per-row rule (Calculation Method = 'Usage' AND GenAI Tool
-  // Consumption = 0), matching summary.dormantLicenseSeatCount computed
-  // server-side in roi.ts -- not userCapacityBreakdown's aggregate
-  // Usage-token SUM = 0, which also (incorrectly) matches users with no
-  // Usage row at all.
+  // Users who consumed zero tokens across the entire selected period --
+  // every user in the period minus every user with a Usage row recording
+  // real consumption -- matching summary.dormantLicenseSeatCount /
+  // inactiveUserCount computed server-side in roi.ts. Deliberately
+  // roster-based rather than "has a single Usage row equal to 0", so a
+  // wider range like "All Months" only counts someone here if they truly
+  // never touched the tool in any of those months.
   const zeroConsumptionUsageEmails = useMemo(() => {
-    const set = new Set<string>();
+    const allEmails = new Set<string>();
+    const activeEmails = new Set<string>();
     for (const r of allRows) {
-      if (r.calculationMethod === 'Usage' && r.tokenConsumption === 0) {
-        const email = (r.userMail || '').toLowerCase().trim();
-        if (email) set.add(email);
+      const email = (r.userMail || '').toLowerCase().trim();
+      if (!email) continue;
+      allEmails.add(email);
+      if (r.calculationMethod === 'Usage' && r.tokenConsumption > 0) {
+        activeEmails.add(email);
       }
+    }
+    const set = new Set<string>();
+    for (const email of allEmails) {
+      if (!activeEmails.has(email)) set.add(email);
     }
     return set;
   }, [allRows]);
@@ -1317,7 +1320,7 @@ export function ExecutiveInferenceDrilldownView({
                   valueClassName="text-rose-400"
                   subtitle="No Usage activity recorded"
                   subtitleClassName="text-rose-300/80"
-                  tooltip="Filter Calculation Method = 'Usage' AND GenAI Tool Consumption = 0. Count of distinct users — provisioned seats with zero recorded consumption."
+                  tooltip="Total Provisioned Licenses minus Active Engaged Licenses. Count of distinct users with zero total GenAI Tool Consumption across every Usage entry in the selected period."
                 />
                 <StatTile
                   label="Annualized License Leakage"
@@ -1468,7 +1471,7 @@ export function ExecutiveInferenceDrilldownView({
                   valueClassName="text-rose-400"
                   subtitle={`${reclamationDormantCount} Seats (${recoverablePercentOfLicenseCost}% of total)`}
                   subtitleClassName="text-rose-300/80"
-                  tooltip="Filter Calculation Method = 'Usage' AND GenAI Tool Consumption = 0, restricted to users with a real License Cost > 0. Sum of License Cost across those confirmed dormant seats -- reclaimed under Rule 1."
+                  tooltip="Users with zero total GenAI Tool Consumption across every Usage entry in the selected period (same population as Unutilized Licenses). Sum of License Cost across those confirmed dormant seats -- reclaimed under Rule 1."
                 />
                 <StatTile
                   label="Below Free Limit (Warning)"
