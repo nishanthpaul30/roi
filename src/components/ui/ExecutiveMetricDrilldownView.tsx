@@ -228,7 +228,10 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
   );
 
   const byTool = summaryData?.byAiTool || [];
-  const byCtNonCt = summaryData?.byCtNonCt || [];
+  // Only the two real CT / Non-CT values are ever shown here -- any stray
+  // "Unclassified" bucket (rows with a blank CT/Non-CT column) is dropped
+  // rather than rendered as a third tile.
+  const byCtNonCt = (summaryData?.byCtNonCt || []).filter((c: any) => c.ctNonCt === 'CT' || c.ctNonCt === 'Non-CT');
   const byRegion = summaryData?.byManagementRegion || [];
   const byServiceLine = summaryData?.byServiceLine || [];
   const topUsers = summaryData?.topUsers || [];
@@ -728,7 +731,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
                             <span>{toolLabel(t.tool)}</span>
                             <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </td>
-                          <td className="py-2.5 pr-3 text-right text-ey-muted">{t.licenseHolderCount}</td>
+                          <td className="py-2.5 pr-3 text-right text-ey-muted">{t.licenseHolderCount || t.userCount}</td>
                           <td className="py-2.5 pr-3 text-right text-ey-light">{t.userCount}</td>
                           <td className="py-2.5 pr-3 text-right text-emerald-400 font-bold">{t.adoptionSharePercent}%</td>
                           <td className="py-2.5 pr-3 text-right text-amber-400 font-bold">{t.wastagePercent}%</td>
