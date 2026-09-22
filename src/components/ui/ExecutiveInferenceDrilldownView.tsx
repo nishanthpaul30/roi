@@ -170,6 +170,7 @@ export function ExecutiveInferenceDrilldownView({
   // Dormant Seats Action Ledger: which Service Line row (if any) is expanded
   // to show its individual dormant employees.
   const [expandedDormantServiceLine, setExpandedDormantServiceLine] = useState<string | null>(null);
+  const [dormantEmployeeSearch, setDormantEmployeeSearch] = useState('');
   // License Reclamation Action Ledger: the mandated hierarchy path drilled
   // into so far (CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1
   // -> Sub-Service Line 2), empty = top level.
@@ -1392,7 +1393,10 @@ export function ExecutiveInferenceDrilldownView({
                         return (
                           <React.Fragment key={sl.serviceLine}>
                             <tr
-                              onClick={() => setExpandedDormantServiceLine(isExpanded ? null : sl.serviceLine)}
+                              onClick={() => {
+                                setExpandedDormantServiceLine(isExpanded ? null : sl.serviceLine);
+                                setDormantEmployeeSearch('');
+                              }}
                               className="hover:bg-ey-card-hover/80 transition cursor-pointer"
                               title={`Click to ${isExpanded ? 'hide' : 'view'} individual dormant licenses in ${sl.serviceLine}`}
                             >
@@ -1422,7 +1426,19 @@ export function ExecutiveInferenceDrilldownView({
                             </tr>
                             {isExpanded && (
                               <tr>
-                                <td colSpan={4} className="p-0 bg-ey-black/40">
+                                <td colSpan={4} className="p-3 bg-ey-black/40">
+                                  <div className="flex justify-end mb-2">
+                                    <div className="relative max-w-xs w-full sm:w-64">
+                                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ey-muted pointer-events-none" />
+                                      <input
+                                        type="text"
+                                        value={dormantEmployeeSearch}
+                                        onChange={(e) => setDormantEmployeeSearch(e.target.value)}
+                                        placeholder="Search by name or email..."
+                                        className="w-full pl-8 pr-3 py-2 text-xs bg-ey-black border border-ey-border rounded-lg text-ey-light placeholder-ey-muted focus:outline-none focus:border-ey-yellow/50 transition"
+                                      />
+                                    </div>
+                                  </div>
                                   <table className="w-full text-left text-xs font-mono">
                                     <thead className="text-ey-muted uppercase tracking-wider border-b border-ey-border/60">
                                       <tr>
@@ -1434,7 +1450,14 @@ export function ExecutiveInferenceDrilldownView({
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-ey-border/40">
-                                      {dormantUsers.filter((u) => u.serviceLine === sl.serviceLine).map((u) => (
+                                      {dormantUsers
+                                        .filter((u) => u.serviceLine === sl.serviceLine)
+                                        .filter((u) => {
+                                          const term = dormantEmployeeSearch.trim().toLowerCase();
+                                          if (!term) return true;
+                                          return u.name.toLowerCase().includes(term) || u.email.toLowerCase().includes(term);
+                                        })
+                                        .map((u) => (
                                         <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
                                           <td className="px-4 py-2.5 pl-10 font-medium text-ey-light">
                                             <div>{u.name}</div>
@@ -1488,7 +1511,7 @@ export function ExecutiveInferenceDrilldownView({
                   valueClassName="text-rose-400"
                   subtitle={`${reclamationDormantCount} Seats (${recoverablePercentOfLicenseCost}% of total)`}
                   subtitleClassName="text-rose-300/80"
-                  tooltip="Users with zero total GenAI Tool Consumption across every Usage entry in the selected period (same population as Unutilized Licenses). Sum of License Cost across those confirmed dormant seats -- reclaimed under Rule 1."
+                  tooltip="Users with zero total GenAI Tool Consumption across every Usage entry in the selected period (same population as Unutilized Licenses). Sum of License Cost across those confirmed dormant seats."
                 />
                 <StatTile
                   label="Below Free Limit (Warning)"

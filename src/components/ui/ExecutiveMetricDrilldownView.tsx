@@ -2,6 +2,16 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
+} from 'recharts';
+import {
   ArrowLeft,
   Zap,
   DollarSign,
@@ -20,6 +30,8 @@ import {
   ArrowUpRight,
   Database,
   Calendar,
+  BarChart3,
+  Table2,
   X,
 } from 'lucide-react';
 import { MetricChart } from '@/components/ui/MetricChart';
@@ -114,6 +126,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
 
   // Level 3 Deep-Dive Sub-Drilldown State
   const [subDrilldown, setSubDrilldown] = useState<SubDrilldownState | null>(null);
+  const [toolView, setToolView] = useState<'chart' | 'table'>('chart');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -626,7 +639,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
                   value={summaryData?.inactiveUserCount ?? 0}
                   valueClassName="text-amber-400"
                   subtitle="Provisioned, zero usage this period"
-                  tooltip="Total Roster minus Active Licenses. Count of distinct users with zero total GenAI Tool Consumption across every Usage entry in the selected period — provisioned seats that never recorded any real usage."
+                  tooltip="Count of distinct users with zero total GenAI Tool Consumption across every Usage entry in the selected period — provisioned seats that never recorded any real usage."
                 />
                 <StatTile
                   label="Total Roster"
@@ -638,13 +651,61 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
 
               {/* Per-Tool Adoption Share & Wastage -> Level 3 Trigger */}
               <div className="bg-ey-card border border-ey-border rounded-2xl p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-ey-border pb-3">
+                <div className="flex items-center justify-between border-b border-ey-border pb-3 gap-3">
                   <h3 className="text-sm font-bold text-ey-light uppercase tracking-wider flex items-center gap-2">
                     <Layers className="w-4 h-4 text-ey-yellow" />
                     <span>Adoption Share &amp; Wastage by AI Tool</span>
                   </h3>
-                  <span className="text-[10px] font-mono text-ey-yellow">Click tool for log records 🔍</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-[10px] font-mono text-ey-yellow hidden sm:inline">
+                      {toolView === 'table' ? 'Click tool for log records 🔍' : 'Switch to table to drill into logs'}
+                    </span>
+                    <div className="flex items-center gap-1 bg-ey-black border border-ey-border rounded-lg p-1">
+                      <button
+                        onClick={() => setToolView('chart')}
+                        title="Chart view"
+                        className={`p-1.5 rounded-md transition ${toolView === 'chart' ? 'bg-ey-yellow text-ey-black' : 'text-ey-muted hover:text-ey-light'}`}
+                      >
+                        <BarChart3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setToolView('table')}
+                        title="Table view"
+                        className={`p-1.5 rounded-md transition ${toolView === 'table' ? 'bg-ey-yellow text-ey-black' : 'text-ey-muted hover:text-ey-light'}`}
+                      >
+                        <Table2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
+
+                {toolView === 'chart' ? (
+                  <div style={{ width: '100%', height: 300 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={byTool.map((t: any) => ({
+                          tool: toolLabel(t.tool),
+                          'Adoption Share': t.adoptionSharePercent,
+                          'Wastage': t.wastagePercent,
+                        }))}
+                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--ey-border)" vertical={false} />
+                        <XAxis dataKey="tool" stroke="var(--ey-muted)" fontSize={11} tickLine={false} />
+                        <YAxis stroke="var(--ey-muted)" fontSize={11} tickLine={false} tickFormatter={(v) => `${v}%`} />
+                        <RechartsTooltip
+                          cursor={false}
+                          contentStyle={{ backgroundColor: 'var(--ey-card)', borderColor: 'var(--ey-border)', borderRadius: '0.5rem', color: 'var(--ey-light)' }}
+                          itemStyle={{ fontSize: '12px' }}
+                          formatter={(value) => `${value}%`}
+                        />
+                        <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                        <Bar dataKey="Adoption Share" fill="#34d399" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="Wastage" fill="#fbbf24" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs font-mono">
                     <thead className="text-ey-muted uppercase tracking-wider border-b border-ey-border">
@@ -676,6 +737,7 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
                     </tbody>
                   </table>
                 </div>
+                )}
               </div>
             </div>
           )}
