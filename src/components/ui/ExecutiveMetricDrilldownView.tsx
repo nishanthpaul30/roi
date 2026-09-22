@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useTableSort } from '@/lib/useTableSort';
+import { SortableTh } from '@/components/ui/SortableTh';
 import {
   ResponsiveContainer,
   BarChart,
@@ -207,8 +209,20 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
     );
   }, [granularRows, searchTerm]);
 
-  const totalPages = Math.ceil(filteredGranularRows.length / itemsPerPage) || 1;
-  const paginatedGranularRows = filteredGranularRows.slice(
+  const { sortKey: granularSortKey, sortDir: granularSortDir, sortedRows: sortedGranularRows, handleSort: handleGranularSort } =
+    useTableSort(filteredGranularRows, {
+      monthYear: (r) => r.monthYear,
+      displayName: (r) => r.displayName,
+      aiTool: (r) => r.aiTool,
+      projectCode: (r) => r.projectCode,
+      orgServiceLine: (r) => r.orgServiceLine,
+      billableFlag: (r) => r.billableFlag,
+      tokenConsumption: (r) => r.tokenConsumption,
+      cost: (r) => r.cost,
+    });
+
+  const totalPages = Math.ceil(sortedGranularRows.length / itemsPerPage) || 1;
+  const paginatedGranularRows = sortedGranularRows.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -228,6 +242,16 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
   );
 
   const byTool = summaryData?.byAiTool || [];
+  const { sortKey: toolSortKey, sortDir: toolSortDir, sortedRows: sortedByTool, handleSort: handleToolSort } = useTableSort(
+    byTool,
+    {
+      tool: (t: any) => t.tool,
+      licenseHolderCount: (t: any) => t.licenseHolderCount || t.userCount,
+      userCount: (t: any) => t.userCount,
+      adoptionSharePercent: (t: any) => t.adoptionSharePercent,
+      wastagePercent: (t: any) => t.wastagePercent,
+    }
+  );
   // Only the two real CT / Non-CT values are ever shown here -- any stray
   // "Unclassified" bucket (rows with a blank CT/Non-CT column) is dropped
   // rather than rendered as a third tile.
@@ -454,14 +478,38 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
               <table className="w-full text-left text-xs font-mono">
                 <thead className="bg-ey-black/60 text-ey-muted uppercase tracking-wider border-b border-ey-border">
                   <tr>
-                    <th className="px-4 py-3">Month</th>
-                    <th className="px-4 py-3">User &amp; Email</th>
-                    <th className="px-4 py-3">AI Tool</th>
-                    <th className="px-4 py-3">Engagement Code</th>
-                    <th className="px-4 py-3">Service Line</th>
-                    <th className="px-4 py-3 text-center">Billable</th>
-                    <th className="px-4 py-3 text-right">Tokens</th>
-                    <th className="px-4 py-3 text-right">Cost (USD)</th>
+                    <SortableTh label="Month" sortKey="monthYear" activeKey={granularSortKey} direction={granularSortDir} onSort={handleGranularSort} className="px-4 py-3" />
+                    <SortableTh label="User & Email" sortKey="displayName" activeKey={granularSortKey} direction={granularSortDir} onSort={handleGranularSort} className="px-4 py-3" />
+                    <SortableTh label="AI Tool" sortKey="aiTool" activeKey={granularSortKey} direction={granularSortDir} onSort={handleGranularSort} className="px-4 py-3" />
+                    <SortableTh label="Engagement Code" sortKey="projectCode" activeKey={granularSortKey} direction={granularSortDir} onSort={handleGranularSort} className="px-4 py-3" />
+                    <SortableTh label="Service Line" sortKey="orgServiceLine" activeKey={granularSortKey} direction={granularSortDir} onSort={handleGranularSort} className="px-4 py-3" />
+                    <SortableTh
+                      label="Billable"
+                      sortKey="billableFlag"
+                      activeKey={granularSortKey}
+                      direction={granularSortDir}
+                      onSort={handleGranularSort}
+                      className="px-4 py-3 text-center"
+                      align="right"
+                    />
+                    <SortableTh
+                      label="Tokens"
+                      sortKey="tokenConsumption"
+                      activeKey={granularSortKey}
+                      direction={granularSortDir}
+                      onSort={handleGranularSort}
+                      className="px-4 py-3 text-right"
+                      align="right"
+                    />
+                    <SortableTh
+                      label="Cost (USD)"
+                      sortKey="cost"
+                      activeKey={granularSortKey}
+                      direction={granularSortDir}
+                      onSort={handleGranularSort}
+                      className="px-4 py-3 text-right"
+                      align="right"
+                    />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ey-border">
@@ -713,15 +761,47 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
                   <table className="w-full text-left text-xs font-mono">
                     <thead className="text-ey-muted uppercase tracking-wider border-b border-ey-border">
                       <tr>
-                        <th className="py-2 pr-3">AI Tool</th>
-                        <th className="py-2 pr-3 text-right">License Holders</th>
-                        <th className="py-2 pr-3 text-right">Active Users</th>
-                        <th className="py-2 pr-3 text-right">Adoption Share</th>
-                        <th className="py-2 pr-3 text-right">Wastage</th>
+                        <SortableTh label="AI Tool" sortKey="tool" activeKey={toolSortKey} direction={toolSortDir} onSort={handleToolSort} className="py-2 pr-3" />
+                        <SortableTh
+                          label="License Holders"
+                          sortKey="licenseHolderCount"
+                          activeKey={toolSortKey}
+                          direction={toolSortDir}
+                          onSort={handleToolSort}
+                          className="py-2 pr-3 text-right"
+                          align="right"
+                        />
+                        <SortableTh
+                          label="Active Users"
+                          sortKey="userCount"
+                          activeKey={toolSortKey}
+                          direction={toolSortDir}
+                          onSort={handleToolSort}
+                          className="py-2 pr-3 text-right"
+                          align="right"
+                        />
+                        <SortableTh
+                          label="Adoption Share"
+                          sortKey="adoptionSharePercent"
+                          activeKey={toolSortKey}
+                          direction={toolSortDir}
+                          onSort={handleToolSort}
+                          className="py-2 pr-3 text-right"
+                          align="right"
+                        />
+                        <SortableTh
+                          label="Wastage"
+                          sortKey="wastagePercent"
+                          activeKey={toolSortKey}
+                          direction={toolSortDir}
+                          onSort={handleToolSort}
+                          className="py-2 pr-3 text-right"
+                          align="right"
+                        />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-ey-border/60">
-                      {byTool.map((t: any) => (
+                      {sortedByTool.map((t: any) => (
                         <tr
                           key={t.tool}
                           onClick={() => chooseFacet({ field: 'aiTool', value: t.tool, label: 'Adoption Share & Wastage by AI Tool' })}

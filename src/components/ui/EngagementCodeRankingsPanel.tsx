@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { FolderKanban, Search, ArrowUpRight } from 'lucide-react';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
+import { useTableSort } from '@/lib/useTableSort';
+import { SortableTh } from '@/components/ui/SortableTh';
 
 export interface EngagementCodeRankingRow {
   projectCode: string;
@@ -43,8 +45,16 @@ export function EngagementCodeRankingsPanel({
     return matchesSearch && matchesType;
   });
 
-  const totalPages = Math.ceil(filteredList.length / itemsPerPage) || 1;
-  const paginatedList = filteredList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const { sortKey, sortDir, sortedRows: sortedList, handleSort } = useTableSort(filteredList, {
+    projectCode: (r) => r.projectCode,
+    billability: (r) => (isBillableCode(r.projectCode) ? 'Billable' : 'Non-Billable'),
+    userCount: (r) => r.userCount,
+    tokens: (r) => r.tokens,
+    cost: (r) => r.cost,
+  });
+
+  const totalPages = Math.ceil(sortedList.length / itemsPerPage) || 1;
+  const paginatedList = sortedList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <div className="bg-ey-card border border-ey-border rounded-xl p-5 shadow-sm space-y-4">
@@ -96,11 +106,35 @@ export function EngagementCodeRankingsPanel({
         <table className="w-full text-left text-xs">
           <thead className="bg-ey-black/60 text-ey-muted font-semibold uppercase tracking-wider border-b border-ey-border">
             <tr>
-              <th className="px-4 py-3">Engagement Code</th>
-              <th className="px-4 py-3">Billability</th>
-              <th className="px-4 py-3 text-right">Active Users</th>
-              <th className="px-4 py-3 text-right">Token Consumption</th>
-              <th className="px-4 py-3 text-right">Total AI Investment</th>
+              <SortableTh label="Engagement Code" sortKey="projectCode" activeKey={sortKey} direction={sortDir} onSort={handleSort} className="px-4 py-3" />
+              <SortableTh label="Billability" sortKey="billability" activeKey={sortKey} direction={sortDir} onSort={handleSort} className="px-4 py-3" />
+              <SortableTh
+                label="Active Users"
+                sortKey="userCount"
+                activeKey={sortKey}
+                direction={sortDir}
+                onSort={handleSort}
+                className="px-4 py-3 text-right"
+                align="right"
+              />
+              <SortableTh
+                label="Token Consumption"
+                sortKey="tokens"
+                activeKey={sortKey}
+                direction={sortDir}
+                onSort={handleSort}
+                className="px-4 py-3 text-right"
+                align="right"
+              />
+              <SortableTh
+                label="Total AI Investment"
+                sortKey="cost"
+                activeKey={sortKey}
+                direction={sortDir}
+                onSort={handleSort}
+                className="px-4 py-3 text-right"
+                align="right"
+              />
             </tr>
           </thead>
           <tbody className="divide-y divide-ey-border">
@@ -167,7 +201,7 @@ export function EngagementCodeRankingsPanel({
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2 text-xs text-ey-muted">
           <div>
-            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredList.length)} of {filteredList.length} engagement codes
+            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, sortedList.length)} of {sortedList.length} engagement codes
           </div>
           <div className="flex items-center space-x-2">
             <button

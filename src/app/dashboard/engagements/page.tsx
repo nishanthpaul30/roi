@@ -7,11 +7,12 @@ import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { useRawRows } from '@/hooks/useRawRows';
-import { Briefcase, ChevronRight, RotateCcw, ArrowUpRight, X, Info } from 'lucide-react';
+import { Briefcase, ChevronRight, RotateCcw, X, Info } from 'lucide-react';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 import { summarize, type Level, type PathEntry } from '@/lib/hierarchyDrilldown';
 import { EngagementCodeRankingsPanel } from '@/components/ui/EngagementCodeRankingsPanel';
 import { StatTile } from '@/components/ui/StatTile';
+import { GroupsTable } from '@/components/ui/GroupsTable';
 
 // The engagement-side hierarchy, picked up where the org hierarchy (CT/Non-CT ->
 // Country -> Service Line -> Sub-Service Line 1 -> Sub-Service Line 2 -> Users)
@@ -259,37 +260,11 @@ function EngagementAnalytics() {
                   {groups.length === 0 ? (
                     <p className="text-xs text-ey-muted py-6 text-center">No data matches the current path.</p>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs text-ey-light">
-                        <thead className="bg-ey-black/80 text-[11px] uppercase font-semibold text-ey-muted border-b border-ey-border">
-                          <tr>
-                            <th className="px-4 py-2.5">{f.label}</th>
-                            <th className="px-4 py-2.5 text-right">Active Users</th>
-                            <th className="px-4 py-2.5 text-right">Token Consumption</th>
-                            <th className="px-4 py-2.5 text-right">Total Cost ($)</th>
-                            <th className="px-4 py-2.5"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-ey-border">
-                          {groups.map((g) => (
-                            <tr
-                              key={g.value}
-                              onClick={() => selectValue(currentLevel.id, f.key, f.label, g.value)}
-                              className="hover:bg-ey-card-hover/80 transition cursor-pointer group"
-                            >
-                              <td className="px-4 py-2.5 font-semibold group-hover:text-ey-yellow flex items-center gap-1.5">
-                                {g.value}
-                                <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 text-ey-yellow transition-opacity" />
-                              </td>
-                              <td className="px-4 py-2.5 text-right">{g.userCount}</td>
-                              <td className="px-4 py-2.5 text-right font-mono">{formatCompactNumber(g.tokens)}</td>
-                              <td className="px-4 py-2.5 text-right font-mono font-bold">{fmtCost(g.cost)}</td>
-                              <td className="px-4 py-2.5 text-right text-ey-muted">Drill Down</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <GroupsTable
+                      groups={groups}
+                      labelHeader={f.label}
+                      onSelect={(value) => selectValue(currentLevel.id, f.key, f.label, value)}
+                    />
                   )}
                 </div>
               );

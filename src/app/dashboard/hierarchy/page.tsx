@@ -7,11 +7,12 @@ import { DataTable, Column } from '@/components/ui/DataTable';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { useRawRows } from '@/hooks/useRawRows';
 import Link from 'next/link';
-import { GitBranch, ChevronRight, RotateCcw, ArrowUpRight, TableProperties, Globe2, Briefcase, Info } from 'lucide-react';
+import { GitBranch, ChevronRight, RotateCcw, TableProperties, Globe2, Briefcase, Info } from 'lucide-react';
 import { GeoHierarchyMap } from '@/components/ui/GeoHierarchyMap';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 import { summarize, type Level, type PathEntry } from '@/lib/hierarchyDrilldown';
 import { StatTile } from '@/components/ui/StatTile';
+import { GroupsTable } from '@/components/ui/GroupsTable';
 
 // The required application-wide hierarchy — always followed while drilling down:
 // CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1 -> Sub-Service Line 2 ->
@@ -247,37 +248,7 @@ export default function HierarchyDrilldownPage() {
             ) : viewMode === 'map' ? (
               <GeoHierarchyMap groups={combinedCountryGroups} onSelect={selectCombined} />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-ey-light">
-                  <thead className="bg-ey-black/80 text-[11px] uppercase font-semibold text-ey-muted border-b border-ey-border">
-                    <tr>
-                      <th className="px-4 py-2.5">Country</th>
-                      <th className="px-4 py-2.5 text-right">Active Users</th>
-                      <th className="px-4 py-2.5 text-right">Token Consumption</th>
-                      <th className="px-4 py-2.5 text-right">Total Cost ($)</th>
-                      <th className="px-4 py-2.5"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-ey-border">
-                    {combinedCountryGroups.map((g) => (
-                      <tr
-                        key={g.value}
-                        onClick={() => selectCombined(g.value)}
-                        className="hover:bg-ey-card-hover/80 transition cursor-pointer group"
-                      >
-                        <td className="px-4 py-2.5 font-semibold group-hover:text-ey-yellow flex items-center gap-1.5">
-                          {g.value}
-                          <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 text-ey-yellow transition-opacity" />
-                        </td>
-                        <td className="px-4 py-2.5 text-right">{g.userCount}</td>
-                        <td className="px-4 py-2.5 text-right font-mono">{formatCompactNumber(g.tokens)}</td>
-                        <td className="px-4 py-2.5 text-right font-mono font-bold">{fmtCost(g.cost)}</td>
-                        <td className="px-4 py-2.5 text-right text-ey-muted">Drill Down</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <GroupsTable groups={combinedCountryGroups} labelHeader="Country" onSelect={selectCombined} />
             )}
           </div>
         ) : (
@@ -329,52 +300,27 @@ export default function HierarchyDrilldownPage() {
                       onSelect={(value) => selectValue(currentLevel.id, f.key, f.label, value)}
                     />
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs text-ey-light">
-                        <thead className="bg-ey-black/80 text-[11px] uppercase font-semibold text-ey-muted border-b border-ey-border">
-                          <tr>
-                            <th className="px-4 py-2.5">{f.label}</th>
-                            <th className="px-4 py-2.5 text-right">Active Users</th>
-                            <th className="px-4 py-2.5 text-right">Token Consumption</th>
-                            <th className="px-4 py-2.5 text-right">Total Cost ($)</th>
-                            <th className="px-4 py-2.5"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-ey-border">
-                          {groups.map((g) => (
-                            <tr
-                              key={g.value}
-                              onClick={() => selectValue(currentLevel.id, f.key, f.label, g.value)}
-                              className="hover:bg-ey-card-hover/80 transition cursor-pointer group"
-                            >
-                              <td className="px-4 py-2.5 font-semibold group-hover:text-ey-yellow flex items-center gap-1.5">
-                                {g.value}
-                                <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 text-ey-yellow transition-opacity" />
-                              </td>
-                              <td className="px-4 py-2.5 text-right">{g.userCount}</td>
-                              <td className="px-4 py-2.5 text-right font-mono">{formatCompactNumber(g.tokens)}</td>
-                              <td className="px-4 py-2.5 text-right font-mono font-bold">{fmtCost(g.cost)}</td>
-                              <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                                {currentLevel.id === 'user' ? (
-                                  // The org hierarchy ends at the user; this hands off to the
-                                  // engagement-side chain for that same person.
-                                  <Link
-                                    href={`/dashboard/engagements?user=${encodeURIComponent(g.value)}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="inline-flex items-center gap-1 text-ey-yellow hover:underline font-semibold"
-                                  >
-                                    <Briefcase className="w-3 h-3" />
-                                    Engagements
-                                  </Link>
-                                ) : (
-                                  <span className="text-ey-muted">Drill Down</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <GroupsTable
+                      groups={groups}
+                      labelHeader={f.label}
+                      onSelect={(value) => selectValue(currentLevel.id, f.key, f.label, value)}
+                      renderAction={
+                        currentLevel.id === 'user'
+                          ? (g) => (
+                              // The org hierarchy ends at the user; this hands off to the
+                              // engagement-side chain for that same person.
+                              <Link
+                                href={`/dashboard/engagements?user=${encodeURIComponent(g.value)}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 text-ey-yellow hover:underline font-semibold"
+                              >
+                                <Briefcase className="w-3 h-3" />
+                                Engagements
+                              </Link>
+                            )
+                          : undefined
+                      }
+                    />
                   )}
                 </div>
               );

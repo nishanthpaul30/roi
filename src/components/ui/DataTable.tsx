@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 export interface Column<T> {
   header: string;
@@ -27,8 +27,17 @@ export function DataTable<T extends Record<string, any>>({
 }: DataTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortKey, setSortKey] = useState<string | null>(null);
+  // Sort is tracked by column index (not accessorKey) since accessorKey may
+  // be a derived function rather than a stable, unique field name.
+  const [sortColIdx, setSortColIdx] = useState<number | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const getValue = (row: T, col: Column<T>) => {
+    if (typeof col.accessorKey === 'function') {
+      return col.accessorKey(row);
+    }
+    return row[col.accessorKey];
+  };
 
   // Search filter logic
   const filteredData = data.filter((row) =>
@@ -41,19 +50,40 @@ export function DataTable<T extends Record<string, any>>({
     })
   );
 
+  // Sort logic — applied after search, before pagination, so page numbers
+  // stay meaningful against the sorted order.
+  const sortedData = (() => {
+    if (sortColIdx === null) return filteredData;
+    const col = columns[sortColIdx];
+    if (!col) return filteredData;
+    const dir = sortDirection === 'asc' ? 1 : -1;
+    return [...filteredData].sort((a, b) => {
+      const va = getValue(a, col);
+      const vb = getValue(b, col);
+      if (va === vb) return 0;
+      if (va === null || va === undefined) return 1;
+      if (vb === null || vb === undefined) return -1;
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+      return String(va).localeCompare(String(vb), undefined, { numeric: true }) * dir;
+    });
+  })();
+
+  const handleSort = (idx: number) => {
+    if (sortColIdx === idx) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColIdx(idx);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1);
+  };
+
   // Pagination logic
-  const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
-  const paginatedData = filteredData.slice(
+  const totalPages = Math.ceil(sortedData.length / pageSize) || 1;
+  const paginatedData = sortedData.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
-
-  const getValue = (row: T, col: Column<T>) => {
-    if (typeof col.accessorKey === 'function') {
-      return col.accessorKey(row);
-    }
-    return row[col.accessorKey];
-  };
 
   const renderCell = (row: T, col: Column<T>) => {
     if (col.cell) {
@@ -91,13 +121,36 @@ export function DataTable<T extends Record<string, any>>({
         <table className="w-full text-left text-xs text-ey-light">
           <thead className="bg-ey-black/80 text-[11px] uppercase font-semibold text-ey-muted border-b border-ey-border">
             <tr>
-              {columns.map((col, idx) => (
-                <th key={idx} className="px-4 py-3">
-                  <div className="flex items-center space-x-1">
-                    <span>{col.header}</span>
-                  </div>
-                </th>
-              ))}
+              {columns.map((col, idx) => {
+                const sortable = col.sortable !== false;
+                const isActive = sortColIdx === idx;
+                return (
+                  <th key={idx} className="px-4 py-3">
+                    {sortable ? (
+                      <button
+                        onClick={() => handleSort(idx)}
+                        className={`flex items-center space-x-1 hover:text-ey-light transition ${isActive ? 'text-ey-yellow' : ''}`}
+                        title={`Sort by ${col.header}`}
+                      >
+                        <span>{col.header}</span>
+                        {isActive ? (
+                          sortDirection === 'asc' ? (
+                            <ArrowUp className="w-3 h-3" />
+                          ) : (
+                            <ArrowDown className="w-3 h-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 opacity-50" />
+                        )}
+                      </button>
+                    ) : (
+                      <div className="flex items-center space-x-1">
+                        <span>{col.header}</span>
+                      </div>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-ey-border">

@@ -5,6 +5,9 @@ import Link from 'next/link';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { ChevronRight, RotateCcw, ArrowUpRight, GitBranch, Briefcase, Search } from 'lucide-react';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
+import { useTableSort } from '@/lib/useTableSort';
+import { SortableTh } from '@/components/ui/SortableTh';
+import { GroupsTable } from '@/components/ui/GroupsTable';
 
 interface LevelField {
   key: keyof CsvUsageRow;
@@ -145,6 +148,16 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
     return userRows.filter((u) => u.name.toLowerCase().includes(term) || u.email.toLowerCase().includes(term));
   }, [userRows, userSearch]);
 
+  const { sortKey: userSortKey, sortDir: userSortDir, sortedRows: sortedUserRows, handleSort: handleUserSort } = useTableSort(
+    filteredUserRows,
+    {
+      name: (u) => u.name,
+      tokens: (u) => u.tokens,
+      cost: (u) => u.cost,
+      records: (u) => u.rowCount,
+    }
+  );
+
   return (
     <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
       <div className="border-b border-ey-border/60 pb-3 flex items-center justify-between gap-3 flex-wrap">
@@ -212,23 +225,47 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
           <table className="w-full text-left text-xs font-mono">
             <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
               <tr>
-                <th className="px-4 py-3">User</th>
-                <th className="px-4 py-3 text-right">Tokens</th>
-                <th className="px-4 py-3 text-right">Cost ($)</th>
-                <th className="px-4 py-3 text-center">Records</th>
+                <SortableTh label="User" sortKey="name" activeKey={userSortKey} direction={userSortDir} onSort={handleUserSort} className="px-4 py-3" />
+                <SortableTh
+                  label="Tokens"
+                  sortKey="tokens"
+                  activeKey={userSortKey}
+                  direction={userSortDir}
+                  onSort={handleUserSort}
+                  className="px-4 py-3 text-right"
+                  align="right"
+                />
+                <SortableTh
+                  label="Cost ($)"
+                  sortKey="cost"
+                  activeKey={userSortKey}
+                  direction={userSortDir}
+                  onSort={handleUserSort}
+                  className="px-4 py-3 text-right"
+                  align="right"
+                />
+                <SortableTh
+                  label="Records"
+                  sortKey="records"
+                  activeKey={userSortKey}
+                  direction={userSortDir}
+                  onSort={handleUserSort}
+                  className="px-4 py-3 text-center"
+                  align="right"
+                />
                 <th className="px-4 py-3 text-center">Engagements</th>
                 <th className="px-4 py-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ey-border">
-              {filteredUserRows.length === 0 ? (
+              {sortedUserRows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-ey-muted">
                     {userRows.length === 0 ? 'No users match this path.' : 'No users match your search.'}
                   </td>
                 </tr>
               ) : (
-                filteredUserRows.map((u, i) => (
+                sortedUserRows.map((u, i) => (
                   <tr
                     key={i}
                     onClick={() => onSelectUser(u.email, u.name)}
@@ -326,33 +363,12 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
                 ) : (
                   // Large value sets (Engagement Code, etc. can run into the hundreds) stay
                   // a compact scannable table — a card per row wouldn't be readable at that volume.
-                  <div className="overflow-x-auto border border-ey-border rounded-xl">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border text-[10px]">
-                        <tr>
-                          <th className="px-3 py-2">{f.label}</th>
-                          <th className="px-3 py-2 text-right">Users</th>
-                          <th className="px-3 py-2 text-right">Tokens</th>
-                          <th className="px-3 py-2 text-right">Cost ($)</th>
-                          <th className="px-3 py-2"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-ey-border">
-                        {groups.map((g) => (
-                          <tr
-                            key={g.value}
-                            onClick={() => selectValue(currentLevel.id, f.key, f.label, g.value)}
-                            className="hover:bg-ey-card-hover/80 transition cursor-pointer group"
-                          >
-                            <td className="px-3 py-2 font-semibold text-ey-light group-hover:text-ey-yellow">{g.value}</td>
-                            <td className="px-3 py-2 text-right">{g.userCount}</td>
-                            <td className="px-3 py-2 text-right font-mono">{formatCompactNumber(g.tokens)}</td>
-                            <td className="px-3 py-2 text-right font-mono font-bold">{fmtCost(g.cost)}</td>
-                            <td className="px-3 py-2 text-right text-ey-muted text-[10px]">Drill Down</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="border border-ey-border rounded-xl overflow-hidden">
+                    <GroupsTable
+                      groups={groups}
+                      labelHeader={f.label}
+                      onSelect={(value) => selectValue(currentLevel.id, f.key, f.label, value)}
+                    />
                   </div>
                 )}
               </div>

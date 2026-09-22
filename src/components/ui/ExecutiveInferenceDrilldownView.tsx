@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { useTableSort } from '@/lib/useTableSort';
+import { SortableTh } from '@/components/ui/SortableTh';
 import {
   ArrowLeft,
   ChevronRight,
@@ -427,8 +429,14 @@ export function ExecutiveInferenceDrilldownView({
       (u) => u.displayName.toLowerCase().includes(term) || u.email.toLowerCase().includes(term)
     );
   }, [usageWarningUsers, warningUserSearch]);
-  const warningTotalPages = Math.ceil(searchedWarningUsers.length / warningPageSize) || 1;
-  const paginatedWarningUsers = searchedWarningUsers.slice(
+  const { sortKey: warningSortKey, sortDir: warningSortDir, sortedRows: sortedWarningUsers, handleSort: handleWarningSort } =
+    useTableSort(searchedWarningUsers, {
+      displayName: (u) => u.displayName,
+      actualCost: (u) => u.actualCost,
+      usageFreeTokenLimit: (u) => u.usageFreeTokenLimit,
+    });
+  const warningTotalPages = Math.ceil(sortedWarningUsers.length / warningPageSize) || 1;
+  const paginatedWarningUsers = sortedWarningUsers.slice(
     (warningPage - 1) * warningPageSize,
     warningPage * warningPageSize
   );
@@ -474,6 +482,20 @@ export function ExecutiveInferenceDrilldownView({
     }
     return Array.from(map.values()).sort((a, b) => b.recoverableAmount - a.recoverableAmount);
   }, [ledgerFilteredUsers, currentLedgerLevel, emailToRow]);
+
+  const { sortKey: ledgerGroupSortKey, sortDir: ledgerGroupSortDir, sortedRows: sortedLedgerGroups, handleSort: handleLedgerGroupSort } =
+    useTableSort(ledgerGroups, {
+      value: (g) => g.value,
+      count: (g) => g.count,
+      recoverableAmount: (g) => g.recoverableAmount,
+    });
+
+  const { sortKey: ledgerUserSortKey, sortDir: ledgerUserSortDir, sortedRows: sortedLedgerUsers, handleSort: handleLedgerUserSort } =
+    useTableSort(searchedLedgerUsers, {
+      displayName: (u) => u.displayName,
+      licenseCost: (u: any) => u.licenseCost,
+      recoverableAmount: (u) => u.recoverableAmount,
+    });
 
   // Compute Power Users (Pareto Analysis: Top 20%)
   const sortedUsersBySpend = useMemo(() => {
@@ -1127,8 +1149,21 @@ export function ExecutiveInferenceDrilldownView({
     [usageGranularRows]
   );
 
-  const totalPages = Math.ceil(filteredGranularRows.length / itemsPerPage) || 1;
-  const paginatedGranularRows = filteredGranularRows.slice(
+  const { sortKey: granularSortKey, sortDir: granularSortDir, sortedRows: sortedGranularRows, handleSort: handleGranularSort } =
+    useTableSort(filteredGranularRows, {
+      monthYear: (r) => r.monthYear,
+      displayName: (r) => r.displayName,
+      aiTool: (r) => r.aiTool,
+      projectCode: (r) => r.projectCode,
+      orgServiceLine: (r) => r.orgServiceLine,
+      superRegion: (r: any) => r.superRegion,
+      billableFlag: (r) => r.billableFlag,
+      tokenConsumption: (r) => r.tokenConsumption,
+      cost: (r) => r.cost,
+    });
+
+  const totalPages = Math.ceil(sortedGranularRows.length / itemsPerPage) || 1;
+  const paginatedGranularRows = sortedGranularRows.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -1584,18 +1619,34 @@ export function ExecutiveInferenceDrilldownView({
                     <table className="w-full text-left text-xs font-mono">
                       <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
                         <tr>
-                          <th className="px-4 py-3">{currentLedgerLevel.label}</th>
-                          <th className="px-4 py-3 text-center">Dormant Seats</th>
-                          <th className="px-4 py-3 text-right">Recoverable ($)</th>
+                          <SortableTh label={currentLedgerLevel.label} sortKey="value" activeKey={ledgerGroupSortKey} direction={ledgerGroupSortDir} onSort={handleLedgerGroupSort} className="px-4 py-3" />
+                          <SortableTh
+                            label="Dormant Seats"
+                            sortKey="count"
+                            activeKey={ledgerGroupSortKey}
+                            direction={ledgerGroupSortDir}
+                            onSort={handleLedgerGroupSort}
+                            className="px-4 py-3 text-center"
+                            align="right"
+                          />
+                          <SortableTh
+                            label="Recoverable ($)"
+                            sortKey="recoverableAmount"
+                            activeKey={ledgerGroupSortKey}
+                            direction={ledgerGroupSortDir}
+                            onSort={handleLedgerGroupSort}
+                            className="px-4 py-3 text-right"
+                            align="right"
+                          />
                           <th className="px-4 py-3" />
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-ey-border">
-                        {ledgerGroups.length === 0 ? (
+                        {sortedLedgerGroups.length === 0 ? (
                           <tr>
                             <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">No dormant licenses at this level.</td>
                           </tr>
-                        ) : ledgerGroups.map((g) => (
+                        ) : sortedLedgerGroups.map((g) => (
                           <tr
                             key={g.value}
                             onClick={() => setLedgerPath((prev) => [...prev, { key: currentLedgerLevel.key, label: currentLedgerLevel.label, value: g.value }])}
@@ -1639,20 +1690,36 @@ export function ExecutiveInferenceDrilldownView({
                     <table className="w-full text-left text-xs font-mono">
                       <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
                         <tr>
-                          <th className="px-4 py-3">Provisioned Employee</th>
-                          <th className="px-4 py-3 text-right">License Cost</th>
-                          <th className="px-4 py-3 text-right">Recoverable</th>
+                          <SortableTh label="Provisioned Employee" sortKey="displayName" activeKey={ledgerUserSortKey} direction={ledgerUserSortDir} onSort={handleLedgerUserSort} className="px-4 py-3" />
+                          <SortableTh
+                            label="License Cost"
+                            sortKey="licenseCost"
+                            activeKey={ledgerUserSortKey}
+                            direction={ledgerUserSortDir}
+                            onSort={handleLedgerUserSort}
+                            className="px-4 py-3 text-right"
+                            align="right"
+                          />
+                          <SortableTh
+                            label="Recoverable"
+                            sortKey="recoverableAmount"
+                            activeKey={ledgerUserSortKey}
+                            direction={ledgerUserSortDir}
+                            onSort={handleLedgerUserSort}
+                            className="px-4 py-3 text-right"
+                            align="right"
+                          />
                           <th className="px-4 py-3 text-center">Action Trigger</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-ey-border">
-                        {searchedLedgerUsers.length === 0 ? (
+                        {sortedLedgerUsers.length === 0 ? (
                           <tr>
                             <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">
                               {ledgerFilteredUsers.length === 0 ? 'No dormant licenses at this level.' : 'No users match your search.'}
                             </td>
                           </tr>
-                        ) : searchedLedgerUsers.map((u) => (
+                        ) : sortedLedgerUsers.map((u) => (
                           <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
                             <td className="px-4 py-3 font-medium text-ey-light">
                               <div>{u.displayName}</div>
@@ -1731,9 +1798,25 @@ export function ExecutiveInferenceDrilldownView({
                       <table className="w-full text-left text-xs font-mono">
                         <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
                           <tr>
-                            <th className="px-4 py-3">Employee</th>
-                            <th className="px-4 py-3 text-right">Usage Cost</th>
-                            <th className="px-4 py-3 text-right">Free Limit</th>
+                            <SortableTh label="Employee" sortKey="displayName" activeKey={warningSortKey} direction={warningSortDir} onSort={handleWarningSort} className="px-4 py-3" />
+                            <SortableTh
+                              label="Usage Cost"
+                              sortKey="actualCost"
+                              activeKey={warningSortKey}
+                              direction={warningSortDir}
+                              onSort={handleWarningSort}
+                              className="px-4 py-3 text-right"
+                              align="right"
+                            />
+                            <SortableTh
+                              label="Free Limit"
+                              sortKey="usageFreeTokenLimit"
+                              activeKey={warningSortKey}
+                              direction={warningSortDir}
+                              onSort={handleWarningSort}
+                              className="px-4 py-3 text-right"
+                              align="right"
+                            />
                             <th className="px-4 py-3 text-center">Status</th>
                           </tr>
                         </thead>
@@ -2220,15 +2303,39 @@ export function ExecutiveInferenceDrilldownView({
             <table className="w-full text-left text-xs font-mono">
               <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
                 <tr>
-                  <th className="px-4 py-3">Month</th>
-                  <th className="px-4 py-3">Employee &amp; Email</th>
-                  <th className="px-4 py-3">AI Tool</th>
-                  <th className="px-4 py-3">Engagement Code</th>
-                  <th className="px-4 py-3">Service Line</th>
-                  <th className="px-4 py-3">Super Region</th>
-                  <th className="px-4 py-3 text-center">Billable</th>
-                  <th className="px-4 py-3 text-right">Tokens</th>
-                  <th className="px-4 py-3 text-right">Cost (USD)</th>
+                  <SortableTh label="Month" sortKey="monthYear" activeKey={granularSortKey} direction={granularSortDir} onSort={handleGranularSort} className="px-4 py-3" />
+                  <SortableTh label="Employee & Email" sortKey="displayName" activeKey={granularSortKey} direction={granularSortDir} onSort={handleGranularSort} className="px-4 py-3" />
+                  <SortableTh label="AI Tool" sortKey="aiTool" activeKey={granularSortKey} direction={granularSortDir} onSort={handleGranularSort} className="px-4 py-3" />
+                  <SortableTh label="Engagement Code" sortKey="projectCode" activeKey={granularSortKey} direction={granularSortDir} onSort={handleGranularSort} className="px-4 py-3" />
+                  <SortableTh label="Service Line" sortKey="orgServiceLine" activeKey={granularSortKey} direction={granularSortDir} onSort={handleGranularSort} className="px-4 py-3" />
+                  <SortableTh label="Super Region" sortKey="superRegion" activeKey={granularSortKey} direction={granularSortDir} onSort={handleGranularSort} className="px-4 py-3" />
+                  <SortableTh
+                    label="Billable"
+                    sortKey="billableFlag"
+                    activeKey={granularSortKey}
+                    direction={granularSortDir}
+                    onSort={handleGranularSort}
+                    className="px-4 py-3 text-center"
+                    align="right"
+                  />
+                  <SortableTh
+                    label="Tokens"
+                    sortKey="tokenConsumption"
+                    activeKey={granularSortKey}
+                    direction={granularSortDir}
+                    onSort={handleGranularSort}
+                    className="px-4 py-3 text-right"
+                    align="right"
+                  />
+                  <SortableTh
+                    label="Cost (USD)"
+                    sortKey="cost"
+                    activeKey={granularSortKey}
+                    direction={granularSortDir}
+                    onSort={handleGranularSort}
+                    className="px-4 py-3 text-right"
+                    align="right"
+                  />
                   <th className="px-4 py-3 text-center">Inspect</th>
                 </tr>
               </thead>

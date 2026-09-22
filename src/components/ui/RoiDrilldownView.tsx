@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useTableSort } from '@/lib/useTableSort';
+import { SortableTh } from '@/components/ui/SortableTh';
 import {
   ArrowLeft,
   ChevronRight,
@@ -294,11 +296,26 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
     });
   }, [targetRows, searchTerm, toolFilter, billableFilter]);
 
+  const { sortKey: logSortKey, sortDir: logSortDir, sortedRows: sortedFilteredRows, handleSort: handleLogSort } = useTableSort(
+    filteredRows,
+    {
+      monthYear: (r) => r.monthYear,
+      displayName: (r) => r.displayName,
+      aiTool: (r) => r.aiTool,
+      projectCode: (r) => r.projectCode,
+      orgServiceLine: (r) => r.orgServiceLine,
+      subServiceLine1: (r) => r.subServiceLine1,
+      billableFlag: (r) => r.billableFlag,
+      tokenConsumption: (r) => r.tokenConsumption,
+      cost: (r) => r.cost,
+    }
+  );
+
   // Pagination
-  const totalPages = Math.ceil(filteredRows.length / itemsPerPage) || 1;
+  const totalPages = Math.ceil(sortedFilteredRows.length / itemsPerPage) || 1;
   const paginatedRows = useMemo(() => {
-    return filteredRows.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  }, [filteredRows, currentPage, itemsPerPage]);
+    return sortedFilteredRows.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [sortedFilteredRows, currentPage, itemsPerPage]);
 
   // Telemetry Aggregates for current slice
   const totalSliceCost = useMemo(() => targetRows.reduce((sum, r) => sum + r.cost, 0), [targetRows]);
@@ -1285,15 +1302,39 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
           <table className="w-full text-left text-xs font-mono">
             <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
               <tr>
-                <th className="px-4 py-3">Month</th>
-                <th className="px-4 py-3">Employee</th>
-                <th className="px-4 py-3">AI Tool</th>
-                <th className="px-4 py-3">Engagement Code</th>
-                <th className="px-4 py-3">Service Line</th>
-                <th className="px-4 py-3">Sub Service Line</th>
-                <th className="px-4 py-3 text-center">Billable</th>
-                <th className="px-4 py-3 text-right">Tokens</th>
-                <th className="px-4 py-3 text-right">Cost (USD)</th>
+                <SortableTh label="Month" sortKey="monthYear" activeKey={logSortKey} direction={logSortDir} onSort={handleLogSort} className="px-4 py-3" />
+                <SortableTh label="Employee" sortKey="displayName" activeKey={logSortKey} direction={logSortDir} onSort={handleLogSort} className="px-4 py-3" />
+                <SortableTh label="AI Tool" sortKey="aiTool" activeKey={logSortKey} direction={logSortDir} onSort={handleLogSort} className="px-4 py-3" />
+                <SortableTh label="Engagement Code" sortKey="projectCode" activeKey={logSortKey} direction={logSortDir} onSort={handleLogSort} className="px-4 py-3" />
+                <SortableTh label="Service Line" sortKey="orgServiceLine" activeKey={logSortKey} direction={logSortDir} onSort={handleLogSort} className="px-4 py-3" />
+                <SortableTh label="Sub Service Line" sortKey="subServiceLine1" activeKey={logSortKey} direction={logSortDir} onSort={handleLogSort} className="px-4 py-3" />
+                <SortableTh
+                  label="Billable"
+                  sortKey="billableFlag"
+                  activeKey={logSortKey}
+                  direction={logSortDir}
+                  onSort={handleLogSort}
+                  className="px-4 py-3 text-center"
+                  align="right"
+                />
+                <SortableTh
+                  label="Tokens"
+                  sortKey="tokenConsumption"
+                  activeKey={logSortKey}
+                  direction={logSortDir}
+                  onSort={handleLogSort}
+                  className="px-4 py-3 text-right"
+                  align="right"
+                />
+                <SortableTh
+                  label="Cost (USD)"
+                  sortKey="cost"
+                  activeKey={logSortKey}
+                  direction={logSortDir}
+                  onSort={handleLogSort}
+                  className="px-4 py-3 text-right"
+                  align="right"
+                />
                 <th className="px-4 py-3 text-center">Action</th>
               </tr>
             </thead>
