@@ -174,6 +174,7 @@ export function ExecutiveInferenceDrilldownView({
   // into so far (CT/Non-CT -> Country -> Service Line -> Sub-Service Line 1
   // -> Sub-Service Line 2), empty = top level.
   const [ledgerPath, setLedgerPath] = useState<{ key: keyof CsvUsageRow; label: string; value: string }[]>([]);
+  const [ledgerUserSearch, setLedgerUserSearch] = useState('');
 
   // Level 4 Search, Pagination & Modal Record Inspector State
   const [searchTerm, setSearchTerm] = useState('');
@@ -184,6 +185,7 @@ export function ExecutiveInferenceDrilldownView({
 
   // Pagination for the License Reclamation "Usage Below Free Limit" warning table
   const [warningPage, setWarningPage] = useState(1);
+  const [warningUserSearch, setWarningUserSearch] = useState('');
   const warningPageSize = 10;
   // Collapsed by default -- this table is a lower-priority warning, not an actionable ledger.
   const [isWarningSectionExpanded, setIsWarningSectionExpanded] = useState(false);
@@ -417,8 +419,15 @@ export function ExecutiveInferenceDrilldownView({
   const totalWarningUsageCost = useMemo(() => usageWarningUsers.reduce((s, u) => s + u.actualCost, 0), [usageWarningUsers]);
   const totalWarningFreeLimit = useMemo(() => usageWarningUsers.reduce((s, u) => s + u.usageFreeTokenLimit, 0), [usageWarningUsers]);
   const totalWarningUnusedCapacity = Math.max(0, totalWarningFreeLimit - totalWarningUsageCost);
-  const warningTotalPages = Math.ceil(usageWarningUsers.length / warningPageSize) || 1;
-  const paginatedWarningUsers = usageWarningUsers.slice(
+  const searchedWarningUsers = useMemo(() => {
+    const term = warningUserSearch.trim().toLowerCase();
+    if (!term) return usageWarningUsers;
+    return usageWarningUsers.filter(
+      (u) => u.displayName.toLowerCase().includes(term) || u.email.toLowerCase().includes(term)
+    );
+  }, [usageWarningUsers, warningUserSearch]);
+  const warningTotalPages = Math.ceil(searchedWarningUsers.length / warningPageSize) || 1;
+  const paginatedWarningUsers = searchedWarningUsers.slice(
     (warningPage - 1) * warningPageSize,
     warningPage * warningPageSize
   );
@@ -442,6 +451,14 @@ export function ExecutiveInferenceDrilldownView({
 
   const currentLedgerLevel = RECLAMATION_LEVELS[ledgerPath.length];
   const isLedgerUserLevel = !currentLedgerLevel;
+
+  const searchedLedgerUsers = useMemo(() => {
+    const term = ledgerUserSearch.trim().toLowerCase();
+    if (!term) return ledgerFilteredUsers;
+    return ledgerFilteredUsers.filter(
+      (u) => u.displayName.toLowerCase().includes(term) || u.email.toLowerCase().includes(term)
+    );
+  }, [ledgerFilteredUsers, ledgerUserSearch]);
 
   const ledgerGroups = useMemo(() => {
     if (!currentLedgerLevel) return [];
@@ -1582,7 +1599,20 @@ export function ExecutiveInferenceDrilldownView({
                   </div>
                 ) : (
                   /* Level 6: Users -- end of the mandated hierarchy */
-                  <div className="overflow-x-auto border border-ey-border rounded-xl">
+                  <div className="space-y-3">
+                    <div className="flex justify-end">
+                    <div className="relative max-w-xs w-full sm:w-64">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ey-muted pointer-events-none" />
+                      <input
+                        type="text"
+                        value={ledgerUserSearch}
+                        onChange={(e) => setLedgerUserSearch(e.target.value)}
+                        placeholder="Search by name or email..."
+                        className="w-full pl-8 pr-3 py-2 text-xs bg-ey-black border border-ey-border rounded-lg text-ey-light placeholder-ey-muted focus:outline-none focus:border-ey-yellow/50 transition"
+                      />
+                    </div>
+                    </div>
+                    <div className="overflow-x-auto border border-ey-border rounded-xl">
                     <table className="w-full text-left text-xs font-mono">
                       <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
                         <tr>
@@ -1593,11 +1623,13 @@ export function ExecutiveInferenceDrilldownView({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-ey-border">
-                        {ledgerFilteredUsers.length === 0 ? (
+                        {searchedLedgerUsers.length === 0 ? (
                           <tr>
-                            <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">No dormant licenses at this level.</td>
+                            <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">
+                              {ledgerFilteredUsers.length === 0 ? 'No dormant licenses at this level.' : 'No users match your search.'}
+                            </td>
                           </tr>
-                        ) : ledgerFilteredUsers.map((u) => (
+                        ) : searchedLedgerUsers.map((u) => (
                           <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
                             <td className="px-4 py-3 font-medium text-ey-light">
                               <div>{u.displayName}</div>
@@ -1617,6 +1649,7 @@ export function ExecutiveInferenceDrilldownView({
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1656,6 +1689,21 @@ export function ExecutiveInferenceDrilldownView({
 
                 {isWarningSectionExpanded && (
                   <>
+                    <div className="flex justify-end">
+                    <div className="relative max-w-xs w-full sm:w-64">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ey-muted pointer-events-none" />
+                      <input
+                        type="text"
+                        value={warningUserSearch}
+                        onChange={(e) => {
+                          setWarningUserSearch(e.target.value);
+                          setWarningPage(1);
+                        }}
+                        placeholder="Search by name or email..."
+                        className="w-full pl-8 pr-3 py-2 text-xs bg-ey-black border border-ey-border rounded-lg text-ey-light placeholder-ey-muted focus:outline-none focus:border-amber-500/50 transition"
+                      />
+                    </div>
+                    </div>
                     <div className="overflow-x-auto border border-ey-border rounded-xl">
                       <table className="w-full text-left text-xs font-mono">
                         <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
@@ -1669,7 +1717,11 @@ export function ExecutiveInferenceDrilldownView({
                         <tbody className="divide-y divide-ey-border">
                           {paginatedWarningUsers.length === 0 ? (
                             <tr>
-                              <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">No seats currently under their free limit.</td>
+                              <td colSpan={4} className="px-4 py-8 text-center text-ey-muted">
+                                {searchedWarningUsers.length === 0 && usageWarningUsers.length > 0
+                                  ? 'No users match your search.'
+                                  : 'No seats currently under their free limit.'}
+                              </td>
                             </tr>
                           ) : paginatedWarningUsers.map((u) => (
                             <tr key={u.email} className="hover:bg-ey-card-hover/60 transition">
@@ -1696,8 +1748,8 @@ export function ExecutiveInferenceDrilldownView({
                       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-ey-muted font-mono">
                         <div>
                           Showing {(warningPage - 1) * warningPageSize + 1} to{' '}
-                          {Math.min(warningPage * warningPageSize, usageWarningUsers.length)} of{' '}
-                          {usageWarningUsers.length} seats
+                          {Math.min(warningPage * warningPageSize, searchedWarningUsers.length)} of{' '}
+                          {searchedWarningUsers.length} seats
                         </div>
                         <div className="flex items-center space-x-2">
                           <button

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
-import { ChevronRight, RotateCcw, ArrowUpRight, GitBranch, Briefcase } from 'lucide-react';
+import { ChevronRight, RotateCcw, ArrowUpRight, GitBranch, Briefcase, Search } from 'lucide-react';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 
 interface LevelField {
@@ -92,10 +92,17 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
   const usageRows = rows;
   const basePath = useMemo(() => initialPath || [], [initialPath]);
   const [path, setPath] = useState<PathEntry[]>(basePath);
+  const [userSearch, setUserSearch] = useState('');
 
   useEffect(() => {
     onPathChange?.(path);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path]);
+  // Clear any in-progress search whenever the drilled-down path changes, so
+  // a filter typed at one leaf doesn't silently persist and hide everyone
+  // at the next one.
+  useEffect(() => {
+    setUserSearch('');
   }, [path]);
 
   const pathRows = useMemo(
@@ -131,6 +138,12 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
     }
     return Array.from(map.values()).sort((a, b) => b.cost - a.cost);
   }, [isComplete, pathRows]);
+
+  const filteredUserRows = useMemo(() => {
+    const term = userSearch.trim().toLowerCase();
+    if (!term) return userRows;
+    return userRows.filter((u) => u.name.toLowerCase().includes(term) || u.email.toLowerCase().includes(term));
+  }, [userRows, userSearch]);
 
   return (
     <div className="bg-ey-card border border-ey-border rounded-2xl p-5 shadow-sm space-y-4">
@@ -182,7 +195,20 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
       </div>
 
       {isComplete ? (
-        <div className="overflow-x-auto border border-ey-border rounded-xl">
+        <div className="space-y-3">
+          <div className="flex justify-end">
+          <div className="relative max-w-xs w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ey-muted pointer-events-none" />
+            <input
+              type="text"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              placeholder="Search by name or email..."
+              className="w-full pl-8 pr-3 py-2 text-xs bg-ey-black border border-ey-border rounded-lg text-ey-light placeholder-ey-muted focus:outline-none focus:border-ey-yellow/50 transition"
+            />
+          </div>
+          </div>
+          <div className="overflow-x-auto border border-ey-border rounded-xl">
           <table className="w-full text-left text-xs font-mono">
             <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
               <tr>
@@ -195,12 +221,14 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
               </tr>
             </thead>
             <tbody className="divide-y divide-ey-border">
-              {userRows.length === 0 ? (
+              {filteredUserRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-ey-muted">No users match this path.</td>
+                  <td colSpan={6} className="px-4 py-8 text-center text-ey-muted">
+                    {userRows.length === 0 ? 'No users match this path.' : 'No users match your search.'}
+                  </td>
                 </tr>
               ) : (
-                userRows.map((u, i) => (
+                filteredUserRows.map((u, i) => (
                   <tr
                     key={i}
                     onClick={() => onSelectUser(u.email, u.name)}
@@ -236,6 +264,7 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
               )}
             </tbody>
           </table>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
