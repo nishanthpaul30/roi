@@ -1,0 +1,23 @@
+Welcome to the GenAI Usage & ROI Dashboard — an intelligence platform built to
+go beyond traditional reporting. What sets it apart from standard dashboards is
+that it doesn't just display data: it thinks about it and provides actionable
+recommendations.
+
+Most dashboards stop at visibility — charts, tables, filters. This one goes a
+step further with a built-in Strategic Inference Engine. Ingesting raw usage
+telemetry directly from provided CSV data sources — across teams, adopted AI
+tools, and business units — it automatically surfaces the handful of findings
+that actually matter to leadership: which licenses are sitting completely
+dormant, which teams are quietly over-relying on non-billable AI spend, where
+project billability is slipping, who the habitual power users are, and where
+cost concentration creates risk.
+
+Each of these isn't just a flag — it comes with a quantified dollar impact and a
+specific, ready-to-execute recommendation. For example, the engine can pinpoint
+immediately recoverable savings from dormant licenses, paired with a direct
+reclamation action — not a suggestion to 'go investigate,' but a decision
+already packaged for approval.
+
+Ultimately, this dashboard doesn't just answer 'what happened with AI spend.'
+It answers 'what should we do about it' — turning raw telemetry into strategic,
+dollar-backed action items, automatically, every time the data updates.
