@@ -80,7 +80,25 @@ interface HierarchyDrilldownPanelProps {
    * that shows other context (e.g. a trend chart) alongside this panel can
    * re-scope itself to match how deep the user has drilled. */
   onPathChange?: (path: PathEntry[]) => void;
+  /**
+   * Adds a "Tools Used" column to the terminal Users table, listing each
+   * user's distinct AI tools. Off by default — most callers (License
+   * Reclamation, Non-Billable Overrun, etc.) don't care which tool a row
+   * came from, so the column would just be noise. The Multi-Tool Comparison
+   * overlap cohort is the one case where *which* tools overlap is the whole
+   * point of the list, not an incidental detail.
+   */
+  showToolsColumn?: boolean;
 }
+
+const TOOL_LABELS: Record<string, string> = {
+  chatgpt: 'ChatGPT',
+  github: 'GitHub Copilot',
+  claude: 'Claude',
+  replit: 'Replit',
+  factory: 'Factory AI',
+  cursor: 'Cursor AI',
+};
 
 /**
  * Embeddable version of the mandated hierarchy navigator: click through
@@ -88,7 +106,7 @@ interface HierarchyDrilldownPanelProps {
  * any individual user is ever named. Used by every Executive Overview
  * inference drilldown so user-level detail only ever appears at the last level.
  */
-export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, initialPath, onPathChange }: HierarchyDrilldownPanelProps) {
+export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, initialPath, onPathChange, showToolsColumn }: HierarchyDrilldownPanelProps) {
   // Costs are Total AI Investment (Usage + License rows), matching the figures
   // this panel sits beside in the Executive Overview and ROI drilldowns. Tokens
   // are unaffected (License rows are always 0) and user counts stay active-only.
@@ -129,15 +147,16 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
 
   const userRows = useMemo(() => {
     if (!isComplete) return [];
-    const map = new Map<string, { email: string; name: string; tokens: number; cost: number; rowCount: number }>();
+    const map = new Map<string, { email: string; name: string; tokens: number; cost: number; rowCount: number; tools: Set<string> }>();
     for (const r of pathRows) {
       const email = (r.userMail || '').toLowerCase().trim();
       if (!email) continue;
-      if (!map.has(email)) map.set(email, { email, name: r.displayName || email, tokens: 0, cost: 0, rowCount: 0 });
+      if (!map.has(email)) map.set(email, { email, name: r.displayName || email, tokens: 0, cost: 0, rowCount: 0, tools: new Set() });
       const u = map.get(email)!;
       u.tokens += r.tokenConsumption;
       u.cost += r.cost;
       u.rowCount += 1;
+      if (r.aiTool) u.tools.add(r.aiTool.toLowerCase());
     }
     return Array.from(map.values()).sort((a, b) => b.cost - a.cost);
   }, [isComplete, pathRows]);
@@ -226,6 +245,7 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
             <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
               <tr>
                 <SortableTh label="User" sortKey="name" activeKey={userSortKey} direction={userSortDir} onSort={handleUserSort} className="px-4 py-3" />
+                {showToolsColumn && <th className="px-4 py-3">Tools Used</th>}
                 <SortableTh
                   label="Tokens"
                   sortKey="tokens"
@@ -260,7 +280,7 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
             <tbody className="divide-y divide-ey-border">
               {sortedUserRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-ey-muted">
+                  <td colSpan={showToolsColumn ? 7 : 6} className="px-4 py-8 text-center text-ey-muted">
                     {userRows.length === 0 ? 'No users match this path.' : 'No users match your search.'}
                   </td>
                 </tr>
@@ -275,6 +295,20 @@ export function HierarchyDrilldownPanel({ rows, onSelectUser, title, subtitle, i
                       <div className="group-hover:text-ey-yellow transition-colors font-semibold">{u.name}</div>
                       <div className="text-[10px] text-ey-muted">{u.email}</div>
                     </td>
+                    {showToolsColumn && (
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {Array.from(u.tools).map((tool) => (
+                            <span
+                              key={tool}
+                              className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30"
+                            >
+                              {TOOL_LABELS[tool] || tool}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-right">{formatCompactNumber(u.tokens)}</td>
                     <td className="px-4 py-3 text-right font-bold text-ey-yellow">{fmtCost(u.cost)}</td>
                     <td className="px-4 py-3 text-center text-ey-muted">{u.rowCount}</td>

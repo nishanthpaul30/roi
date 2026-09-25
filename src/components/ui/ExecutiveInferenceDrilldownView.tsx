@@ -2017,6 +2017,7 @@ export function ExecutiveInferenceDrilldownView({
                         title="Multi-Platform License"
                         subtitle="Individual user identity is only revealed at the final step of the required hierarchy."
                         onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
+                        showToolsColumn
                       />
                     </div>
                   )}
