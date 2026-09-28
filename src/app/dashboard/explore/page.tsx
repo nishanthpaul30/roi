@@ -265,7 +265,7 @@ export default function DataExplorerPage() {
         disabledMessage="These shared filters don't apply to Data Playground — use the Start/End Period and Additional Filters below instead."
       />
 
-      <main className="p-6 space-y-6 max-w-7xl mx-auto w-full no-print">
+      <main className="p-6 space-y-6 w-full no-print">
         {/* Header */}
         <div className="bg-ey-card/50 border border-ey-border rounded-xl p-4 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
