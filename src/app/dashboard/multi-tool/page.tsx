@@ -23,7 +23,7 @@ export default function MultiToolComparisonPage() {
     <div className="flex-1 flex flex-col">
       <GlobalFilterBar filters={filters} onFilterChange={setFilters} filterOptions={data?.filterOptions} />
 
-      <main className="p-6 space-y-6 max-w-7xl mx-auto w-full">
+      <main className="p-6 space-y-6 w-full">
         {activeInferenceDrilldown ? (
           <ExecutiveInferenceDrilldownView
             inferenceId={activeInferenceDrilldown}

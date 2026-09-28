@@ -408,7 +408,7 @@ export default function MetricsDerivationPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto text-ey-light">
+    <div className="p-6 space-y-6 w-full text-ey-light">
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-ey-card via-ey-card to-ey-black p-6 rounded-2xl border border-ey-border shadow-xl space-y-3 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
