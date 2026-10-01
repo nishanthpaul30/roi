@@ -355,16 +355,15 @@ export function generatePrescriptiveInferences(
 
   // ---------------------------------------------------------------------------
   // Compile inferences array with License Reclamation Intelligence pinned
-  // first (#1); the remaining strategic cards are sorted dynamically by
-  // financial leverage score.
+  // first (#1) and Hours Saved ROI pinned second (#2); the remaining
+  // strategic cards are sorted dynamically by financial leverage score.
   // ---------------------------------------------------------------------------
   const otherInferences = [
     billabilityInference,
     paretoInference,
-    hoursSavedRoiInference,
     toolOverlapInference,
     nonBillableOverrunInference,
   ].sort((a, b) => b.leverageScore - a.leverageScore);
 
-  return [reclamationInference, ...otherInferences];
+  return [reclamationInference, hoursSavedRoiInference, ...otherInferences];
 }
