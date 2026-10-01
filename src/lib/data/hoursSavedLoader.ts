@@ -51,22 +51,31 @@ function getHoursSavedFilePath(): string {
 
   for (const dir of possibleDirs) {
     try {
-      if (!fs.existsSync || !fs.existsSync(dir)) continue;
-      const matches = (fs.readdirSync(dir) as string[])
+      if (!fs.existsSync || !fs.existsSync(dir)) {
+        console.log(`[HoursSaved] directory does not exist, skipping: ${dir}`);
+        continue;
+      }
+      const allFiles = fs.readdirSync(dir) as string[];
+      const matches = allFiles
         .filter((f) => f.startsWith(HOURS_SAVED_FILENAME_PREFIX) && f.endsWith(HOURS_SAVED_FILENAME_SUFFIX))
         .sort();
+      console.log(`[HoursSaved] checked dir: ${dir} — ${allFiles.length} files, ${matches.length} matching "${HOURS_SAVED_FILENAME_PREFIX}*${HOURS_SAVED_FILENAME_SUFFIX}"`);
       if (matches.length > 0) {
         // Lexicographically last -- an ISO date (YYYY-MM-DD) in the filename
         // sorts correctly that way, so the newest dated file wins.
-        return path.join(dir, matches[matches.length - 1]);
+        const resolved = path.join(dir, matches[matches.length - 1]);
+        console.log(`[HoursSaved] using file: ${resolved}${matches.length > 1 ? ` (picked newest of ${matches.length} matches: ${matches.join(', ')})` : ''}`);
+        return resolved;
       }
-    } catch (_err) {
+    } catch (err) {
       // Ignore fs permission/absence errors in edge runtimes
+      console.log(`[HoursSaved] error reading dir ${dir}:`, err);
     }
   }
 
   // No dated file found on disk -- loadHoursSavedData()'s caller falls back
   // to the embedded RAW_HOURS_SAVED_DATA constant when this is empty.
+  console.log('[HoursSaved] no file matching the expected name found in any candidate directory — will fall back to the embedded sample data');
   return '';
 }
 
@@ -120,22 +129,31 @@ function normalizeAiTool(assetName: string): string {
  * feature is AI-tool ROI only.
  */
 export function parseRawHoursSavedText(raw: string): HoursSavedRow[] {
+  console.log(`[HoursSaved] parseRawHoursSavedText called with ${raw.length} raw characters`);
   const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-  if (lines.length < 2) return [];
+  console.log(`[HoursSaved] ${lines.length} non-empty lines (including header)`);
+  if (lines.length < 2) {
+    console.log('[HoursSaved] fewer than 2 lines (header + at least 1 data row expected) — returning 0 rows');
+    return [];
+  }
 
   const header = lines[0].split(',').map(h => h.trim());
+  console.log('[HoursSaved] header row:', header);
 
   const engagementCodeIdx = findColumnIndex(header, 'Engagement Code', 'EngagementCode');
   const assetNameIdx = findColumnIndex(header, 'Asset Name', 'AssetName');
   const assetTypeIdx = findColumnIndex(header, 'Asset Type', 'AssetType');
   const approvedIdx = findColumnIndex(header, 'Approved (Actual)', 'ApprovedTotalHrs', 'Approved Total Hrs', 'Approved');
   const pendingApprovalIdx = findColumnIndex(header, 'Pending Approval (Submitted)', 'Pending Approval', 'PendingApproval', 'Pending');
+  console.log('[HoursSaved] resolved column indices:', {
+    engagementCodeIdx, assetNameIdx, assetTypeIdx, approvedIdx, pendingApprovalIdx,
+  });
 
   if (engagementCodeIdx === -1 || assetNameIdx === -1) {
     // The two columns this data is keyed by are missing entirely -- nothing
     // downstream can be trusted, so fail loudly instead of silently
     // returning empty/garbage rows.
-    console.error('actuals-planned-overall-*.csv is missing an "Engagement Code" or "Asset Name" column — got headers:', header);
+    console.error('[HoursSaved] FATAL: missing "Engagement Code" or "Asset Name" column — got headers:', header);
     return [];
   }
 
@@ -143,14 +161,27 @@ export function parseRawHoursSavedText(raw: string): HoursSavedRow[] {
   const monthColumns = header
     .map((label, idx) => ({ label, idx }))
     .filter(({ label }) => isMonthColumn(label));
+  console.log(`[HoursSaved] detected ${monthColumns.length} month columns:`, monthColumns.map((m) => m.label));
+  if (monthColumns.length === 0) {
+    console.log('[HoursSaved] WARNING: no month columns detected — every row will show 0 hours saved. Check that month headers match a 3-letter abbreviation (jan/feb/mar/.../dec).');
+  }
 
   const rows: HoursSavedRow[] = [];
+  const skippedByAssetType: string[] = [];
+  const seenAssetTypeValues = new Set<string>();
 
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(',');
     const get = (idx: number) => (idx >= 0 && cols[idx] !== undefined ? cols[idx].trim() : '');
 
-    if (assetTypeIdx !== -1 && get(assetTypeIdx).toLowerCase() !== 'ai') continue;
+    if (assetTypeIdx !== -1) {
+      const rawAssetType = get(assetTypeIdx);
+      seenAssetTypeValues.add(JSON.stringify(rawAssetType)); // JSON.stringify surfaces hidden whitespace/case
+      if (rawAssetType.toLowerCase() !== 'ai') {
+        skippedByAssetType.push(rawAssetType);
+        continue;
+      }
+    }
 
     // The real source file can carry a compound value here, e.g.
     // "E-117775 - CYBER SECURITY" (code + a trailing description) instead of
@@ -173,16 +204,32 @@ export function parseRawHoursSavedText(raw: string): HoursSavedRow[] {
       sumOfMonthlyHrs += hrs;
     }
 
+    const aiTool = normalizeAiTool(assetName);
+    if (rows.length < 3) {
+      // Log the first few rows in full so you can see exactly how each raw
+      // value got transformed -- compare engagementCode/aiTool here against
+      // what you'd expect to join against in ai_usage_data.csv.
+      console.log(`[HoursSaved] row ${i}: raw Engagement Code="${rawEngagementCode}" -> engagementCode="${engagementCode}" | raw Asset Name="${assetName}" -> aiTool="${aiTool}" | approvedTotalHrs=${approvedTotalHrs}`);
+    }
+
     rows.push({
       engagementCode,
       assetName,
-      aiTool: normalizeAiTool(assetName),
+      aiTool,
       approvedTotalHrs,
       pendingApprovalHrs,
       monthlyHours,
       sumOfMonthlyHrs,
       realizationPercent: approvedTotalHrs > 0 ? Number(((sumOfMonthlyHrs / approvedTotalHrs) * 100).toFixed(1)) : 0,
     });
+  }
+
+  console.log(`[HoursSaved] SUMMARY: ${lines.length - 1} data rows seen, ${skippedByAssetType.length} skipped by Asset Type filter, ${rows.length} rows returned`);
+  if (assetTypeIdx !== -1) {
+    console.log('[HoursSaved] distinct raw Asset Type values seen (JSON-quoted to reveal hidden whitespace):', Array.from(seenAssetTypeValues));
+  }
+  if (rows.length === 0 && lines.length > 1) {
+    console.log('[HoursSaved] WARNING: 0 rows returned despite data lines being present. Most likely cause: every row\'s Asset Type value failed the exact "ai" check above, OR the delimiter in this file is not a comma (check the header row logged above -- if it looks like one long unsplit string, that\'s the problem).');
   }
 
   return rows;
@@ -195,21 +242,30 @@ export function parseRawHoursSavedText(raw: string): HoursSavedRow[] {
  * process.
  */
 export function loadHoursSavedData(): HoursSavedRow[] {
-  if (_cache) return _cache;
+  if (_cache) {
+    console.log(`[HoursSaved] returning cached result: ${_cache.length} rows`);
+    return _cache;
+  }
 
+  console.log('[HoursSaved] loadHoursSavedData() called, no cache yet — resolving file path...');
   let raw = '';
   try {
     const fsModule = getFs();
     const csvPath = getHoursSavedFilePath();
     if (fsModule && fsModule.readFileSync) {
       raw = fsModule.readFileSync(/*turbopackIgnore: true*/ csvPath, 'utf-8');
+      console.log(`[HoursSaved] read ${raw.length} characters from disk: ${csvPath}`);
+    } else {
+      console.log('[HoursSaved] fs module unavailable in this runtime — will use embedded fallback');
     }
-  } catch (_err) {
+  } catch (err) {
     // Cloudflare Pages / Workers Edge runtime fallback
+    console.log('[HoursSaved] fs read threw, falling back to embedded data:', err);
     raw = RAW_HOURS_SAVED_DATA;
   }
 
   if (!raw || raw.trim().length === 0) {
+    console.log('[HoursSaved] disk read was empty — using embedded RAW_HOURS_SAVED_DATA instead (this is the OLD data baked in at the last `node scripts/embedCsv.js` run, not necessarily your current file!)');
     raw = RAW_HOURS_SAVED_DATA;
   }
 
