@@ -12,9 +12,12 @@
  *
  * Extracts every distinct Engagement Code straight from ai_usage_data.csv
  * (so dev hours only ever exist for engagements the rest of the app already
- * knows about) and mocks FY Jul-Jun monthly hours for each. Runs
- * automatically before every build (see package.json's "prebuild" script),
- * and writes both:
+ * knows about) and mocks FY Jul-Jun monthly hours for each. Run manually
+ * whenever ai_usage_data.csv is updated (same convention as embed-csv.js --
+ * NOT wired into the build, since ai_usage_data.csv's source file can change
+ * independently of a code build, and re-running on every build would
+ * silently regenerate mock data against a source that hasn't actually
+ * changed). Writes both:
  *   - public/dev-hours-timesheet.csv (human-readable)
  *   - src/lib/data/rawDevHoursData.ts (embedded fallback for edge runtimes
  *     with no reliable filesystem read at request time, mirroring
@@ -22,6 +25,7 @@
  *
  * Usage:
  *   node scripts/generateDevHoursCsv.js
+ *   (or: npm run generate-dev-hours)
  */
 
 const fs = require('fs');
