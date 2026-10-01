@@ -80,7 +80,7 @@ export interface CsvUsageRow {
 export interface HoursSavedRow {
   engagementCode: string;              // Extracted from the "Engagement Code" column (which may carry a trailing description, e.g. "E-117775 - CYBER SECURITY") -- just the leading E-NNNNNN/I-NNNNNN is kept, since that's what joins to CsvUsageRow.projectCode
   assetName: string;                   // "Asset Name" column, as given in the source file (e.g. "Github")
-  aiTool: string;                      // assetName.toLowerCase() — joins to CsvUsageRow.aiTool
+  aiTool: string;                      // normalizeAiTool(assetName) — exact match first, then falls back to substring containment (e.g. "GitHub Copilot" -> "github") so near-miss naming still joins to CsvUsageRow.aiTool
   approvedTotalHrs: number;            // The approved-hours column (e.g. "Approved (Actual)") — a target, not a sum
   pendingApprovalHrs: number;          // "Pending Approval (Submitted)" column — submitted but not yet approved; informational only, 0 if the column is absent
   monthlyHours: Record<string, number>; // One entry per detected month column, keyed by its own header text, e.g. { jul: 62, aug: 58 }

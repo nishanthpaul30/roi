@@ -1,8 +1,8 @@
 // AUTO-GENERATED — do not edit manually.
 // Re-generate by running: node scripts/embedCsv.js
-// Source: actuals-planned-overall-2026-09-30.csv (63 data rows, generated 2026-10-01T07:23:53.502Z)
+// Source: actuals-planned-overall-2026-09-30.csv (63 data rows, generated 2026-10-01T07:37:54.561Z)
 export const RAW_HOURS_SAVED_DATA = `Engagement Code,Asset Name,Asset Type,Approved (Actual),Pending Approval (Submitted),jul,aug,sep,oct,nov,dec,jan,feb,mar,apr,may,jun
-E-157049 - TECHNOLOGY,ChatGPT,ai,97,6,25,23,22,0,0,0,0,0,0,0,0,0
+E-157049 - TECHNOLOGY,ChatGPT Enterprise,ai,97,6,25,23,22,0,0,0,0,0,0,0,0,0
 E-157049 - TECHNOLOGY,Claude,ai,111,0,42,13,45,0,0,0,0,0,0,0,0,0
 E-157049 - TECHNOLOGY,Cursor,ai,256,0,13,21,22,0,0,0,0,0,0,0,0,0
 E-157049 - TECHNOLOGY,Factory,ai,72,0,43,20,42,0,0,0,0,0,0,0,0,0

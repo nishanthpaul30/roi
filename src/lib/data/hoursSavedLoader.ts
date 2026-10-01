@@ -85,6 +85,27 @@ function findColumnIndex(header: string[], ...candidates: string[]): number {
   return header.findIndex((h) => lowered.includes(h.toLowerCase()));
 }
 
+// The six AI tools ai_usage_data.csv's Product column actually uses -- the
+// join key both files must agree on.
+const CANONICAL_AI_TOOLS = ['chatgpt', 'github', 'claude', 'replit', 'factory', 'cursor'];
+
+/**
+ * Maps an Asset Name to one of CANONICAL_AI_TOOLS. Tries an exact match
+ * first ("Github" -> "github"); if that fails, falls back to substring
+ * containment -- e.g. "GitHub Copilot" or "Cursor AI" both contain a
+ * canonical tool name, so they still join correctly without needing an
+ * exhaustive alias table for every real-world product name variant. If
+ * NEITHER matches, the lowercased value is kept as-is (visible for
+ * debugging) rather than silently becoming "unknown" -- it just won't join,
+ * exactly as an unrecognized value would without this function at all.
+ */
+function normalizeAiTool(assetName: string): string {
+  const lower = assetName.trim().toLowerCase();
+  if (CANONICAL_AI_TOOLS.includes(lower)) return lower;
+  const match = CANONICAL_AI_TOOLS.find((tool) => lower.includes(tool));
+  return match || lower;
+}
+
 /**
  * Parses actuals-planned-overall-*.csv by HEADER NAME, not column position — the real
  * source file carries more fields than this feature uses, so each needed
@@ -155,7 +176,7 @@ export function parseRawHoursSavedText(raw: string): HoursSavedRow[] {
     rows.push({
       engagementCode,
       assetName,
-      aiTool: assetName.toLowerCase(),
+      aiTool: normalizeAiTool(assetName),
       approvedTotalHrs,
       pendingApprovalHrs,
       monthlyHours,
