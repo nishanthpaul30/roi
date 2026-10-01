@@ -248,11 +248,11 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement }: HoursSavedG
                     </tr>
 
                     {isOpen &&
-                      g.tools.map((t) => {
+                      g.tools.map((t, toolIdx) => {
                         const tStatus = realizationStyle(t.realizationPercent);
                         return (
                           <tr
-                            key={`${g.engagementCode}:::${t.aiTool}`}
+                            key={`${g.engagementCode}:::${t.assetName}:::${toolIdx}`}
                             onClick={() => onSelectEngagement(g.engagementCode)}
                             className="hover:bg-ey-card-hover/60 transition cursor-pointer"
                           >
