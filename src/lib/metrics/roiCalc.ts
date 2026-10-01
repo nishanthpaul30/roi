@@ -15,6 +15,17 @@ export function computeHoursSavedValueUsd(hoursSaved: number, rate: number): num
 }
 
 /**
+ * Hours actually recorded (sumOfMonthlyHrs) aren't locked into the business
+ * case until they're approved -- only approvedTotalHrs is. Caps the hours
+ * counted toward ROI's dollar value at the approved target, so hours beyond
+ * what's been approved don't inflate ROI before they're actually signed off.
+ * (approvedTotalHrs = 0 means nothing is approved yet, so nothing counts.)
+ */
+export function computeRoiEligibleHours(actualHours: number, approvedHours: number): number {
+  return Math.min(actualHours, approvedHours);
+}
+
+/**
  * (value of hours saved - cost) / cost * 100. Null when there's no cost to
  * compare against (can't compute ROI against a cost of 0/unknown). Used both
  * for tool-cost-only ROI (per tool row) and total-investment ROI (per

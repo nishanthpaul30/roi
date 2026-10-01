@@ -6,7 +6,7 @@ import type { TokenCostSummary } from '@/lib/metrics/types';
 import { formatCompactCurrency as fmtCost, formatCompactNumber as fmtNum } from '@/lib/format';
 import { useTableSort } from '@/lib/useTableSort';
 import { SortableTh } from '@/components/ui/SortableTh';
-import { computeHoursSavedValueUsd, computeRoiPercent, computeDevCostUsd, computeTotalInvestmentUsd } from '@/lib/metrics/roiCalc';
+import { computeHoursSavedValueUsd, computeRoiPercent, computeDevCostUsd, computeTotalInvestmentUsd, computeRoiEligibleHours } from '@/lib/metrics/roiCalc';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
 type HoursSavedRow = NonNullable<TokenCostSummary['hoursSavedByEngagement']>[number];
@@ -84,7 +84,11 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
         const totalPendingHrs = tools.reduce((s, t) => s + t.pendingApprovalHrs, 0);
         const totalHoursSaved = tools.reduce((s, t) => s + t.sumOfMonthlyHrs, 0);
         const totalCost = tools.reduce((s, t) => s + (t.cost ?? 0), 0);
-        const hoursSavedValueUsd = computeHoursSavedValueUsd(totalHoursSaved, devHourRate);
+        // Capped per tool (not on the engagement total) so one tool
+        // overshooting its own approved target can't borrow "room" from
+        // another tool that undershot its own.
+        const totalRoiEligibleHours = tools.reduce((s, t) => s + computeRoiEligibleHours(t.sumOfMonthlyHrs, t.approvedTotalHrs), 0);
+        const hoursSavedValueUsd = computeHoursSavedValueUsd(totalRoiEligibleHours, devHourRate);
         // devHoursSpent is engagement-level, duplicated on every tool row --
         // read it once (tools[0]), never sum across tools, or it over-counts
         // on a multi-tool engagement.
@@ -254,7 +258,7 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
                   </button>
                   <InfoTooltip widthClassName="w-60">
                     <span className="font-semibold text-ey-yellow block mb-1">Total Investment ROI</span>
-                    At the engagement row: (Value of Hours Saved &minus; Total Investment) &divide; Total Investment &times; 100, where Total Investment = AI Tool Cost + (Dev Hours &times; $/dev-hr). Dev hours come from the mock timesheet data (see Dev Hours column) and apply per engagement, not per tool.
+                    At the engagement row: (Value of Hours Saved &minus; Total Investment) &divide; Total Investment &times; 100, where Total Investment = AI Tool Cost + (Dev Hours &times; $/dev-hr). Dev hours come from the mock timesheet data (see Dev Hours column) and apply per engagement, not per tool. Hours Saved here is capped at each tool&apos;s Approved Hrs &mdash; hours recorded beyond what&apos;s approved don&apos;t count toward value yet.
                   </InfoTooltip>
                 </div>
               </th>
@@ -317,7 +321,8 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
                     {isOpen &&
                       g.tools.map((t, toolIdx) => {
                         const tStatus = realizationStyle(t.realizationPercent);
-                        const tHoursSavedValueUsd = computeHoursSavedValueUsd(t.sumOfMonthlyHrs, devHourRate);
+                        const tRoiEligibleHours = computeRoiEligibleHours(t.sumOfMonthlyHrs, t.approvedTotalHrs);
+                        const tHoursSavedValueUsd = computeHoursSavedValueUsd(tRoiEligibleHours, devHourRate);
                         const tRoiPercent = computeRoiPercent(tHoursSavedValueUsd, t.cost);
                         return (
                           <tr

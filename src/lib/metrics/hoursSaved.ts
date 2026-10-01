@@ -3,7 +3,7 @@ import 'server-only';
 import { loadHoursSavedData } from '../data/hoursSavedLoader';
 import { loadDevHoursData } from '../data/devHoursLoader';
 import type { CsvUsageRow } from '../data/csvLoader';
-import { DEFAULT_DEV_HOUR_RATE_USD, computeHoursSavedValueUsd, computeRoiPercent } from './roiCalc';
+import { DEFAULT_DEV_HOUR_RATE_USD, computeHoursSavedValueUsd, computeRoiPercent, computeRoiEligibleHours } from './roiCalc';
 
 // The current fiscal year starts in July (FY calendar: Jul-Dec of this
 // calendar year, then Jan-Jun of the next). actuals-planned-overall-*.csv's month
@@ -41,11 +41,13 @@ export interface EngagementHoursSaved {
   userCount: number | null;
   // cost / sumOfMonthlyHrs -- null when there's no cost match or no hours saved yet.
   costPerHourSaved: number | null;
-  // sumOfMonthlyHrs * DEFAULT_DEV_HOUR_RATE_USD -- the dollar value of hours saved
-  // so far, at the default blended developer rate. The UI recomputes this
-  // client-side (see lib/metrics/roiCalc.ts) when the user picks a different
-  // rate, so this field is only the as-served default, not necessarily what's
-  // on screen.
+  // min(sumOfMonthlyHrs, approvedTotalHrs) * DEFAULT_DEV_HOUR_RATE_USD -- the
+  // dollar value of hours saved SO FAR, capped at the approved target since
+  // hours beyond what's approved aren't locked into the business case yet
+  // (see computeRoiEligibleHours), at the default blended developer rate.
+  // The UI recomputes this client-side (see lib/metrics/roiCalc.ts) when the
+  // user picks a different rate, so this field is only the as-served
+  // default, not necessarily what's on screen.
   hoursSavedValueUsd: number;
   // (hoursSavedValueUsd - cost) / cost * 100 at the default rate -- null when
   // there's no cost match (can't compute ROI against a cost of 0/unknown).
@@ -101,7 +103,8 @@ export function joinHoursSavedToEngagements(spendRows: CsvUsageRow[]): Engagemen
     const tokens = consolidated ? Math.round(consolidated.tokens) : null;
     const userCount = consolidated ? consolidated.users.size : null;
     const costPerHourSaved = cost !== null && h.sumOfMonthlyHrs > 0 ? Number((cost / h.sumOfMonthlyHrs).toFixed(2)) : null;
-    const hoursSavedValueUsd = computeHoursSavedValueUsd(h.sumOfMonthlyHrs, DEFAULT_DEV_HOUR_RATE_USD);
+    const roiEligibleHours = computeRoiEligibleHours(h.sumOfMonthlyHrs, h.approvedTotalHrs);
+    const hoursSavedValueUsd = computeHoursSavedValueUsd(roiEligibleHours, DEFAULT_DEV_HOUR_RATE_USD);
     const roiPercent = computeRoiPercent(hoursSavedValueUsd, cost);
 
     const monthlyCost: Record<string, number | null> = {};

@@ -2,7 +2,7 @@
 
 import { Clock3 } from 'lucide-react';
 import type { TokenCostSummary } from '@/lib/metrics/types';
-import { computeHoursSavedValueUsd, computeRoiPercent, computeDevCostUsd, computeTotalInvestmentUsd } from '@/lib/metrics/roiCalc';
+import { computeHoursSavedValueUsd, computeRoiPercent, computeDevCostUsd, computeTotalInvestmentUsd, computeRoiEligibleHours } from '@/lib/metrics/roiCalc';
 import { formatCompactCurrency as fmtCost, formatCompactNumber as fmtNum } from '@/lib/format';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
@@ -50,10 +50,12 @@ export function EngagementHoursSavedPanel({ rows, engagementCode, devHourRate }:
   // Engagement-level totals, across every tool row for this engagement.
   // devHoursSpent is the same value on every row (dev hours aren't tracked
   // per tool), so it's read once rather than summed.
-  const totalHoursSaved = rows.reduce((s, r) => s + r.sumOfMonthlyHrs, 0);
   const totalToolCost = rows.reduce((s, r) => s + (r.cost ?? 0), 0);
   const devHoursSpent = rows[0].devHoursSpent;
-  const totalHoursSavedValueUsd = computeHoursSavedValueUsd(totalHoursSaved, devHourRate);
+  // Capped per tool row (not on the engagement total) so one tool
+  // overshooting its own approved target can't borrow "room" from another.
+  const totalRoiEligibleHours = rows.reduce((s, r) => s + computeRoiEligibleHours(r.sumOfMonthlyHrs, r.approvedTotalHrs), 0);
+  const totalHoursSavedValueUsd = computeHoursSavedValueUsd(totalRoiEligibleHours, devHourRate);
   const devCostUsd = computeDevCostUsd(devHoursSpent, devHourRate);
   const totalInvestmentUsd = computeTotalInvestmentUsd(totalToolCost, devCostUsd);
   const totalInvestmentRoiPercent = computeRoiPercent(totalHoursSavedValueUsd, totalInvestmentUsd);
@@ -79,6 +81,7 @@ export function EngagementHoursSavedPanel({ rows, engagementCode, devHourRate }:
             <span className="font-semibold text-ey-yellow block mb-1">How this is calculated</span>
             Dev Hours = hours clocked on {engagementCode} (mock timesheet data) = <span className="font-mono">{fmtNum(devHoursSpent)} hrs</span>, at ${devHourRate}/dev-hr = <span className="font-mono">{fmtCost(devCostUsd)}</span>.<br />
             Total Investment = AI Tool Cost + Dev Cost = <span className="font-mono">{fmtCost(totalToolCost)} + {fmtCost(devCostUsd)} = {fmtCost(totalInvestmentUsd)}</span>.<br />
+            Value of Hours Saved uses Hours Saved capped at each tool&apos;s Approved Hrs &mdash; hours recorded beyond what&apos;s approved don&apos;t count yet.<br />
             ROI % = (Value of Hours Saved &minus; Total Investment) &divide; Total Investment &times; 100 = <span className="font-mono">({fmtCost(totalHoursSavedValueUsd)} &minus; {fmtCost(totalInvestmentUsd)}) &divide; {fmtCost(totalInvestmentUsd)} &times; 100 = {totalInvestmentRoiPercent !== null ? `${totalInvestmentRoiPercent >= 0 ? '+' : ''}${totalInvestmentRoiPercent}%` : '—'}</span>
           </InfoTooltip>
         </div>
@@ -108,7 +111,8 @@ export function EngagementHoursSavedPanel({ rows, engagementCode, devHourRate }:
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {rows.map((r) => {
           const status = realizationStyle(r.realizationPercent);
-          const hoursSavedValueUsd = computeHoursSavedValueUsd(r.sumOfMonthlyHrs, devHourRate);
+          const roiEligibleHours = computeRoiEligibleHours(r.sumOfMonthlyHrs, r.approvedTotalHrs);
+          const hoursSavedValueUsd = computeHoursSavedValueUsd(roiEligibleHours, devHourRate);
           const roiPercent = computeRoiPercent(hoursSavedValueUsd, r.cost);
           // The source file spans the full fiscal year (Jul-Jun), with
           // future months sitting at 0 until they actually arrive -- showing

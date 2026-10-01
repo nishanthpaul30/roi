@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import type { TokenCostSummary } from '@/lib/metrics/types';
-import { computeRoiPercent, computeDevCostUsd, computeTotalInvestmentUsd } from '@/lib/metrics/roiCalc';
+import { computeRoiPercent, computeDevCostUsd, computeTotalInvestmentUsd, computeRoiEligibleHours } from '@/lib/metrics/roiCalc';
 import { formatCompactCurrency as fmtCost, formatCompactNumber as fmtNum } from '@/lib/format';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
@@ -29,7 +29,10 @@ export function HoursSavedExecutiveSummary({ rows, devHourRate }: HoursSavedExec
     const totalCost = rows.reduce((s, r) => s + (r.cost ?? 0), 0);
     const overallRealizationPercent = totalApprovedHrs > 0 ? (totalHoursSaved / totalApprovedHrs) * 100 : 0;
     const blendedCostPerHourSaved = totalHoursSaved > 0 ? totalCost / totalHoursSaved : null;
-    const totalHoursSavedValueUsd = totalHoursSaved * devHourRate;
+    // Capped per row (not on the portfolio total) so one row overshooting
+    // its own approved target can't borrow "room" from another that undershot.
+    const totalRoiEligibleHours = rows.reduce((s, r) => s + computeRoiEligibleHours(r.sumOfMonthlyHrs, r.approvedTotalHrs), 0);
+    const totalHoursSavedValueUsd = totalRoiEligibleHours * devHourRate;
 
     // devHoursSpent is engagement-level, duplicated on every tool row of a
     // multi-tool engagement -- dedupe by projectCode before summing, or a
@@ -58,6 +61,7 @@ export function HoursSavedExecutiveSummary({ rows, devHourRate }: HoursSavedExec
       overallRealizationPercent,
       blendedCostPerHourSaved,
       totalHoursSavedValueUsd,
+      totalRoiEligibleHours,
       totalDevHoursSpent,
       totalDevCostUsd,
       totalInvestmentUsd,
@@ -129,8 +133,8 @@ export function HoursSavedExecutiveSummary({ rows, devHourRate }: HoursSavedExec
             <p className="text-[10px] text-ey-muted uppercase tracking-wider">ROI (Hours Saved vs. Total Investment)</p>
             <InfoTooltip widthClassName="w-64">
               <span className="font-semibold text-ey-yellow block mb-1">How this is calculated</span>
-              Value of Hours Saved = Hours Saved &times; $/dev-hr.<br />
-              <span className="font-mono">{fmtHrs(stats.totalHoursSaved)} hrs &times; ${devHourRate}/hr = {fmtExact(stats.totalHoursSavedValueUsd)}</span><br />
+              Value of Hours Saved = (Hours Saved capped at each row&apos;s Approved Hrs) &times; $/dev-hr &mdash; hours recorded beyond what&apos;s approved don&apos;t count toward value yet.<br />
+              <span className="font-mono">{fmtHrs(stats.totalRoiEligibleHours)} hrs &times; ${devHourRate}/hr = {fmtExact(stats.totalHoursSavedValueUsd)}</span><br />
               Total Investment = AI Tool Cost + Dev Hours Cost.<br />
               <span className="font-mono">{fmtExact(stats.totalCost)} + {fmtExact(stats.totalDevCostUsd)} = {fmtExact(stats.totalInvestmentUsd)}</span><br />
               ROI % = (Value &minus; Total Investment) &divide; Total Investment &times; 100.<br />

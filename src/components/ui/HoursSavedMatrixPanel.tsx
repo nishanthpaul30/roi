@@ -6,7 +6,7 @@ import type { TokenCostSummary } from '@/lib/metrics/types';
 import { formatCompactCurrency as fmtCost, formatCompactNumber as fmtNum } from '@/lib/format';
 import { SortableTh } from '@/components/ui/SortableTh';
 import type { SortDirection } from '@/lib/useTableSort';
-import { computeHoursSavedValueUsd, computeRoiPercent } from '@/lib/metrics/roiCalc';
+import { computeHoursSavedValueUsd, computeRoiPercent, computeRoiEligibleHours } from '@/lib/metrics/roiCalc';
 
 type HoursSavedRow = NonNullable<TokenCostSummary['hoursSavedByEngagement']>[number];
 
@@ -40,7 +40,10 @@ const METRIC_CONFIG: Record<Metric, { label: string; format: (v: number) => stri
 // baked in at the server-side default rate (see lib/metrics/roiCalc.ts).
 function getMetricValue(row: HoursSavedRow, metric: Metric, devHourRate: number): number | null {
   if (metric === 'roiPercent') {
-    return computeRoiPercent(computeHoursSavedValueUsd(row.sumOfMonthlyHrs, devHourRate), row.cost);
+    // Hours Saved is capped at Approved Hrs for ROI -- hours recorded
+    // beyond what's approved aren't locked into the business case yet.
+    const roiEligibleHours = computeRoiEligibleHours(row.sumOfMonthlyHrs, row.approvedTotalHrs);
+    return computeRoiPercent(computeHoursSavedValueUsd(roiEligibleHours, devHourRate), row.cost);
   }
   return row[metric];
 }
