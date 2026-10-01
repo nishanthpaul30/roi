@@ -73,9 +73,23 @@ export interface EngagementHoursSaved {
  * isn't double-counted against each tool's own hours saved. Monthly figures
  * use FY_START_CALENDAR_YEAR to resolve each month column to a real
  * calendar month (see monthLabelToMonthId).
+ *
+ * ai_usage_data.csv is treated as the MASTER list of valid Engagement Codes
+ * (same principle as dev-hours-timesheet.csv generation, which only ever
+ * mints codes seen there): a Hours Saved row whose Engagement Code doesn't
+ * exist ANYWHERE in ai_usage_data.csv is dropped entirely, rather than
+ * showing a row with real approved/hours-saved figures but no possible cost
+ * match. `allSpendRows` should be the FULL, unfiltered roster (not the
+ * current date-range-filtered `spendRows`), so validity doesn't flicker
+ * on/off as the user changes the date filter -- a code is either real or
+ * it isn't, independent of which months are currently in view.
  */
-export function joinHoursSavedToEngagements(spendRows: CsvUsageRow[]): EngagementHoursSaved[] {
-  const hoursSavedRows = loadHoursSavedData();
+export function joinHoursSavedToEngagements(
+  spendRows: CsvUsageRow[],
+  allSpendRows: CsvUsageRow[]
+): EngagementHoursSaved[] {
+  const validEngagementCodes = new Set(allSpendRows.map((r) => r.projectCode));
+  const hoursSavedRows = loadHoursSavedData().filter((h) => validEngagementCodes.has(h.engagementCode));
   const devHoursByEngagement = new Map<string, number>(
     loadDevHoursData().map((d) => [d.engagementCode, d.totalDevHours])
   );

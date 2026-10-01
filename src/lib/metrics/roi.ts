@@ -591,8 +591,10 @@ export async function calculateTokenCostSummary(
 
   // Hours Saved (actuals-planned-overall-*.csv), joined onto byProjectCode by Engagement
   // Code -- a separate, non-metered data source (see EngagementHoursSaved's
-  // doc comment), kept out of every cost/token aggregate above.
-  const hoursSavedByEngagement = joinHoursSavedToEngagements(spendRows);
+  // doc comment), kept out of every cost/token aggregate above. allRows (not
+  // the date-filtered spendRows) is passed as the master Engagement Code
+  // validity list, so a code's validity doesn't change as the date filter does.
+  const hoursSavedByEngagement = joinHoursSavedToEngagements(spendRows, allRows);
 
   // Monthly Trend breakdown (Year / Month columns) with per-AI-tool cost split
   const byMonthMap = groupBy(spendRows, r => String(r.monthId));
