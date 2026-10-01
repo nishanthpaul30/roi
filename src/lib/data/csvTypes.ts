@@ -50,3 +50,40 @@ export interface CsvUsageRow {
   rs: string;                        // RS
   gds: string;                       // GDS
 }
+
+/**
+ * Row shape for actuals-planned-overall-*.csv — a separate, supplementary data source
+ * (not metered telemetry) reporting the productivity hours an AI tool is
+ * estimated/approved to have saved on a given client engagement.
+ *
+ * The source file carries more columns than this feature uses (it's read by
+ * HEADER NAME, not position — see hoursSavedLoader.ts — so extra fields are
+ * simply ignored rather than breaking the parser). One of those extra
+ * columns, Asset Type ("ai" | "non-ai"), is used as a filter at load time:
+ * non-AI rows never make it into HoursSavedRow at all, so there's no
+ * assetType field here to check later — by the time a row exists, it has
+ * already passed that filter.
+ *
+ * Grain: one row per (Engagement Code, AI Tool/Asset). approvedTotalHrs is
+ * the approved business-case TARGET, not a figure the monthly columns are
+ * expected to sum to — the two are independently sourced. pendingApprovalHrs
+ * is a separate, not-yet-approved figure (hours submitted for sign-off but
+ * not locked into the business case yet) — it's never added into
+ * approvedTotalHrs or used in realizationPercent, both of which stay based
+ * on what's actually approved. Month columns are detected by name (any
+ * header matching a month abbreviation, e.g. "jul"), wherever they fall in
+ * the file, and are resolved to real calendar months via the current fiscal
+ * year (see hoursSaved.ts's monthLabelToMonthId) — the relation to
+ * ai_usage_data.csv is by (Engagement Code, AI Tool), at both the
+ * consolidated and the monthly grain.
+ */
+export interface HoursSavedRow {
+  engagementCode: string;              // "Engagement Code" column — joins to CsvUsageRow.projectCode
+  assetName: string;                   // "Asset Name" column, as given in the source file (e.g. "Github")
+  aiTool: string;                      // assetName.toLowerCase() — joins to CsvUsageRow.aiTool
+  approvedTotalHrs: number;            // The approved-hours column (e.g. "Approved (Actual)") — a target, not a sum
+  pendingApprovalHrs: number;          // "Pending Approval (Submitted)" column — submitted but not yet approved; informational only, 0 if the column is absent
+  monthlyHours: Record<string, number>; // One entry per detected month column, keyed by its own header text, e.g. { jul: 62, aug: 58 }
+  sumOfMonthlyHrs: number;             // Derived: sum of monthlyHours' values
+  realizationPercent: number;          // Derived: sumOfMonthlyHrs / approvedTotalHrs * 100 (0 when approvedTotalHrs is 0) -- based on approved hours only, pendingApprovalHrs is never included
+}

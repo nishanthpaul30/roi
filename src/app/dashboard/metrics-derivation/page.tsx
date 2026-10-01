@@ -14,6 +14,7 @@ import {
   Wallet,
   TrendingUp,
   Download,
+  Clock3,
 } from 'lucide-react';
 
 // Derivation Data Item Interface
@@ -66,6 +67,22 @@ const CSV_SCHEMA = [
   { column: 'GDS', fieldName: 'gds', description: 'Parsed and retained but not used in any insight', dataType: 'String (passthrough)' },
   { column: '— (derived from Month)', fieldName: 'monthYear / monthId', description: 'monthYear is a human-readable label (e.g. "March_2026") for chart axes; monthId is a sortable numeric key (e.g. 202603) used for date-range filtering and ordering — both come from the Month column\'s own date, not from Year', dataType: 'Derived' },
   { column: '— (derived from Engagement Code)', fieldName: 'billableFlag / projectType', description: 'billableFlag ("True"/"False") and projectType ("External"/"Internal") are derived from the Engagement Code prefix: E-XXXXXX → billable/External, I-XXXXXX → non-billable/Internal', dataType: 'Derived' },
+];
+
+// A second, separate data source (not metered telemetry): approved-vs-actual
+// productivity hours per (Engagement Code, AI Tool), joined onto the dataset
+// above rather than merged into it. Columns are matched by HEADER NAME, not
+// position, so this schema documents the expected names, not fixed indices.
+// Month columns ("jul", "aug", ...) are open-ended -- whatever the source
+// file's header row contains -- and are resolved to a real calendar month via
+// the current fiscal year (Jul-Jun), not listed as fixed columns here.
+const HOURS_SAVED_CSV_SCHEMA = [
+  { column: 'Engagement Code', fieldName: 'engagementCode', description: 'Joins to the dataset above\'s projectCode. An Engagement Code with no match there still appears in the UI, with cost/tokens/$-per-hour shown as "—" rather than being dropped', dataType: 'String' },
+  { column: 'Asset Name', fieldName: 'assetName / aiTool', description: 'The AI tool name, e.g. "Github" — lowercased to aiTool for the join, so it must match the spelling used in the Product column above (case-insensitive)', dataType: 'String' },
+  { column: 'Asset Type', fieldName: '(filter only, not stored)', description: '"ai" or "non-ai". A "non-ai" row is dropped at load time and never reaches the rest of the app — this feature is AI-tool ROI only', dataType: 'String' },
+  { column: 'Approved (Actual)', fieldName: 'approvedTotalHrs', description: 'The approved business-case TARGET for this (Engagement, Tool) pair — not a figure the month columns are expected to sum to; the two are independently sourced', dataType: 'Numeric' },
+  { column: 'Pending Approval (Submitted)', fieldName: 'pendingApprovalHrs', description: 'Hours submitted for sign-off but not yet approved. Shown as its own pipeline figure — never added into approvedTotalHrs or used in Realization %', dataType: 'Numeric' },
+  { column: 'jul, aug, sep, … (any month name)', fieldName: 'monthlyHours[label]', description: 'One column per month, detected by name wherever it falls in the header (not a fixed position) — so extra columns can sit anywhere without breaking the parser. A future month sits at 0 until it actually arrives', dataType: 'Numeric, 12 max (Jul–Jun)' },
 ];
 
 const FORMULA_CATEGORIES = [
@@ -121,6 +138,16 @@ const FORMULA_CATEGORIES = [
       { name: 'Tool Overlap Cost', formula: 'Overlap = COUNT(DISTINCT user) with Cost USD > 0 on 2+ Products in the SAME month', example: '205 users, $6,695.98/mo ($80.4k annualised)' },
       { name: 'Pareto Cost Concentration (Top 10% / 20%)', formula: 'Top N% Share = (∑ actualCost of top N% users / Total Cost) × 100', example: 'Top 20% (99 users): $6,604.96 ÷ $8,732.25 × 100 = 75.6%' },
       { name: 'Zero-Consumption / High-Spend Users', formula: 'COUNT(DISTINCT user) with 0 GenAI Tool Consumption / with SUM(cost) > $100', example: '25 Zero-Consumption Users · 14 High-Spend Users' },
+    ],
+  },
+  {
+    title: 'Hours Saved & Cost Efficiency Formulas',
+    icon: Clock3,
+    color: 'text-amber-400',
+    formulas: [
+      { name: 'Hours Saved Realization (%)', formula: 'Realization % = SUM(monthly hours) / Approved (Actual) × 100', example: '78 ÷ 254 × 100 = 30.7% (E-157049 / GitHub Copilot)' },
+      { name: 'Cost per Hour Saved ($)', formula: 'Tool Cost (same Engagement + Tool, from ai_usage_data.csv) / SUM(monthly hours)', example: '$213.85 ÷ 78 hrs = $2.74 / hour saved' },
+      { name: 'Portfolio Blended Cost / Hour Saved', formula: 'SUM(Tool Cost, all rows) / SUM(Hours Saved, all rows) -- not an average of each row\'s own ratio', example: '$14,283.33 ÷ 4,817 hrs = $2.97 / hour saved, portfolio-wide' },
     ],
   },
 ];
@@ -366,6 +393,36 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     notes: 'Looser than Tool Overlap Cost above (no same-month requirement), so this count is always ≥ it. Backs the "Multi-Tool License Overlap & License Consolidation Alert" box shown inside the Tool Overlap Cost drilldown',
     category: 'Governance',
   },
+  {
+    name: 'Hours Saved Realization (%)',
+    csvField: 'monthlyHours (every month column, actuals-planned-overall-*.csv) vs approvedTotalHrs (Approved (Actual) column)',
+    formula: 'Realization % = SUM(monthlyHours across all month columns) / approvedTotalHrs × 100',
+    sampleInput: 'E-157049 / GitHub Copilot: jul=45, aug=25, sep=8, oct..jun=0, Approved (Actual)=254',
+    workedCalculation: '(45 + 25 + 8) ÷ 254 × 100',
+    derivedOutput: '30.7%',
+    notes: 'A trailing month at 0 is not missing data — it is a future fiscal-year month that has not arrived yet, so it correctly contributes nothing to the sum rather than being excluded or treated as a gap. Pending Approval (Submitted) is never added to approvedTotalHrs here, so hours still awaiting sign-off cannot inflate this number. Powers the status badge (On/Above Target ≥100%, On Track ≥75%, Behind Target <75%) on both the Matrix and Grouped Table views',
+    category: 'Hours Saved',
+  },
+  {
+    name: 'Cost per Hour Saved ($)',
+    csvField: 'cost (ai_usage_data.csv, summed for the SAME Engagement Code + AI Tool pair) ÷ sumOfMonthlyHrs',
+    formula: 'Tool Cost / SUM(monthlyHours) — joined by (Engagement Code, AI Tool), not Engagement Code alone',
+    sampleInput: 'E-157049 / GitHub Copilot: Tool Cost = $213.85, Hours Saved = 78',
+    workedCalculation: '$213.85 ÷ 78',
+    derivedOutput: '$2.74 / hour saved',
+    notes: 'The join is deliberately scoped to (Engagement, Tool), not just Engagement — an engagement using 6 different tools gets 6 separate cost figures, one per tool, never one tool\'s hours compared against the whole engagement\'s combined spend. The same formula also runs per month (monthlyCostPerHourSaved) wherever that month\'s cost has arrived in ai_usage_data.csv; a month with hours saved but no cost yet correctly shows "—" rather than a wrong $0 or a crash',
+    category: 'Hours Saved',
+  },
+  {
+    name: 'Portfolio Blended Cost per Hour Saved',
+    csvField: 'cost and monthlyHours, summed across every tracked (Engagement, Tool) pair',
+    formula: 'SUM(Tool Cost, all rows) / SUM(Hours Saved, all rows)',
+    sampleInput: '61 tracked Engagement × Tool pairs, Total Tool Cost = $14,283.33, Total Hours Saved = 4,817',
+    workedCalculation: '$14,283.33 ÷ 4,817',
+    derivedOutput: '$2.97 / hour saved, portfolio-wide',
+    notes: 'Deliberately NOT an average of each row\'s own Cost per Hour Saved — averaging 61 separate ratios would let a tiny, cheap engagement count exactly as much as a large, expensive one. Summing dollars and hours first and dividing once weights the result by actual dollars at stake. Overall Realization % (SUM hours saved ÷ SUM approved hours = 4,817 ÷ 10,014 = 48.1%) follows the same sum-then-divide rule. Powers the Hours Saved Executive Summary strip on Engagement Analytics',
+    category: 'Hours Saved',
+  },
 ];
 
 export default function MetricsDerivationPage() {
@@ -373,7 +430,7 @@ export default function MetricsDerivationPage() {
   const [copiedFormula, setCopiedFormula] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
-  const categories = ['All', 'Tokens', 'Cost', 'Projects', 'Breakdowns', 'License & Adoption', 'Governance'];
+  const categories = ['All', 'Tokens', 'Cost', 'Projects', 'Breakdowns', 'License & Adoption', 'Governance', 'Hours Saved'];
 
   const filteredMetrics = METRICS_DERIVATION_LIST.filter((item) => {
     const matchesSearch =
@@ -391,21 +448,24 @@ export default function MetricsDerivationPage() {
     setTimeout(() => setCopiedFormula(null), 2000);
   };
 
-  const handleExportSchemaToCsv = () => {
+  const exportSchemaToCsv = (schema: typeof CSV_SCHEMA, filename: string) => {
     const escapeCsvValue = (value: string) => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
     const headers = ['CSV Column Name', 'Internal Field', 'Data Type', 'Description & Usage'];
-    const rows = CSV_SCHEMA.map((row) => [row.column, row.fieldName, row.dataType, row.description].map(escapeCsvValue));
+    const rows = schema.map((row) => [row.column, row.fieldName, row.dataType, row.description].map(escapeCsvValue));
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 'ai_usage_data_schema.csv');
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
+
+  const handleExportSchemaToCsv = () => exportSchemaToCsv(CSV_SCHEMA, 'ai_usage_data_schema.csv');
+  const handleExportHoursSavedSchemaToCsv = () => exportSchemaToCsv(HOURS_SAVED_CSV_SCHEMA, 'hours_saved_schema.csv');
 
   return (
     <div className="p-6 space-y-6 w-full text-ey-light">
@@ -438,6 +498,9 @@ export default function MetricsDerivationPage() {
           </span>
           <span className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-ey-black/60 border border-ey-border text-emerald-400">
             Cost Field: Cost (in $)
+          </span>
+          <span className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-ey-black/60 border border-ey-border text-amber-400 flex items-center gap-1.5">
+            <Clock3 className="w-3 h-3" /> Input Dataset: actuals-planned-overall-*.csv (Engagement × Tool-grained)
           </span>
         </div>
       </div>
@@ -477,6 +540,54 @@ export default function MetricsDerivationPage() {
               {CSV_SCHEMA.map((row) => (
                 <tr key={row.fieldName} className="hover:bg-ey-black/30 transition">
                   <td className="p-2.5 text-ey-yellow font-medium">{row.column}</td>
+                  <td className="p-2.5 text-cyan-300">{row.fieldName}</td>
+                  <td className="p-2.5 text-ey-muted">{row.dataType}</td>
+                  <td className="p-2.5 text-ey-muted font-sans text-xs">{row.description}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Hours Saved CSV Input Schema Reference Section */}
+      <div className="bg-ey-card border border-ey-border rounded-xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Clock3 className="w-4 h-4 text-amber-400" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-ey-light">
+              CSV Input Data Schema Mapping (`actuals-planned-overall-*.csv`)
+            </h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-ey-muted font-mono">{HOURS_SAVED_CSV_SCHEMA.length} Named Columns + Open-Ended Month Columns • Joined by (Engagement Code, AI Tool)</span>
+            <button
+              onClick={handleExportHoursSavedSchemaToCsv}
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-black bg-ey-yellow hover:bg-ey-yellow-hover px-2.5 py-1.5 rounded-lg transition shrink-0"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export to CSV
+            </button>
+          </div>
+        </div>
+        <p className="text-[11px] text-ey-muted -mt-2">
+          A separate, supplementary data source — not metered telemetry. Columns are matched by header NAME, not position, so extra fields the real file carries beyond these are simply ignored rather than breaking the parser.
+        </p>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-left border-collapse">
+            <thead>
+              <tr className="border-b border-ey-border/80 text-ey-muted bg-ey-black/40">
+                <th className="p-2.5 font-semibold">CSV Column Name</th>
+                <th className="p-2.5 font-semibold">Internal Field</th>
+                <th className="p-2.5 font-semibold">Data Type</th>
+                <th className="p-2.5 font-semibold">Description & Usage</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-ey-border/40 text-ey-light font-mono text-[11px]">
+              {HOURS_SAVED_CSV_SCHEMA.map((row) => (
+                <tr key={row.fieldName} className="hover:bg-ey-black/30 transition">
+                  <td className="p-2.5 text-amber-400 font-medium">{row.column}</td>
                   <td className="p-2.5 text-cyan-300">{row.fieldName}</td>
                   <td className="p-2.5 text-ey-muted">{row.dataType}</td>
                   <td className="p-2.5 text-ey-muted font-sans text-xs">{row.description}</td>

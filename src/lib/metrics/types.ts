@@ -144,6 +144,25 @@ export interface TokenCostSummary {
     cost: number;
     userCount: number;
   }[];
+  // Hours Saved (actuals-planned-overall-*.csv), joined by (Engagement Code, AI Tool).
+  // A separate, non-metered/approved-vs-actual data source — see
+  // EngagementHoursSaved in lib/metrics/hoursSaved.ts for field meanings.
+  hoursSavedByEngagement?: {
+    projectCode: string;
+    assetName: string;
+    aiTool: string;
+    approvedTotalHrs: number;
+    pendingApprovalHrs: number;
+    monthlyHours: Record<string, number>;
+    sumOfMonthlyHrs: number;
+    realizationPercent: number;
+    cost: number | null;
+    tokens: number | null;
+    userCount: number | null;
+    costPerHourSaved: number | null;
+    monthlyCost: Record<string, number | null>;
+    monthlyCostPerHourSaved: Record<string, number | null>;
+  }[];
   // Monthly Trend Insights (derived from Month_Year / Month Id CSV columns)
   monthlyTrend: MonthlyTrendPoint[];
   // User Engagement Cohorts (avg distinct active days per active month, per user)
