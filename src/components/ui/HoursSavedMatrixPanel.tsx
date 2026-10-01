@@ -6,12 +6,14 @@ import type { TokenCostSummary } from '@/lib/metrics/types';
 import { formatCompactCurrency as fmtCost, formatCompactNumber as fmtNum } from '@/lib/format';
 import { SortableTh } from '@/components/ui/SortableTh';
 import type { SortDirection } from '@/lib/useTableSort';
+import { computeHoursSavedValueUsd, computeRoiPercent } from '@/lib/metrics/roiCalc';
 
 type HoursSavedRow = NonNullable<TokenCostSummary['hoursSavedByEngagement']>[number];
 
 interface HoursSavedMatrixPanelProps {
   rows: HoursSavedRow[];
   onSelectEngagement: (projectCode: string) => void;
+  devHourRate: number;
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -23,14 +25,25 @@ const TOOL_LABELS: Record<string, string> = {
   cursor: 'Cursor AI',
 };
 
-type Metric = 'costPerHourSaved' | 'sumOfMonthlyHrs' | 'realizationPercent' | 'cost';
+type Metric = 'costPerHourSaved' | 'sumOfMonthlyHrs' | 'realizationPercent' | 'cost' | 'roiPercent';
 
 const METRIC_CONFIG: Record<Metric, { label: string; format: (v: number) => string; lowerIsBetter: boolean; colorCode: boolean }> = {
   costPerHourSaved: { label: '$ / Hour Saved', format: (v) => fmtCost(v), lowerIsBetter: true, colorCode: true },
   sumOfMonthlyHrs: { label: 'Hours Saved', format: (v) => fmtNum(v), lowerIsBetter: false, colorCode: false },
   realizationPercent: { label: 'Realization %', format: (v) => `${v.toFixed(0)}%`, lowerIsBetter: false, colorCode: true },
   cost: { label: 'Tool Cost', format: (v) => fmtCost(v), lowerIsBetter: false, colorCode: false },
+  roiPercent: { label: 'ROI %', format: (v) => `${v.toFixed(0)}%`, lowerIsBetter: false, colorCode: true },
 };
+
+// roiPercent is never read directly off a row: it's recomputed here against
+// the user-adjustable dev-hour rate, since the row's own roiPercent field is
+// baked in at the server-side default rate (see lib/metrics/roiCalc.ts).
+function getMetricValue(row: HoursSavedRow, metric: Metric, devHourRate: number): number | null {
+  if (metric === 'roiPercent') {
+    return computeRoiPercent(computeHoursSavedValueUsd(row.sumOfMonthlyHrs, devHourRate), row.cost);
+  }
+  return row[metric];
+}
 
 function cellColor(value: number, values: number[], lowerIsBetter: boolean): string {
   if (values.length < 2) return 'text-ey-light';
@@ -51,7 +64,7 @@ function cellColor(value: number, values: number[], lowerIsBetter: boolean): str
  */
 const PAGE_SIZE = 10;
 
-export function HoursSavedMatrixPanel({ rows, onSelectEngagement }: HoursSavedMatrixPanelProps) {
+export function HoursSavedMatrixPanel({ rows, onSelectEngagement, devHourRate }: HoursSavedMatrixPanelProps) {
   const [metric, setMetric] = useState<Metric>('costPerHourSaved');
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -113,10 +126,10 @@ export function HoursSavedMatrixPanel({ rows, onSelectEngagement }: HoursSavedMa
       tools.filter((t) =>
         filteredEngagementCodes.some((eng) => {
           const row = cellMap.get(`${eng}:::${t}`);
-          return row && row[metric] !== null && row[metric] !== undefined;
+          return row && getMetricValue(row, metric, devHourRate) !== null;
         })
       ),
-    [tools, filteredEngagementCodes, cellMap, metric]
+    [tools, filteredEngagementCodes, cellMap, metric, devHourRate]
   );
 
   const sortedEngagementCodes = useMemo(() => {
@@ -125,7 +138,7 @@ export function HoursSavedMatrixPanel({ rows, onSelectEngagement }: HoursSavedMa
     const getValue = (eng: string): string | number | null => {
       if (sortColumn === 'engagementCode') return eng;
       const row = cellMap.get(`${eng}:::${sortColumn}`);
-      return row ? row[metric] : null;
+      return row ? getMetricValue(row, metric, devHourRate) : null;
     };
     return [...filteredEngagementCodes].sort((a, b) => {
       const va = getValue(a);
@@ -136,7 +149,7 @@ export function HoursSavedMatrixPanel({ rows, onSelectEngagement }: HoursSavedMa
       if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
       return String(va).localeCompare(String(vb), undefined, { numeric: true }) * dir;
     });
-  }, [filteredEngagementCodes, cellMap, metric, sortColumn, sortDir]);
+  }, [filteredEngagementCodes, cellMap, metric, sortColumn, sortDir, devHourRate]);
 
   // Paginated by engagement ROW -- the tool columns stay fixed (there are
   // only ever a handful of tools), so pagination only needs to limit how
@@ -148,11 +161,11 @@ export function HoursSavedMatrixPanel({ rows, onSelectEngagement }: HoursSavedMa
   const allValuesForMetric = useMemo(() => {
     const vals: number[] = [];
     for (const r of rows) {
-      const v = r[metric];
-      if (v !== null) vals.push(v as number);
+      const v = getMetricValue(r, metric, devHourRate);
+      if (v !== null) vals.push(v);
     }
     return vals;
-  }, [rows, metric]);
+  }, [rows, metric, devHourRate]);
 
   return (
     <div className="space-y-3">
@@ -236,7 +249,7 @@ export function HoursSavedMatrixPanel({ rows, onSelectEngagement }: HoursSavedMa
                 </td>
                 {visibleTools.map((t) => {
                   const row = cellMap.get(`${eng}:::${t}`);
-                  const value = row ? row[metric] : null;
+                  const value = row ? getMetricValue(row, metric, devHourRate) : null;
                   return (
                     <td
                       key={t}

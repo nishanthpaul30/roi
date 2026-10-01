@@ -1,17 +1,20 @@
 'use client';
 
 import { Fragment, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import type { TokenCostSummary } from '@/lib/metrics/types';
 import { formatCompactCurrency as fmtCost, formatCompactNumber as fmtNum } from '@/lib/format';
 import { useTableSort } from '@/lib/useTableSort';
 import { SortableTh } from '@/components/ui/SortableTh';
+import { computeHoursSavedValueUsd, computeRoiPercent, computeDevCostUsd, computeTotalInvestmentUsd } from '@/lib/metrics/roiCalc';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
 type HoursSavedRow = NonNullable<TokenCostSummary['hoursSavedByEngagement']>[number];
 
 interface HoursSavedGroupedTableProps {
   rows: HoursSavedRow[];
   onSelectEngagement: (projectCode: string) => void;
+  devHourRate: number;
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -29,6 +32,14 @@ function realizationStyle(pct: number) {
   return { label: 'Behind Target', bg: 'bg-rose-500/15', text: 'text-rose-300', border: 'border-rose-500/30' };
 }
 
+// ROI = (value of hours saved at the chosen dev-hour rate - tool cost) / tool cost * 100.
+// Positive means the hours saved are worth more than the tool spend.
+function roiColor(pct: number): string {
+  if (pct >= 100) return 'text-emerald-300';
+  if (pct >= 0) return 'text-ey-yellow';
+  return 'text-rose-300';
+}
+
 interface EngagementGroup {
   engagementCode: string;
   tools: HoursSavedRow[];
@@ -38,6 +49,14 @@ interface EngagementGroup {
   totalCost: number;
   realizationPercent: number;
   costPerHourSaved: number | null;
+  hoursSavedValueUsd: number;
+  devHoursSpent: number;
+  devCostUsd: number;
+  totalInvestmentUsd: number;
+  // Total-Investment ROI: (hoursSavedValueUsd - totalInvestmentUsd) / totalInvestmentUsd * 100,
+  // where totalInvestmentUsd = tool cost + dev hours cost. Engagement-level only --
+  // dev hours have no per-tool breakdown, see devHoursSpent on HoursSavedRow.
+  roiPercent: number | null;
 }
 
 /**
@@ -47,7 +66,7 @@ interface EngagementGroup {
  * repeating the Engagement Code once per tool row with "see the engagement
  * total first, tool detail on demand."
  */
-export function HoursSavedGroupedTable({ rows, onSelectEngagement }: HoursSavedGroupedTableProps) {
+export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }: HoursSavedGroupedTableProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -65,6 +84,13 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement }: HoursSavedG
         const totalPendingHrs = tools.reduce((s, t) => s + t.pendingApprovalHrs, 0);
         const totalHoursSaved = tools.reduce((s, t) => s + t.sumOfMonthlyHrs, 0);
         const totalCost = tools.reduce((s, t) => s + (t.cost ?? 0), 0);
+        const hoursSavedValueUsd = computeHoursSavedValueUsd(totalHoursSaved, devHourRate);
+        // devHoursSpent is engagement-level, duplicated on every tool row --
+        // read it once (tools[0]), never sum across tools, or it over-counts
+        // on a multi-tool engagement.
+        const devHoursSpent = tools[0]?.devHoursSpent ?? 0;
+        const devCostUsd = computeDevCostUsd(devHoursSpent, devHourRate);
+        const totalInvestmentUsd = computeTotalInvestmentUsd(totalCost, devCostUsd);
         return {
           engagementCode,
           tools: [...tools].sort((a, b) => (TOOL_LABELS[a.aiTool] || a.assetName).localeCompare(TOOL_LABELS[b.aiTool] || b.assetName)),
@@ -74,10 +100,15 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement }: HoursSavedG
           totalCost,
           realizationPercent: totalApprovedHrs > 0 ? Number(((totalHoursSaved / totalApprovedHrs) * 100).toFixed(1)) : 0,
           costPerHourSaved: totalHoursSaved > 0 ? Number((totalCost / totalHoursSaved).toFixed(2)) : null,
+          hoursSavedValueUsd,
+          devHoursSpent,
+          devCostUsd,
+          totalInvestmentUsd,
+          roiPercent: computeRoiPercent(hoursSavedValueUsd, totalInvestmentUsd),
         };
       })
       .sort((a, b) => b.totalCost - a.totalCost);
-  }, [rows]);
+  }, [rows, devHourRate]);
 
   const filteredGroups = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -99,6 +130,8 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement }: HoursSavedG
     realizationPercent: (g) => g.realizationPercent,
     totalCost: (g) => g.totalCost,
     costPerHourSaved: (g) => g.costPerHourSaved,
+    devHoursSpent: (g) => g.devHoursSpent,
+    roiPercent: (g) => g.roiPercent,
   });
 
   // Paginated by ENGAGEMENT GROUP, not flattened tool rows -- expanding a
@@ -197,12 +230,40 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement }: HoursSavedG
                 className="px-4 py-3 text-right"
                 align="right"
               />
+              <SortableTh
+                label="Dev Hours"
+                sortKey="devHoursSpent"
+                activeKey={sortKey}
+                direction={sortDir}
+                onSort={handleSortAndResetPage}
+                className="px-4 py-3 text-right"
+                align="right"
+              />
+              <th className="px-4 py-3 text-right">
+                <div className="flex items-center justify-end gap-1.5">
+                  <button
+                    onClick={() => handleSortAndResetPage('roiPercent')}
+                    className={`flex items-center flex-row-reverse space-x-1 space-x-reverse hover:text-ey-light transition ${sortKey === 'roiPercent' ? 'text-ey-yellow' : ''}`}
+                  >
+                    <span>ROI %</span>
+                    {sortKey === 'roiPercent' ? (
+                      sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                    ) : (
+                      <ArrowUpDown className="w-3 h-3 opacity-50" />
+                    )}
+                  </button>
+                  <InfoTooltip widthClassName="w-60">
+                    <span className="font-semibold text-ey-yellow block mb-1">Total Investment ROI</span>
+                    At the engagement row: (Value of Hours Saved &minus; Total Investment) &divide; Total Investment &times; 100, where Total Investment = AI Tool Cost + (Dev Hours &times; $/dev-hr). Dev hours come from the mock timesheet data (see Dev Hours column) and apply per engagement, not per tool.
+                  </InfoTooltip>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-ey-border">
             {paginatedGroups.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-ey-muted">No matching engagements or tools.</td>
+                <td colSpan={9} className="px-4 py-8 text-center text-ey-muted">No matching engagements or tools.</td>
               </tr>
             ) : (
               paginatedGroups.map((g) => {
@@ -245,11 +306,19 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement }: HoursSavedG
                       <td className="px-4 py-3 text-right font-bold text-ey-yellow">
                         {g.costPerHourSaved !== null ? fmtCost(g.costPerHourSaved) : '—'}
                       </td>
+                      <td className="px-4 py-3 text-right text-ey-muted">
+                        {g.devHoursSpent > 0 ? `${fmtNum(g.devHoursSpent)} hrs` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold">
+                        {g.roiPercent !== null ? <span className={roiColor(g.roiPercent)}>{g.roiPercent >= 0 ? '+' : ''}{g.roiPercent}%</span> : <span className="text-ey-muted">—</span>}
+                      </td>
                     </tr>
 
                     {isOpen &&
                       g.tools.map((t, toolIdx) => {
                         const tStatus = realizationStyle(t.realizationPercent);
+                        const tHoursSavedValueUsd = computeHoursSavedValueUsd(t.sumOfMonthlyHrs, devHourRate);
+                        const tRoiPercent = computeRoiPercent(tHoursSavedValueUsd, t.cost);
                         return (
                           <tr
                             key={`${g.engagementCode}:::${t.assetName}:::${toolIdx}`}
@@ -273,6 +342,10 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement }: HoursSavedG
                             <td className="px-4 py-2.5 text-right text-ey-muted">{t.cost !== null ? fmtCost(t.cost) : '—'}</td>
                             <td className="px-4 py-2.5 text-right font-semibold text-ey-yellow">
                               {t.costPerHourSaved !== null ? fmtCost(t.costPerHourSaved) : '—'}
+                            </td>
+                            <td className="px-4 py-2.5 text-right text-ey-muted/50" title="Dev hours are tracked per engagement, not per tool">n/a</td>
+                            <td className="px-4 py-2.5 text-right font-semibold">
+                              {tRoiPercent !== null ? <span className={roiColor(tRoiPercent)}>{tRoiPercent >= 0 ? '+' : ''}{tRoiPercent}%</span> : <span className="text-ey-muted">—</span>}
                             </td>
                           </tr>
                         );

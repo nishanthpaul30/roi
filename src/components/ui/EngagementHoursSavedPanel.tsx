@@ -2,13 +2,16 @@
 
 import { Clock3 } from 'lucide-react';
 import type { TokenCostSummary } from '@/lib/metrics/types';
-import { formatCompactCurrency as fmtCost } from '@/lib/format';
+import { computeHoursSavedValueUsd, computeRoiPercent, computeDevCostUsd, computeTotalInvestmentUsd } from '@/lib/metrics/roiCalc';
+import { formatCompactCurrency as fmtCost, formatCompactNumber as fmtNum } from '@/lib/format';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
 type HoursSavedRow = NonNullable<TokenCostSummary['hoursSavedByEngagement']>[number];
 
 interface EngagementHoursSavedPanelProps {
   rows: HoursSavedRow[];
   engagementCode: string;
+  devHourRate: number;
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -26,6 +29,13 @@ function realizationStyle(pct: number) {
   return { label: 'Behind Target', bg: 'bg-rose-500/15', text: 'text-rose-300', border: 'border-rose-500/30' };
 }
 
+// ROI = (value of hours saved at the chosen dev-hour rate - tool cost) / tool cost * 100.
+function roiColor(pct: number): string {
+  if (pct >= 100) return 'text-emerald-300';
+  if (pct >= 0) return 'text-ey-yellow';
+  return 'text-rose-300';
+}
+
 /**
  * Hours Saved is a separate, non-metered/approved-vs-actual data source
  * (actuals-planned-overall-*.csv) joined onto the usage telemetry by (Engagement Code,
@@ -34,8 +44,19 @@ function realizationStyle(pct: number) {
  * grain; it has no Super Region / Service Line / Competency breakdown of
  * its own.
  */
-export function EngagementHoursSavedPanel({ rows, engagementCode }: EngagementHoursSavedPanelProps) {
+export function EngagementHoursSavedPanel({ rows, engagementCode, devHourRate }: EngagementHoursSavedPanelProps) {
   if (rows.length === 0) return null;
+
+  // Engagement-level totals, across every tool row for this engagement.
+  // devHoursSpent is the same value on every row (dev hours aren't tracked
+  // per tool), so it's read once rather than summed.
+  const totalHoursSaved = rows.reduce((s, r) => s + r.sumOfMonthlyHrs, 0);
+  const totalToolCost = rows.reduce((s, r) => s + (r.cost ?? 0), 0);
+  const devHoursSpent = rows[0].devHoursSpent;
+  const totalHoursSavedValueUsd = computeHoursSavedValueUsd(totalHoursSaved, devHourRate);
+  const devCostUsd = computeDevCostUsd(devHoursSpent, devHourRate);
+  const totalInvestmentUsd = computeTotalInvestmentUsd(totalToolCost, devCostUsd);
+  const totalInvestmentRoiPercent = computeRoiPercent(totalHoursSavedValueUsd, totalInvestmentUsd);
 
   return (
     <div className="bg-ey-card border border-ey-border rounded-xl p-5 shadow-sm space-y-4">
@@ -51,9 +72,44 @@ export function EngagementHoursSavedPanel({ rows, engagementCode }: EngagementHo
         </div>
       </div>
 
+      <div className="bg-ey-black/60 border border-ey-border/80 rounded-xl p-4">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <p className="text-[10px] text-ey-muted uppercase tracking-wider">Engagement Total Investment &amp; ROI</p>
+          <InfoTooltip widthClassName="w-64">
+            <span className="font-semibold text-ey-yellow block mb-1">How this is calculated</span>
+            Dev Hours = hours clocked on {engagementCode} (mock timesheet data) = <span className="font-mono">{fmtNum(devHoursSpent)} hrs</span>, at ${devHourRate}/dev-hr = <span className="font-mono">{fmtCost(devCostUsd)}</span>.<br />
+            Total Investment = AI Tool Cost + Dev Cost = <span className="font-mono">{fmtCost(totalToolCost)} + {fmtCost(devCostUsd)} = {fmtCost(totalInvestmentUsd)}</span>.<br />
+            ROI % = (Value of Hours Saved &minus; Total Investment) &divide; Total Investment &times; 100 = <span className="font-mono">({fmtCost(totalHoursSavedValueUsd)} &minus; {fmtCost(totalInvestmentUsd)}) &divide; {fmtCost(totalInvestmentUsd)} &times; 100 = {totalInvestmentRoiPercent !== null ? `${totalInvestmentRoiPercent >= 0 ? '+' : ''}${totalInvestmentRoiPercent}%` : '—'}</span>
+          </InfoTooltip>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div>
+            <p className="text-[10px] text-ey-muted uppercase tracking-wider">Dev Hours</p>
+            <p className="font-bold text-ey-light">{fmtNum(devHoursSpent)} hrs</p>
+            <p className="text-[10px] text-ey-muted">{fmtCost(devCostUsd)} at ${devHourRate}/hr</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-ey-muted uppercase tracking-wider">AI Tool Cost</p>
+            <p className="font-bold text-ey-light">{fmtCost(totalToolCost)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-ey-muted uppercase tracking-wider">Total Investment</p>
+            <p className="font-bold text-ey-light">{fmtCost(totalInvestmentUsd)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-ey-muted uppercase tracking-wider">ROI</p>
+            <p className={`font-bold ${totalInvestmentRoiPercent !== null ? roiColor(totalInvestmentRoiPercent) : 'text-ey-muted'}`}>
+              {totalInvestmentRoiPercent !== null ? `${totalInvestmentRoiPercent >= 0 ? '+' : ''}${totalInvestmentRoiPercent}%` : '—'}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {rows.map((r) => {
           const status = realizationStyle(r.realizationPercent);
+          const hoursSavedValueUsd = computeHoursSavedValueUsd(r.sumOfMonthlyHrs, devHourRate);
+          const roiPercent = computeRoiPercent(hoursSavedValueUsd, r.cost);
           // The source file spans the full fiscal year (Jul-Jun), with
           // future months sitting at 0 until they actually arrive -- showing
           // all 12 as columns would mostly be a wall of zeros/dashes, so
@@ -70,7 +126,7 @@ export function EngagementHoursSavedPanel({ rows, engagementCode }: EngagementHo
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="grid grid-cols-3 gap-3 text-xs">
                 <div>
                   <p className="text-[10px] text-ey-muted uppercase tracking-wider">Hours Saved</p>
                   <p className="font-bold text-ey-light">
@@ -87,6 +143,13 @@ export function EngagementHoursSavedPanel({ rows, engagementCode }: EngagementHo
                   <p className="text-[10px] text-ey-muted">
                     {r.costPerHourSaved !== null ? `${fmtCost(r.costPerHourSaved)} / hour saved` : 'No hours saved yet'}
                   </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-ey-muted uppercase tracking-wider">ROI</p>
+                  <p className={`font-bold ${roiPercent !== null ? roiColor(roiPercent) : 'text-ey-muted'}`}>
+                    {roiPercent !== null ? `${roiPercent >= 0 ? '+' : ''}${roiPercent}%` : '—'}
+                  </p>
+                  <p className="text-[10px] text-ey-muted">{fmtCost(hoursSavedValueUsd)} value saved</p>
                 </div>
               </div>
 

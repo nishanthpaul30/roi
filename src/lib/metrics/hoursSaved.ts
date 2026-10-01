@@ -1,7 +1,9 @@
 import 'server-only';
 
 import { loadHoursSavedData } from '../data/hoursSavedLoader';
+import { loadDevHoursData } from '../data/devHoursLoader';
 import type { CsvUsageRow } from '../data/csvLoader';
+import { DEFAULT_DEV_HOUR_RATE_USD, computeHoursSavedValueUsd, computeRoiPercent } from './roiCalc';
 
 // The current fiscal year starts in July (FY calendar: Jul-Dec of this
 // calendar year, then Jan-Jun of the next). actuals-planned-overall-*.csv's month
@@ -39,6 +41,22 @@ export interface EngagementHoursSaved {
   userCount: number | null;
   // cost / sumOfMonthlyHrs -- null when there's no cost match or no hours saved yet.
   costPerHourSaved: number | null;
+  // sumOfMonthlyHrs * DEFAULT_DEV_HOUR_RATE_USD -- the dollar value of hours saved
+  // so far, at the default blended developer rate. The UI recomputes this
+  // client-side (see lib/metrics/roiCalc.ts) when the user picks a different
+  // rate, so this field is only the as-served default, not necessarily what's
+  // on screen.
+  hoursSavedValueUsd: number;
+  // (hoursSavedValueUsd - cost) / cost * 100 at the default rate -- null when
+  // there's no cost match (can't compute ROI against a cost of 0/unknown).
+  // Same caveat as hoursSavedValueUsd: the UI may show a recomputed value.
+  roiPercent: number | null;
+  // Total dev hours clocked on this ENGAGEMENT (not per tool -- the
+  // timesheet data has no per-tool breakdown), from the mock developer
+  // timesheet (see data/devHoursLoader.ts). The same value is repeated on
+  // every tool row of a multi-tool engagement -- sum it once per distinct
+  // projectCode, not once per row, or it over-counts.
+  devHoursSpent: number;
   // Per month label (e.g. "Jul"), the matching month's cost and $/hour --
   // null where the month falls outside the current dataset's date range
   // (e.g. Sep/Oct before that data has arrived) or the label doesn't map to
@@ -56,6 +74,9 @@ export interface EngagementHoursSaved {
  */
 export function joinHoursSavedToEngagements(spendRows: CsvUsageRow[]): EngagementHoursSaved[] {
   const hoursSavedRows = loadHoursSavedData();
+  const devHoursByEngagement = new Map<string, number>(
+    loadDevHoursData().map((d) => [d.engagementCode, d.totalDevHours])
+  );
 
   const consolidatedMap = new Map<string, { cost: number; tokens: number; users: Set<string> }>();
   const monthlyMap = new Map<string, { cost: number; tokens: number }>();
@@ -80,6 +101,8 @@ export function joinHoursSavedToEngagements(spendRows: CsvUsageRow[]): Engagemen
     const tokens = consolidated ? Math.round(consolidated.tokens) : null;
     const userCount = consolidated ? consolidated.users.size : null;
     const costPerHourSaved = cost !== null && h.sumOfMonthlyHrs > 0 ? Number((cost / h.sumOfMonthlyHrs).toFixed(2)) : null;
+    const hoursSavedValueUsd = computeHoursSavedValueUsd(h.sumOfMonthlyHrs, DEFAULT_DEV_HOUR_RATE_USD);
+    const roiPercent = computeRoiPercent(hoursSavedValueUsd, cost);
 
     const monthlyCost: Record<string, number | null> = {};
     const monthlyCostPerHourSaved: Record<string, number | null> = {};
@@ -104,6 +127,9 @@ export function joinHoursSavedToEngagements(spendRows: CsvUsageRow[]): Engagemen
       tokens,
       userCount,
       costPerHourSaved,
+      hoursSavedValueUsd,
+      roiPercent,
+      devHoursSpent: devHoursByEngagement.get(h.engagementCode) ?? 0,
       monthlyCost,
       monthlyCostPerHourSaved,
     };

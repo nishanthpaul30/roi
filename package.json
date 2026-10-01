@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/generateDevHoursCsv.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "embed-csv": "node scripts/embedCsv.js"
+    "embed-csv": "node scripts/embedCsv.js",
+    "generate-dev-hours": "node scripts/generateDevHoursCsv.js"
   },
   "dependencies": {
     "clsx": "^2.1.1",

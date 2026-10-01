@@ -160,6 +160,9 @@ export interface TokenCostSummary {
     tokens: number | null;
     userCount: number | null;
     costPerHourSaved: number | null;
+    hoursSavedValueUsd: number;
+    roiPercent: number | null;
+    devHoursSpent: number;
     monthlyCost: Record<string, number | null>;
     monthlyCostPerHourSaved: Record<string, number | null>;
   }[];

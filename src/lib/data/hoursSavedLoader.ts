@@ -7,6 +7,7 @@ import 'server-only';
 
 import { RAW_HOURS_SAVED_DATA } from './rawHoursSavedData';
 import type { HoursSavedRow } from './csvTypes';
+import { splitCsvLine } from './csvParse';
 
 export type { HoursSavedRow } from './csvTypes';
 
@@ -86,46 +87,6 @@ const MONTH_ABBREVIATIONS = new Set([
 /** True when a header label names a month, in any case/length ("Jul", "jul", "July"). */
 function isMonthColumn(header: string): boolean {
   return MONTH_ABBREVIATIONS.has(header.trim().toLowerCase().slice(0, 3));
-}
-
-/**
- * Splits one CSV line into fields, honoring RFC4180-style quoting: a field
- * wrapped in "..." can itself contain commas, and a literal quote inside it
- * is written as "" (doubled). A naive line.split(',') leaves the wrapping
- * quote characters stuck to the value (e.g. Asset Type arriving as the
- * literal string `"ai"` instead of `ai`), which silently fails every
- * exact-match check downstream -- confirmed via diagnostic logging against
- * the real source export. Does not handle a quoted field spanning multiple
- * physical lines (an embedded newline) -- not seen in this data so far.
- */
-function splitCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (inQuotes) {
-      if (char === '"') {
-        if (line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        current += char;
-      }
-    } else if (char === '"') {
-      inQuotes = true;
-    } else if (char === ',') {
-      fields.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  fields.push(current);
-  return fields;
 }
 
 /** Finds a column by trying each candidate header name, case-insensitively. Returns -1 if none match. */

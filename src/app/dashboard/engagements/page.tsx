@@ -16,6 +16,7 @@ import { GroupsTable } from '@/components/ui/GroupsTable';
 import { EngagementHoursSavedPanel } from '@/components/ui/EngagementHoursSavedPanel';
 import { HoursSavedOverviewPanel } from '@/components/ui/HoursSavedOverviewPanel';
 import type { TokenCostSummary } from '@/lib/metrics/types';
+import { DEFAULT_DEV_HOUR_RATE_USD } from '@/lib/metrics/roiCalc';
 
 type EngagementHoursSavedRow = NonNullable<TokenCostSummary['hoursSavedByEngagement']>[number];
 
@@ -39,6 +40,10 @@ function EngagementAnalytics() {
 
   const userParam = (searchParams.get('user') || '').toLowerCase().trim();
   const [path, setPath] = useState<PathEntry[]>([]);
+  // Shared between the overview (Matrix/Table) and the per-engagement
+  // drilldown, so adjusting it anywhere updates ROI consistently everywhere
+  // Hours Saved is shown -- see lib/metrics/roiCalc.ts.
+  const [devHourRate, setDevHourRate] = useState<number>(DEFAULT_DEV_HOUR_RATE_USD);
 
   // Arriving from a different user's row has to restart the drilldown — the
   // engagement path from the previous user rarely exists under the new one.
@@ -141,6 +146,8 @@ function EngagementAnalytics() {
           <HoursSavedOverviewPanel
             rows={data?.tokenCostSummary?.hoursSavedByEngagement || []}
             onSelectEngagement={(code) => selectValue('engagementCode', 'projectCode', 'Engagement Code', code)}
+            devHourRate={devHourRate}
+            onDevHourRateChange={setDevHourRate}
           />
         )}
 
@@ -230,7 +237,7 @@ function EngagementAnalytics() {
         </div>
 
         {selectedEngagementCode && (
-          <EngagementHoursSavedPanel rows={hoursSavedRows} engagementCode={selectedEngagementCode} />
+          <EngagementHoursSavedPanel rows={hoursSavedRows} engagementCode={selectedEngagementCode} devHourRate={devHourRate} />
         )}
 
         {rowsLoading ? (

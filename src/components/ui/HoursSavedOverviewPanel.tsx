@@ -12,6 +12,8 @@ type HoursSavedRow = NonNullable<TokenCostSummary['hoursSavedByEngagement']>[num
 interface HoursSavedOverviewPanelProps {
   rows: HoursSavedRow[];
   onSelectEngagement: (projectCode: string) => void;
+  devHourRate: number;
+  onDevHourRateChange: (rate: number) => void;
 }
 
 /**
@@ -26,7 +28,7 @@ interface HoursSavedOverviewPanelProps {
  * the default, best for comparing tools side by side) and Table (grouped by
  * Engagement Code, expandable to each tool's full row of figures).
  */
-export function HoursSavedOverviewPanel({ rows, onSelectEngagement }: HoursSavedOverviewPanelProps) {
+export function HoursSavedOverviewPanel({ rows, onSelectEngagement, devHourRate, onDevHourRateChange }: HoursSavedOverviewPanelProps) {
   const [view, setView] = useState<'table' | 'matrix'>('matrix');
 
   if (rows.length === 0) return null;
@@ -44,6 +46,22 @@ export function HoursSavedOverviewPanel({ rows, onSelectEngagement }: HoursSaved
               Approved vs. actual productivity hours by engagement and tool, and the cost behind every hour saved. Click a row to see its full monthly breakdown.
             </p>
           </div>
+        </div>
+
+        <div className="flex items-center gap-1 bg-ey-black border border-ey-border rounded-lg px-2.5 py-1.5 shrink-0" title="Blended developer-hour rate used to value Hours Saved for ROI">
+          <label htmlFor="dev-hour-rate" className="text-[11px] font-semibold text-ey-muted whitespace-nowrap">$ / dev-hr</label>
+          <input
+            id="dev-hour-rate"
+            type="number"
+            min={1}
+            step={1}
+            value={devHourRate}
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              if (Number.isFinite(next) && next > 0) onDevHourRateChange(next);
+            }}
+            className="w-14 bg-transparent text-xs font-mono text-ey-yellow font-bold focus:outline-none"
+          />
         </div>
 
         <div className="flex items-center gap-1 bg-ey-black border border-ey-border rounded-lg p-1 shrink-0">
@@ -66,12 +84,12 @@ export function HoursSavedOverviewPanel({ rows, onSelectEngagement }: HoursSaved
         </div>
       </div>
 
-      <HoursSavedExecutiveSummary rows={rows} />
+      <HoursSavedExecutiveSummary rows={rows} devHourRate={devHourRate} />
 
       {view === 'matrix' ? (
-        <HoursSavedMatrixPanel rows={rows} onSelectEngagement={onSelectEngagement} />
+        <HoursSavedMatrixPanel rows={rows} onSelectEngagement={onSelectEngagement} devHourRate={devHourRate} />
       ) : (
-        <HoursSavedGroupedTable rows={rows} onSelectEngagement={onSelectEngagement} />
+        <HoursSavedGroupedTable rows={rows} onSelectEngagement={onSelectEngagement} devHourRate={devHourRate} />
       )}
     </div>
   );
