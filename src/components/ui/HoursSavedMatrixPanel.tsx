@@ -102,6 +102,15 @@ export function HoursSavedMatrixPanel({ rows, onSelectEngagement }: HoursSavedMa
     );
   }, [engagementCodes, tools, cellMap, search]);
 
+  // Hides a tool column entirely when none of the currently filtered
+  // engagements have a tracked row for it -- otherwise a search/filter can
+  // leave a column of nothing but "—" cells. Based on the filtered set (not
+  // the paginated one) so columns stay stable while paging.
+  const visibleTools = useMemo(
+    () => tools.filter((t) => filteredEngagementCodes.some((eng) => cellMap.has(`${eng}:::${t}`))),
+    [tools, filteredEngagementCodes, cellMap]
+  );
+
   const sortedEngagementCodes = useMemo(() => {
     if (!sortColumn) return filteredEngagementCodes;
     const dir = sortDir === 'asc' ? 1 : -1;
@@ -187,7 +196,7 @@ export function HoursSavedMatrixPanel({ rows, onSelectEngagement }: HoursSavedMa
                 onSort={handleSort}
                 className="px-4 py-3 sticky left-0 bg-ey-black/70"
               />
-              {tools.map((t) => (
+              {visibleTools.map((t) => (
                 <SortableTh
                   key={t}
                   label={TOOL_LABELS[t] || t}
@@ -204,7 +213,7 @@ export function HoursSavedMatrixPanel({ rows, onSelectEngagement }: HoursSavedMa
           <tbody className="divide-y divide-ey-border">
             {paginatedEngagementCodes.length === 0 ? (
               <tr>
-                <td colSpan={tools.length + 1} className="px-4 py-8 text-center text-ey-muted">
+                <td colSpan={visibleTools.length + 1} className="px-4 py-8 text-center text-ey-muted">
                   No matching engagements or tools.
                 </td>
               </tr>
@@ -217,7 +226,7 @@ export function HoursSavedMatrixPanel({ rows, onSelectEngagement }: HoursSavedMa
                 >
                   {eng}
                 </td>
-                {tools.map((t) => {
+                {visibleTools.map((t) => {
                   const row = cellMap.get(`${eng}:::${t}`);
                   const value = row ? row[metric] : null;
                   return (
