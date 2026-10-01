@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/generateDevHoursCsv.js",
     "dev": "next dev",
     "prebuild": "node scripts/generateDevHoursCsv.js",
     "build": "next build",
