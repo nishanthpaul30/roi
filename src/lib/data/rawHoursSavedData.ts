@@ -1,6 +1,6 @@
 // AUTO-GENERATED — do not edit manually.
 // Re-generate by running: node scripts/embedCsv.js
-// Source: actuals-planned-overall-2026-09-30.csv (63 data rows, generated 2026-10-01T05:12:26.146Z)
+// Source: actuals-planned-overall-2026-09-30.csv (63 data rows, generated 2026-10-01T06:05:31.720Z)
 export const RAW_HOURS_SAVED_DATA = `Engagement Code,Asset Name,Asset Type,Approved (Actual),Pending Approval (Submitted),jul,aug,sep,oct,nov,dec,jan,feb,mar,apr,may,jun
 E-157049,ChatGPT,ai,97,6,25,23,22,0,0,0,0,0,0,0,0,0
 E-157049,Claude,ai,111,0,42,13,45,0,0,0,0,0,0,0,0,0
@@ -13,7 +13,7 @@ E-134028,Claude,ai,89,0,24,10,37,0,0,0,0,0,0,0,0,0
 E-134028,Cursor,ai,314,0,13,43,26,0,0,0,0,0,0,0,0,0
 E-134028,Github,ai,225,0,12,10,22,0,0,0,0,0,0,0,0,0
 E-134028,Replit,ai,58,0,14,32,25,0,0,0,0,0,0,0,0,0
-E-117775,Claude,ai,272,0,18,31,30,0,0,0,0,0,0,0,0,0
+E-117775 - CYBER SECURITY,Claude,ai,272,0,18,31,30,0,0,0,0,0,0,0,0,0
 E-117775,Cursor,ai,53,0,12,18,42,0,0,0,0,0,0,0,0,0
 E-117775,Factory,ai,165,0,32,25,43,0,0,0,0,0,0,0,0,0
 E-117775,Replit,ai,152,0,11,22,10,0,0,0,0,0,0,0,0,0

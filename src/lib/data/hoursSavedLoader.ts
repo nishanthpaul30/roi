@@ -131,7 +131,15 @@ export function parseRawHoursSavedText(raw: string): HoursSavedRow[] {
 
     if (assetTypeIdx !== -1 && get(assetTypeIdx).toLowerCase() !== 'ai') continue;
 
-    const engagementCode = get(engagementCodeIdx);
+    // The real source file can carry a compound value here, e.g.
+    // "E-117775 - CYBER SECURITY" (code + a trailing description) instead of
+    // the bare code ai_usage_data.csv's projectCode uses. Extracting just the
+    // leading E-NNNNNN / I-NNNNNN pattern keeps the join exact-match; a value
+    // that doesn't start with that pattern is left as-is (trimmed) rather
+    // than silently emptied.
+    const rawEngagementCode = get(engagementCodeIdx);
+    const engagementCodeMatch = rawEngagementCode.match(/^[A-Za-z]-\d+/);
+    const engagementCode = engagementCodeMatch ? engagementCodeMatch[0] : rawEngagementCode;
     const assetName = get(assetNameIdx);
     const approvedTotalHrs = parseFloat(get(approvedIdx)) || 0;
     const pendingApprovalHrs = parseFloat(get(pendingApprovalIdx)) || 0;

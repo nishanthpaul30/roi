@@ -78,7 +78,7 @@ export interface CsvUsageRow {
  * consolidated and the monthly grain.
  */
 export interface HoursSavedRow {
-  engagementCode: string;              // "Engagement Code" column — joins to CsvUsageRow.projectCode
+  engagementCode: string;              // Extracted from the "Engagement Code" column (which may carry a trailing description, e.g. "E-117775 - CYBER SECURITY") -- just the leading E-NNNNNN/I-NNNNNN is kept, since that's what joins to CsvUsageRow.projectCode
   assetName: string;                   // "Asset Name" column, as given in the source file (e.g. "Github")
   aiTool: string;                      // assetName.toLowerCase() — joins to CsvUsageRow.aiTool
   approvedTotalHrs: number;            // The approved-hours column (e.g. "Approved (Actual)") — a target, not a sum
