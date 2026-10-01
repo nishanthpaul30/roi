@@ -205,7 +205,7 @@ export function generatePrescriptiveInferences(
     statSub: hoursSavedRows.length > 0 ? `${fmtCost(roiHoursSavedValueUsd)} value vs ${fmtCost(roiTotalInvestmentUsd)} invested` : `${engagementCount} engagements tracked`,
     finding:
       hoursSavedRows.length > 0
-        ? `Across ${engagementCount} tracked engagements, ${fmtNum(roiEligibleHours)} approved hours saved are worth ${fmtCost(roiHoursSavedValueUsd)} at the blended $${DEFAULT_DEV_HOUR_RATE_USD}/dev-hr rate, against a Total Investment of ${fmtCost(roiTotalInvestmentUsd)} (${fmtCost(roiToolCost)} AI tool cost + ${fmtCost(roiDevCostUsd)} dev hours cost).`
+        ? `Across ${engagementCount} tracked engagements, ${fmtNum(roiEligibleHours)} approved hours saved are worth ${fmtCost(roiHoursSavedValueUsd)} at the blended $${DEFAULT_DEV_HOUR_RATE_USD}/dev-hr rate, against a Total Investment of ${fmtCost(roiTotalInvestmentUsd)} (${fmtCost(roiToolCost)} AI tool cost for just these ${engagementCount} engagements, not the org-wide Total AI Investment card, + ${fmtCost(roiDevCostUsd)} dev hours cost).`
         : 'No Hours Saved data is currently tracked for the selected filters.',
     actionableInsight:
       hoursSavedRows.length > 0

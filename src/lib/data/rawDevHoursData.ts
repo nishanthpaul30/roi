@@ -1,6 +1,6 @@
 // AUTO-GENERATED — do not edit manually.
 // Re-generate by running: node scripts/generateDevHoursCsv.js
-// Mock developer-timesheet data for 496 engagements, generated 2026-10-01T15:15:55.889Z.
+// Mock developer-timesheet data for 496 engagements, generated 2026-10-01T16:52:11.025Z.
 // Deterministic (seeded) mock data, since no real timesheet source exists
 // yet -- see this script's header comment for why.
 export const RAW_DEV_HOURS_DATA = `Engagement Code,jul,aug,sep,oct,nov,dec,jan,feb,mar,apr,may,jun

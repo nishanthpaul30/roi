@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import type { TokenCostSummary } from '@/lib/metrics/types';
-import { computeRoiPercent, computeDevCostUsd, computeTotalInvestmentUsd, computeRoiEligibleHours } from '@/lib/metrics/roiCalc';
+import { computeHoursSavedValueUsd, computeRoiPercent, computeDevCostUsd, computeTotalInvestmentUsd, computeRoiEligibleHours } from '@/lib/metrics/roiCalc';
 import { formatCompactCurrency as fmtCost, formatCompactNumber as fmtNum } from '@/lib/format';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
@@ -32,7 +32,7 @@ export function HoursSavedExecutiveSummary({ rows, devHourRate }: HoursSavedExec
     // Capped per row (not on the portfolio total) so one row overshooting
     // its own approved target can't borrow "room" from another that undershot.
     const totalRoiEligibleHours = rows.reduce((s, r) => s + computeRoiEligibleHours(r.sumOfMonthlyHrs, r.approvedTotalHrs), 0);
-    const totalHoursSavedValueUsd = totalRoiEligibleHours * devHourRate;
+    const totalHoursSavedValueUsd = computeHoursSavedValueUsd(totalRoiEligibleHours, devHourRate);
 
     // devHoursSpent is engagement-level, duplicated on every tool row of a
     // multi-tool engagement -- dedupe by projectCode before summing, or a
