@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import {
-  Users,
   ChevronDown,
   ChevronUp,
   Sparkles,
@@ -12,6 +11,7 @@ import {
   CheckCircle2,
   BadgeDollarSign,
   AlertTriangle,
+  Clock3,
 } from 'lucide-react';
 import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
 import { generatePrescriptiveInferences, PrescriptiveInference } from '@/lib/metrics/prescriptiveEngine';
@@ -26,7 +26,7 @@ const INFERENCE_ICONS: Record<string, React.ComponentType<{ className?: string }
   license_reclamation: BadgeDollarSign,
   project_billability: Layers,
   pareto_risk: ShieldAlert,
-  habitual_retention: Users,
+  hours_saved_roi: Clock3,
   multi_tool_comparison: Layers,
   non_billable_overrun: AlertTriangle,
 };

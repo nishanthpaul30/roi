@@ -8,7 +8,6 @@ import {
   ChevronRight,
   TrendingUp,
   AlertTriangle,
-  Users,
   UserCheck,
   UserX,
   Target,
@@ -33,12 +32,15 @@ import {
   BadgeDollarSign,
   ChevronUp,
   ChevronDown,
+  Clock3,
 } from 'lucide-react';
 import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { useRawRows } from '@/hooks/useRawRows';
 import { HierarchyDrilldownPanel } from './HierarchyDrilldownPanel';
 import { StatTile } from './StatTile';
+import { HoursSavedOverviewPanel } from './HoursSavedOverviewPanel';
+import { DEFAULT_DEV_HOUR_RATE_USD } from '@/lib/metrics/roiCalc';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 import { generatePrescriptiveInferences } from '@/lib/metrics/prescriptiveEngine';
 
@@ -185,6 +187,9 @@ export function ExecutiveInferenceDrilldownView({
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [inspectingRecord, setInspectingRecord] = useState<CsvUsageRow | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+  // hours_saved_roi: dev-hour rate for the embedded HoursSavedOverviewPanel,
+  // local to this drilldown (not shared with Engagement Analytics' own rate).
+  const [hoursSavedDevHourRate, setHoursSavedDevHourRate] = useState<number>(DEFAULT_DEV_HOUR_RATE_USD);
 
   // Pagination for the License Reclamation "Usage Below Free Limit" warning table
   const [warningPage, setWarningPage] = useState(1);
@@ -971,30 +976,19 @@ export function ExecutiveInferenceDrilldownView({
         benefitOutcome: p?.benefitOutcome || `Protects the ROI on ${fmtCost(summary?.nonBillableSpend || 0)} of non-billable spend by redirecting it toward reusable IP instead of one-off internal use. Also strengthens cost-allocation audit trails and makes the case for billing back qualifying work.`,
       };
     })(),
-    habitual_retention: (() => {
-      const p = prescriptiveMap.get('habitual_retention');
-      const embeddedPct = (userCohorts.embedded.length / (activeUserCount || 1)) * 100;
-      const regularPct = (userCohorts.regular.length / (activeUserCount || 1)) * 100;
-      const occasionalPct = (userCohorts.occasional.length / (activeUserCount || 1)) * 100;
+    hours_saved_roi: (() => {
+      const p = prescriptiveMap.get('hours_saved_roi');
       return {
-        id: 'habitual_retention',
-        title: 'Habitual User Retention & Health',
-        tag: 'Adoption Health',
+        id: 'hours_saved_roi',
+        title: 'Hours Saved ROI',
+        tag: 'AI Investment ROI',
         tagColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-        icon: Users,
-        stat: `${(embeddedPct + regularPct).toFixed(0)}% Regular-or-Better Usage`,
-        statSub: `${embeddedPct.toFixed(0)}% Embedded, ${regularPct.toFixed(0)}% Regular, ${occasionalPct.toFixed(0)}% Occasional (of ${activeUserCount} active users)`,
-        finding: p?.finding || `Across ${activeUserCount} active users this period: ${userCohorts.embedded.length} (${embeddedPct.toFixed(0)}%) are Embedded (active in ≥90% of months in the filtered window), ${userCohorts.regular.length} (${regularPct.toFixed(0)}%) are Regular (≥60%), and ${userCohorts.occasional.length} (${occasionalPct.toFixed(0)}%) are Occasional (≥25%). This is measured as active-months ÷ total months in the filtered window, per user — see the Habitual Retention card on Executive Overview for the org-wide cohort breakdown, which also accounts for the ${inactiveUserCount} completely dormant licenses.`,
-        actionableInsight: p?.actionableInsight || (
-          occasionalPct > 20
-            ? 'Investigate the Occasional cohort for onboarding friction or workflow gaps before expanding license capacity further.'
-            : 'AI tools show healthy habitual usage among active licenses. Focus shift from basic onboarding to advanced competency training.'
-        ),
-        benefitOutcome: p?.benefitOutcome || (
-          occasionalPct > 20
-            ? `Protects roughly ${fmtCost(userCohorts.occasional.length * avgLicenseCostPerSeat)}/mo in license spend now at risk from the ${userCohorts.occasional.length}-person Occasional cohort churning off their seats. Also lifts overall productivity return once those seats convert to habitual use.`
-            : `Sustains the return on the active license base by keeping usage habitual rather than one-off. Also compounds productivity gains as advanced training deepens adoption.`
-        ),
+        icon: Clock3,
+        stat: p?.stat || 'Hours Saved ROI',
+        statSub: p?.statSub || '',
+        finding: p?.finding || 'No Hours Saved data is currently tracked for the selected filters.',
+        actionableInsight: p?.actionableInsight || 'Add Hours Saved tracking data to surface this inference.',
+        benefitOutcome: p?.benefitOutcome || 'Tracking this once Hours Saved data is available will quantify AI adoption ROI directly.',
       };
     })(),
     license_reclamation: (() => {
@@ -2064,91 +2058,25 @@ export function ExecutiveInferenceDrilldownView({
             </div>
           )}
 
-          {/* 7. HABITUAL USER RETENTION & HEALTH */}
-          {inferenceId === 'habitual_retention' && (
-            <div className="space-y-6">
-              {selectedCohortFacet === null ? (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-xs">
-                  <div
-                    onClick={() => setSelectedCohortFacet('embedded')}
-                    className="bg-ey-card border border-ey-border hover:border-ey-yellow/80 p-5 rounded-xl cursor-pointer transition group space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                        Core Habitual (≥90% Months)
-                      </span>
-                      <span className="text-[10px] text-ey-muted">{userCohorts.embedded.length} Users</span>
-                    </div>
-                    <p className="text-2xl font-bold text-emerald-400">
-                      {((userCohorts.embedded.length / (activeUserCount || 1)) * 100).toFixed(0)}%
-                    </p>
-                    <p className="text-xs text-ey-muted">Active in nearly every month in window</p>
-                    <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
-                      <span>Continue to View</span>
-                      <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-
-                  <div
-                    onClick={() => setSelectedCohortFacet('regular')}
-                    className="bg-ey-card border border-ey-border hover:border-ey-yellow/80 p-5 rounded-xl cursor-pointer transition group space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                        Regular (≥60% Months)
-                      </span>
-                      <span className="text-[10px] text-ey-muted">{userCohorts.regular.length} Users</span>
-                    </div>
-                    <p className="text-2xl font-bold text-cyan-400">
-                      {((userCohorts.regular.length / (activeUserCount || 1)) * 100).toFixed(0)}%
-                    </p>
-                    <p className="text-xs text-ey-muted">Frequent, consistent monthly usage</p>
-                    <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
-                      <span>Continue to View</span>
-                      <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-
-                  <div
-                    onClick={() => setSelectedCohortFacet('occasional')}
-                    className="bg-ey-card border border-ey-border hover:border-ey-yellow/80 p-5 rounded-xl cursor-pointer transition group space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                        Occasional (≥25% Months)
-                      </span>
-                      <span className="text-[10px] text-ey-muted">{userCohorts.occasional.length} Users</span>
-                    </div>
-                    <p className="text-2xl font-bold text-amber-400">
-                      {((userCohorts.occasional.length / (activeUserCount || 1)) * 100).toFixed(0)}%
-                    </p>
-                    <p className="text-xs text-ey-muted">Target cohort for competency training</p>
-                    <div className="pt-2 border-t border-ey-border/40 text-[10px] text-ey-yellow font-bold flex items-center justify-between">
-                      <span>Continue to View</span>
-                      <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setSelectedCohortFacet(null)}
-                    className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-muted hover:text-ey-yellow bg-ey-black border border-ey-border px-3 py-1.5 rounded-lg transition"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    Back to Cohorts
-                  </button>
-                  <HierarchyDrilldownPanel
-                    rows={allRows.filter((r) => {
-                      const email = (r.userMail || '').toLowerCase().trim();
-                      return userCohorts[selectedCohortFacet].some((u) => u.email === email);
-                    })}
-                    title={`Level 3: ${selectedCohortFacet === 'embedded' ? 'Core Habitual' : selectedCohortFacet === 'regular' ? 'Regular' : 'Occasional'} Cohort`}
-                    onSelectUser={(email, label) => setSelectedEntity({ type: 'user', name: email, label })}
-                  />
-                </>
-              )}
-            </div>
+          {/* 7. HOURS SAVED ROI — reuses the same Matrix/Table/Executive Summary
+              panel shown on Engagement Analytics, fed by the same
+              summary.hoursSavedByEngagement data, so this drilldown doesn't
+              reimplement that UI. Selecting an engagement focuses the
+              standard Level 3 entity banner (spend/users/tools) for that
+              project code, same as other cards' row-click behavior. */}
+          {inferenceId === 'hours_saved_roi' && (
+            (summary?.hoursSavedByEngagement || []).length > 0 ? (
+              <HoursSavedOverviewPanel
+                rows={summary?.hoursSavedByEngagement || []}
+                onSelectEngagement={(code) => setSelectedEntity({ type: 'project_code', name: code, label: code })}
+                devHourRate={hoursSavedDevHourRate}
+                onDevHourRateChange={setHoursSavedDevHourRate}
+              />
+            ) : (
+              <div className="bg-ey-card border border-ey-border rounded-xl p-8 text-center text-ey-muted text-sm">
+                No Hours Saved data is currently tracked for the selected filters.
+              </div>
+            )
           )}
 
         </div>
