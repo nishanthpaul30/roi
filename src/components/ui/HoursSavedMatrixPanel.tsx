@@ -103,12 +103,20 @@ export function HoursSavedMatrixPanel({ rows, onSelectEngagement }: HoursSavedMa
   }, [engagementCodes, tools, cellMap, search]);
 
   // Hides a tool column entirely when none of the currently filtered
-  // engagements have a tracked row for it -- otherwise a search/filter can
-  // leave a column of nothing but "—" cells. Based on the filtered set (not
-  // the paginated one) so columns stay stable while paging.
+  // engagements have a non-null value for the SELECTED metric on it -- a row
+  // can exist for a tool but still have a null costPerHourSaved (no cost
+  // match) or similar, which would otherwise leave a column of nothing but
+  // "—" cells. Depends on metric, not just presence in cellMap. Based on the
+  // filtered set (not the paginated one) so columns stay stable while paging.
   const visibleTools = useMemo(
-    () => tools.filter((t) => filteredEngagementCodes.some((eng) => cellMap.has(`${eng}:::${t}`))),
-    [tools, filteredEngagementCodes, cellMap]
+    () =>
+      tools.filter((t) =>
+        filteredEngagementCodes.some((eng) => {
+          const row = cellMap.get(`${eng}:::${t}`);
+          return row && row[metric] !== null && row[metric] !== undefined;
+        })
+      ),
+    [tools, filteredEngagementCodes, cellMap, metric]
   );
 
   const sortedEngagementCodes = useMemo(() => {
