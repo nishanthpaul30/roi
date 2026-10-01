@@ -88,6 +88,46 @@ function isMonthColumn(header: string): boolean {
   return MONTH_ABBREVIATIONS.has(header.trim().toLowerCase().slice(0, 3));
 }
 
+/**
+ * Splits one CSV line into fields, honoring RFC4180-style quoting: a field
+ * wrapped in "..." can itself contain commas, and a literal quote inside it
+ * is written as "" (doubled). A naive line.split(',') leaves the wrapping
+ * quote characters stuck to the value (e.g. Asset Type arriving as the
+ * literal string `"ai"` instead of `ai`), which silently fails every
+ * exact-match check downstream -- confirmed via diagnostic logging against
+ * the real source export. Does not handle a quoted field spanning multiple
+ * physical lines (an embedded newline) -- not seen in this data so far.
+ */
+function splitCsvLine(line: string): string[] {
+  const fields: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (inQuotes) {
+      if (char === '"') {
+        if (line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else if (char === '"') {
+      inQuotes = true;
+    } else if (char === ',') {
+      fields.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  fields.push(current);
+  return fields;
+}
+
 /** Finds a column by trying each candidate header name, case-insensitively. Returns -1 if none match. */
 function findColumnIndex(header: string[], ...candidates: string[]): number {
   const lowered = candidates.map((c) => c.toLowerCase());
@@ -137,7 +177,7 @@ export function parseRawHoursSavedText(raw: string): HoursSavedRow[] {
     return [];
   }
 
-  const header = lines[0].split(',').map(h => h.trim());
+  const header = splitCsvLine(lines[0]).map(h => h.trim());
   console.log('[HoursSaved] header row:', header);
 
   const engagementCodeIdx = findColumnIndex(header, 'Engagement Code', 'EngagementCode');
@@ -171,7 +211,7 @@ export function parseRawHoursSavedText(raw: string): HoursSavedRow[] {
   const seenAssetTypeValues = new Set<string>();
 
   for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',');
+    const cols = splitCsvLine(lines[i]);
     const get = (idx: number) => (idx >= 0 && cols[idx] !== undefined ? cols[idx].trim() : '');
 
     if (assetTypeIdx !== -1) {
