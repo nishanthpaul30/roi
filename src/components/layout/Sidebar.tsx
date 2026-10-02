@@ -20,6 +20,7 @@ import {
   GitBranch,
   Briefcase,
   Layers,
+  Target,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -29,6 +30,7 @@ const INSIGHTS_NAV_ITEMS = [
   { name: 'Token & Spend ROI', href: '/dashboard/roi', icon: DollarSign },
   { name: 'Service Line Analytics', href: '/dashboard/teams', icon: Building2 },
   { name: 'Engagement Analytics', href: '/dashboard/engagements', icon: Briefcase },
+  { name: 'Engagement Scoring', href: '/dashboard/scoring', icon: Target },
   { name: 'Multi-Tool Comparison', href: '/dashboard/multi-tool', icon: Layers },
   { name: 'Geo Pulse', href: '/dashboard/hierarchy', icon: GitBranch },
 ];

@@ -8,6 +8,8 @@ interface StatTileProps {
   subtitle?: ReactNode;
   subtitleClassName?: string;
   tooltip?: ReactNode;
+  /** Which edge of the icon the tooltip is pinned to: 'right' opens leftward (default), 'left' opens rightward -- use 'left' for a tile at the left edge of the page. */
+  tooltipAlign?: 'left' | 'right';
   borderClassName?: string;
   loading?: boolean;
 }
@@ -27,6 +29,7 @@ export function StatTile({
   subtitle,
   subtitleClassName = 'text-ey-muted',
   tooltip,
+  tooltipAlign = 'right',
   borderClassName = 'border-ey-border',
   loading = false,
 }: StatTileProps) {
@@ -37,7 +40,7 @@ export function StatTile({
         {tooltip && (
           <div className="group/info relative cursor-pointer">
             <Info className="w-3.5 h-3.5 text-ey-muted hover:text-ey-light" />
-            <div className="absolute right-0 top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-52 z-50 font-sans normal-case">
+            <div className={`absolute ${tooltipAlign === 'left' ? 'left-0' : 'right-0'} top-6 hidden group-hover/info:block bg-ey-black text-ey-light text-[11px] p-2 rounded shadow-xl border border-ey-border w-52 z-50 font-sans normal-case`}>
               {tooltip}
             </div>
           </div>
