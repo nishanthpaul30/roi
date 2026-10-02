@@ -15,7 +15,12 @@ import {
   TrendingUp,
   Download,
   Clock3,
+  Target,
+  ChevronsUpDown,
+  ChevronsDownUp,
+  Layers,
 } from 'lucide-react';
+import { CollapsibleSection } from '@/components/ui/CollapsibleSection';
 
 // Derivation Data Item Interface
 interface MetricDerivationItem {
@@ -77,12 +82,22 @@ const CSV_SCHEMA = [
 // file's header row contains -- and are resolved to a real calendar month via
 // the current fiscal year (Jul-Jun), not listed as fixed columns here.
 const HOURS_SAVED_CSV_SCHEMA = [
-  { column: 'Engagement Code', fieldName: 'engagementCode', description: 'Joins to the dataset above\'s projectCode. An Engagement Code with no match there still appears in the UI, with cost/tokens/$-per-hour shown as "—" rather than being dropped', dataType: 'String' },
-  { column: 'Asset Name', fieldName: 'assetName / aiTool', description: 'The AI tool name, e.g. "Github" — lowercased to aiTool for the join, so it must match the spelling used in the Product column above (case-insensitive)', dataType: 'String' },
+  { column: 'Engagement Code', fieldName: 'engagementCode', description: 'Joins to the dataset above\'s projectCode, and ai_usage_data.csv is the MASTER list of valid codes: a row whose code does not exist anywhere in ai_usage_data.csv is dropped. A code that does exist there but has no cost for a given tool still appears, with cost/tokens/$-per-hour shown as "—". The value may carry a trailing description (e.g. "E-117775 - CYBER SECURITY"); only the leading E-/I-NNNNNN is kept for the join', dataType: 'String' },
+  { column: 'Asset Name', fieldName: 'assetName / aiTool', description: 'The AI tool name, e.g. "Github" — normalized to aiTool for the join: an exact (case-insensitive) match to one of the six canonical tool names first, otherwise a substring match (e.g. "GitHub Copilot" → github, "ChatGPT Enterprise" → chatgpt). A name matching neither is kept as-is and simply will not join to a cost', dataType: 'String' },
   { column: 'Asset Type', fieldName: '(filter only, not stored)', description: '"ai" or "non-ai". A "non-ai" row is dropped at load time and never reaches the rest of the app — this feature is AI-tool ROI only', dataType: 'String' },
   { column: 'Approved (Actual)', fieldName: 'approvedTotalHrs', description: 'The approved business-case TARGET for this (Engagement, Tool) pair — not a figure the month columns are expected to sum to; the two are independently sourced', dataType: 'Numeric' },
   { column: 'Pending Approval (Submitted)', fieldName: 'pendingApprovalHrs', description: 'Hours submitted for sign-off but not yet approved. Shown as its own pipeline figure — never added into approvedTotalHrs or used in Realization %', dataType: 'Numeric' },
   { column: 'jul, aug, sep, … (any month name)', fieldName: 'monthlyHours[label]', description: 'One column per month, detected by name wherever it falls in the header (not a fixed position) — so extra columns can sit anywhere without breaking the parser. A future month sits at 0 until it actually arrives', dataType: 'Numeric, 12 max (Jul–Jun)' },
+];
+
+// A third data source, but not an external export: a MOCK developer timesheet
+// (hours clocked per engagement per month), generated from ai_usage_data.csv's
+// own Engagement Codes by scripts/generateDevHoursCsv.js until a real timesheet
+// feed exists. It supplies the human-effort half of Total Investment.
+const DEV_HOURS_CSV_SCHEMA = [
+  { column: 'Engagement Code', fieldName: 'engagementCode', description: 'Bare E-/I-NNNNNN code, taken verbatim from ai_usage_data.csv\'s Engagement Code column — so dev hours only ever exist for engagements the master dataset knows about. One row per distinct code (496 today)', dataType: 'String' },
+  { column: 'jul, aug, sep, … (any month name)', fieldName: 'monthlyDevHours[label]', description: 'One column per fiscal month (Jul–Jun), detected by name like the Hours Saved file. MOCK values: 40–160 hrs per engagement-month from a seeded generator, so they are identical on every run', dataType: 'Numeric, 12 max (Jul–Jun)' },
+  { column: '— (derived from the month columns)', fieldName: 'totalDevHours → devHoursSpent', description: 'Sum of the engagement\'s month columns. ENGAGEMENT-level only — the timesheet has no per-tool breakdown, so the same value is attached to every tool row of a multi-tool engagement and must be counted once per engagement, never once per tool row', dataType: 'Derived' },
 ];
 
 const FORMULA_CATEGORIES = [
@@ -148,6 +163,32 @@ const FORMULA_CATEGORIES = [
       { name: 'Hours Saved Realization (%)', formula: 'Realization % = SUM(monthly hours) / Approved (Actual) × 100', example: '78 ÷ 254 × 100 = 30.7% (E-157049 / GitHub Copilot)' },
       { name: 'Cost per Hour Saved ($)', formula: 'Tool Cost (same Engagement + Tool, from ai_usage_data.csv) / SUM(monthly hours)', example: '$213.85 ÷ 78 hrs = $2.74 / hour saved' },
       { name: 'Portfolio Blended Cost / Hour Saved', formula: 'SUM(Tool Cost, all rows) / SUM(Hours Saved, all rows) -- not an average of each row\'s own ratio', example: '$14,283.33 ÷ 4,817 hrs = $2.97 / hour saved, portfolio-wide' },
+    ],
+  },
+  {
+    title: 'Hours Saved ROI & Investment Formulas',
+    icon: Calculator,
+    color: 'text-lime-400',
+    formulas: [
+      { name: 'ROI-Eligible Hours', formula: 'min(SUM(monthly hours), Approved (Actual)) — capped per (Engagement, Tool) row, then summed', example: 'E-157049 / Factory: min(105, 72) = 72 hrs · portfolio: 4,402 of 4,817 recorded hrs' },
+      { name: 'Value of Hours Saved ($)', formula: 'ROI-Eligible Hours × $/dev-hr (default $30, adjustable on Engagement Analytics)', example: '4,402 hrs × $30 = $132,060' },
+      { name: 'Tool-Level ROI (%)', formula: '(Value of Hours Saved − Tool Cost) / Tool Cost × 100, per (Engagement, Tool) row — tool cost only', example: 'E-120166 / Factory: ($3,270 − $63.25) ÷ $63.25 × 100 = +5,070%' },
+      { name: 'Dev Hours & Dev Cost', formula: 'Dev Cost = Dev Hours (timesheet, counted once per engagement) × $/dev-hr', example: 'E-117775: 1,238 hrs × $30 = $37,140 · portfolio: 19,790 hrs (17 engagements) = $593,700' },
+      { name: 'Total Investment ($)', formula: 'Total Investment = Tool Cost + Dev Cost, at engagement level', example: 'E-117775: $976.30 + $37,140 = $38,116.30' },
+      { name: 'Total Investment ROI (%)', formula: '(Value of Hours Saved − Total Investment) / Total Investment × 100 — engagement rollup, portfolio, and the Executive Overview card', example: 'E-117775: ($8,250 − $38,116.30) ÷ $38,116.30 × 100 = −78.4% · portfolio: −78.3%' },
+    ],
+  },
+  {
+    title: 'Engagement Scoring Formulas',
+    icon: Target,
+    color: 'text-orange-400',
+    formulas: [
+      { name: 'Financial Value (/30)', formula: 'Benefit-to-Cost = Value of Hours Saved / Tool Cost (tracked tools); points = 30 × min(ratio / 3, 1)', example: 'E-117775: $8,250 ÷ $976.30 = 8.5× → 30.0 pts (full points at 3×)' },
+      { name: 'Productivity Gain (/20)', formula: 'points = 20 × min(SUM(hours saved) / SUM(approved hours), 1)', example: 'E-117775: 294 ÷ 642 = 46% → 9.2 pts' },
+      { name: 'Adoption & Utilization (/20)', formula: 'points = 20 × (0.5 × active seats / licensed seats + 0.5 × average of months-used / months-licensed per seat)', example: 'E-117775: 4 of 4 seats active, 63% of licensed months used → 20 × (0.5 × 1.00 + 0.5 × 0.63) = 16.3 pts' },
+      { name: 'Incremental Revenue (/15) · Quality & Risk (/10)', formula: 'Not scored — no data source yet. Shown blank (not zero) and left out of the total', example: 'Needs engagement revenue/margin and quality & risk telemetry' },
+      { name: 'Strategic Importance (/5)', formula: 'points from Engagement Invest Type: Growth 5 · Innovation 4 · Efficiency 3 · Sustain 2', example: 'E-117775: Efficiency → 3 pts' },
+      { name: 'Total Score & Tier', formula: 'Total = SUM(scored dimensions); Available = SUM(max of scored dimensions); % = Total / Available × 100; ≥80 Leading · ≥60 Performing · ≥40 Developing · else At Risk', example: 'E-117775: 58.5 / 75 = 78% → Performing' },
     ],
   },
 ];
@@ -423,24 +464,371 @@ const METRICS_DERIVATION_LIST: MetricDerivationItem[] = [
     notes: 'Deliberately NOT an average of each row\'s own Cost per Hour Saved — averaging 61 separate ratios would let a tiny, cheap engagement count exactly as much as a large, expensive one. Summing dollars and hours first and dividing once weights the result by actual dollars at stake. Overall Realization % (SUM hours saved ÷ SUM approved hours = 4,817 ÷ 10,014 = 48.1%) follows the same sum-then-divide rule. Powers the Hours Saved Executive Summary strip on Engagement Analytics',
     category: 'Hours Saved',
   },
+  {
+    name: 'Engagement Code Validation (ai_usage_data.csv as Master)',
+    csvField: 'engagementCode (actuals-planned-overall-*.csv) vs every distinct projectCode in ai_usage_data.csv (unfiltered)',
+    formula: 'Keep a Hours Saved row only if its Engagement Code exists in ai_usage_data.csv',
+    sampleInput: '17 engagement codes in actuals-planned-overall-2026-09-30.csv; 496 in ai_usage_data.csv',
+    workedCalculation: 'Every Hours Saved code is found in the master set',
+    derivedOutput: '61 of 61 Engagement × Tool rows kept (the 2 "non-ai" rows were already dropped by the Asset Type filter)',
+    notes: 'The master set is the full unfiltered roster, not the date-range-filtered rows, so a code does not flicker in and out as the date filter changes. A code that is valid but has no cost for a given tool in the selected period is kept and shows "—" for cost. The same rule decides which engagement codes the dev-hours timesheet is generated for',
+    category: 'Hours Saved',
+  },
+  {
+    name: 'ROI-Eligible Hours (Approved-Capped)',
+    csvField: 'monthlyHours (sum of every month column) vs approvedTotalHrs (Approved (Actual)), per (Engagement, Tool) row',
+    formula: 'ROI-Eligible Hours = min(SUM(monthlyHours), approvedTotalHrs) per row, then summed',
+    sampleInput: 'E-157049 / Factory: 105 hrs recorded, Approved (Actual) = 72',
+    workedCalculation: 'min(105, 72)',
+    derivedOutput: '72 hrs count toward value (portfolio: 4,402 of 4,817 recorded hrs count)',
+    notes: 'Hours recorded beyond what has been approved are not yet locked into the business case, so they earn no value. The cap is applied per row — never on an already-summed engagement or portfolio total — so one tool overshooting its own target cannot borrow headroom from another that undershot. Approved = 0 means nothing counts. Realization %, Cost per Hour Saved and the Hours Saved column keep using the raw recorded hours; only the ROI value uses the capped figure',
+    category: 'Hours Saved ROI',
+  },
+  {
+    name: 'Value of Hours Saved ($)',
+    csvField: 'ROI-Eligible Hours × the blended $/dev-hr rate (default $30)',
+    formula: 'Value = ROI-Eligible Hours × $/dev-hr',
+    sampleInput: 'ROI-Eligible Hours = 4,402 (portfolio), rate = $30/hr',
+    workedCalculation: '4,402 × $30',
+    derivedOutput: '$132,060',
+    notes: 'The $30 rate is a business assumption, not sourced from the data — one flat blended rate for every role and region. It is adjustable via the "$ / dev-hr" input on Engagement Analytics (and inside the Hours Saved ROI drilldown), and every ROI figure there recomputes live. The Executive Overview card and Engagement Scoring always use the $30 default',
+    category: 'Hours Saved ROI',
+  },
+  {
+    name: 'Tool-Level ROI (%)',
+    csvField: 'Value of Hours Saved and cost (ai_usage_data.csv, same Engagement + Tool), per row',
+    formula: 'ROI % = (Value of Hours Saved − Tool Cost) / Tool Cost × 100',
+    sampleInput: 'E-120166 / Factory: 109 hrs saved (Approved 201), Tool Cost = $63.25',
+    workedCalculation: '(109 × $30 − $63.25) ÷ $63.25 × 100 = ($3,270 − $63.25) ÷ $63.25 × 100',
+    derivedOutput: '+5,070%',
+    notes: 'Weighs value only against the tool\'s own usage + licence cost — dev hours are engagement-level, so they are not part of this per-tool figure (see Total Investment ROI). Extreme percentages are a property of the denominator: sample tool costs are tens of dollars against thousands of dollars of hours value. Null (shown "—") when there is no cost to divide by. The approved cap applies: E-157049 / Factory records 105 hrs against 72 approved → value $2,160 → +3,411.6%. Shown as the "ROI %" column on tool rows and as a Matrix cell metric',
+    category: 'Hours Saved ROI',
+  },
+  {
+    name: 'Dev Hours Invested & Dev Cost',
+    csvField: 'monthlyDevHours (dev-hours-timesheet.csv) summed per Engagement Code',
+    formula: 'Dev Cost = Dev Hours × $/dev-hr, with Dev Hours counted once per engagement (not per tool row)',
+    sampleInput: 'E-117775: 12 monthly values summing to 1,238 hrs; 4 tracked tool rows',
+    workedCalculation: '1,238 × $30',
+    derivedOutput: '$37,140 (portfolio: 19,790 hrs across 17 engagements = $593,700)',
+    notes: 'The timesheet is engagement-level, so devHoursSpent is repeated on each tool row of a multi-tool engagement. Every rollup dedupes by Engagement Code before summing — E-117775 has 4 tool rows but contributes its 1,238 hrs once, not 4,952. MOCK data from a seeded generator (see the dev-hours schema above), a stand-in until a real timesheet feed exists',
+    category: 'Hours Saved ROI',
+  },
+  {
+    name: 'Total Investment ($)',
+    csvField: 'cost (the engagement\'s tracked tool rows) + Dev Cost, per engagement',
+    formula: 'Total Investment = SUM(Tool Cost across the engagement\'s tracked tools) + Dev Cost',
+    sampleInput: 'E-117775: Claude $245.01 + Cursor $361.62 + Factory $62.82 + Replit $306.85 = $976.30 tool cost; Dev Cost = $37,140',
+    workedCalculation: '$976.30 + $37,140',
+    derivedOutput: '$38,116.30 (portfolio: $14,283.33 + $593,700 = $607,983.33)',
+    notes: 'Engagement-level only. The tool cost covers just the tool rows that have Hours Saved data, so it is far smaller than the org-wide Total AI Investment ($236,697.73 — usage + licence across all 496 engagements). Different populations, not a mismatch',
+    category: 'Hours Saved ROI',
+  },
+  {
+    name: 'Total Investment ROI (%)',
+    csvField: 'Value of Hours Saved vs Total Investment, at engagement and portfolio level',
+    formula: 'ROI % = (Value of Hours Saved − Total Investment) / Total Investment × 100',
+    sampleInput: 'E-117775: eligible hours = 79 (Claude) + 53 (Cursor, capped from 72) + 100 (Factory) + 43 (Replit) = 275 → Value $8,250; Total Investment = $38,116.30',
+    workedCalculation: '($8,250 − $38,116.30) ÷ $38,116.30 × 100',
+    derivedOutput: '−78.4% (portfolio: ($132,060 − $607,983.33) ÷ $607,983.33 × 100 = −78.3%)',
+    notes: 'Negative means developer-hour cost outweighs the value of hours saved so far. Used on the engagement rollup row, the Executive Summary ROI card, the engagement drilldown panel and the Executive Overview card; per-tool rows and Matrix cells stay tool-cost-only. Null when Total Investment is 0',
+    category: 'Hours Saved ROI',
+  },
+  {
+    name: 'Hours Saved ROI (Executive Overview Card)',
+    csvField: 'summary.hoursSavedByEngagement — the same joined rows as Engagement Analytics',
+    formula: 'Portfolio Total Investment ROI at the default $30/dev-hr; pinned as the #2 card, after License Reclamation',
+    sampleInput: '17 tracked engagements: value $132,060 vs Total Investment $607,983.33 ($14,283.33 tool cost + $593,700 dev cost)',
+    workedCalculation: '($132,060 − $607,983.33) ÷ $607,983.33 × 100',
+    derivedOutput: '−78.3% ROI; net impact −$475,923.33',
+    notes: 'The "$14.3K AI tool cost" in the card is scoped to the 17 tracked engagements only — not the org-wide Total AI Investment ($236.7K across all 496 engagements, licences included). Clicking the card opens the same Matrix / Table / Executive Summary view inline, with its own $/dev-hr control, rather than navigating away',
+    category: 'Hours Saved ROI',
+  },
+  {
+    name: 'Engagement Score Framework (Dimensions, Weights & Blanks)',
+    csvField: 'ai_usage_data.csv rows (filtered) + the Hours Saved join, scored per Engagement Code',
+    formula: 'Six dimensions, 100 pts: Financial 30 · Productivity 20 · Adoption 20 · Incremental Revenue 15 · Quality & Risk 10 · Strategic 5. A dimension with no data is null (blank), never 0',
+    sampleInput: '496 engagements, all months, no filters',
+    workedCalculation: 'Adoption and Strategic score for all 496; Financial and Productivity only for the 17 with Hours Saved; Revenue and Quality & Risk for none',
+    derivedOutput: '25 points available to 479 engagements, 75 points to 17',
+    notes: 'Page: Engagement Scoring (/dashboard/scoring), served by /api/metrics/scoring. Weights, thresholds and the Invest-Type mapping live in one config (scoringConfig.ts) so the page and the server score against the same numbers. Uses the default $30/dev-hr',
+    category: 'Engagement Scoring',
+  },
+  {
+    name: 'Financial Value (/30)',
+    csvField: 'Hours Saved rows (hours, approved hours) and cost, for the engagement\'s tracked tools',
+    formula: 'Benefit-to-Cost = Value of Hours Saved / Tool Cost; points = 30 × min(ratio / 3, 1)',
+    sampleInput: 'E-117775: Value = $8,250 (275 eligible hrs × $30), Tool Cost = $976.30',
+    workedCalculation: '$8,250 ÷ $976.30 = 8.5×; 30 × min(8.5 / 3, 1)',
+    derivedOutput: '30.0 of 30',
+    notes: 'The 3× target is configurable. Blank when the engagement has no Hours Saved row or no tool cost to compare against. Tool cost only — dev hours are not part of this dimension. Every tracked engagement in the sample data reaches full points because sample tool costs are tiny',
+    category: 'Engagement Scoring',
+  },
+  {
+    name: 'Productivity Gain (/20)',
+    csvField: 'monthlyHours and approvedTotalHrs, summed across the engagement\'s tracked tools',
+    formula: 'points = 20 × min(SUM(hours saved) / SUM(approved hours), 1)',
+    sampleInput: 'E-117775: 294 hrs saved against 642 approved',
+    workedCalculation: '294 ÷ 642 = 46%; 20 × 0.46',
+    derivedOutput: '9.2 of 20',
+    notes: 'Uses the raw recorded hours (not the approved-capped figure), capped at 100% realization. Blank with no Hours Saved row or no approved target',
+    category: 'Engagement Scoring',
+  },
+  {
+    name: 'Adoption & Utilization (/20)',
+    csvField: 'calculationMethod = "License" rows (seats, licensed months) vs "Usage" rows with tokenConsumption > 0 (active months), per (user, tool) seat',
+    formula: 'points = 20 × (0.5 × Activation + 0.5 × Consistency); Activation = active seats / licensed seats; Consistency = average over seats of (months used / months licensed)',
+    sampleInput: 'E-117775: 4 licensed seats, all 4 used at least once; seats used in 63% of their licensed months on average',
+    workedCalculation: '20 × (0.5 × 1.00 + 0.5 × 0.63)',
+    derivedOutput: '16.3 of 20',
+    notes: 'A seat is one (user, tool) licence. An engagement with licences but no usage scores 0 — a real signal, not a blank. Blank only when there are no licence rows at all in the selected period. Scored for all 496 engagements',
+    category: 'Engagement Scoring',
+  },
+  {
+    name: 'Strategic Importance (/5)',
+    csvField: 'Engagement Invest Type (engagementInvestType)',
+    formula: 'points = lookup: Growth 5 · Innovation 4 · Efficiency 3 · Sustain 2',
+    sampleInput: 'E-117775: Invest Type = Efficiency',
+    workedCalculation: 'Look up "Efficiency"',
+    derivedOutput: '3 of 5',
+    notes: 'The point mapping is a placeholder for leadership to set (scoringConfig.ts). Invest Type is constant within an engagement. Blank if the type is missing or unmapped. Nominally 5% of the score, but when other dimensions are blank it carries more weight in the tier percentage (20% of a 25-point total)',
+    category: 'Engagement Scoring',
+  },
+  {
+    name: 'Total Score, Available Points & Tier',
+    csvField: 'The six dimension scores per engagement',
+    formula: 'Total = SUM(scored dimensions); Available = SUM(max points of scored dimensions); % = Total / Available × 100; ≥ 80% Leading, ≥ 60% Performing, ≥ 40% Developing, else At Risk',
+    sampleInput: 'E-117775: 30.0 + 9.2 + 16.3 + 3.0 scored; Revenue and Quality & Risk blank',
+    workedCalculation: 'Total 58.5; Available 30 + 20 + 20 + 5 = 75; 58.5 ÷ 75 × 100',
+    derivedOutput: '78% → Performing (portfolio, all months: 209 Leading · 190 Performing · 0 Developing · 97 At Risk)',
+    notes: 'The tier uses the percentage of available points, so a blank dimension never counts against an engagement. The flip side: 479 engagements are tiered on 25 points (Adoption + Strategic) only — lower confidence, flagged by the "Scored n/6" column. The tier filter and the Tier Distribution drilldown apply after scoring, so the engagements listed under a tier are exactly those tiered that way',
+    category: 'Engagement Scoring',
+  },
+  {
+    name: 'Incremental Revenue & Quality & Risk (Not Yet Scored)',
+    csvField: 'None — no source data yet',
+    formula: 'Not scored: shown blank, excluded from both Total and Available',
+    sampleInput: 'All 496 engagements',
+    workedCalculation: 'Not applicable — nothing to calculate',
+    derivedOutput: 'Blank: "— / 15" and "— / 10"',
+    notes: 'Incremental Revenue (15 pts) needs engagement revenue or margin by month from Finance/PMO plus a rule for what counts as AI-attributable. Quality & Risk (10 pts) needs review defect/rework rates, suggestion-acceptance telemetry and compliance events (policy violations, data-loss alerts, security incidents). Until then these dimensions contribute neither points nor denominator',
+    category: 'Engagement Scoring',
+  },
 ];
+
+// Catalog groups, in reading order. Each is one collapsible group in the catalog.
+const CATALOG_CATEGORIES = [
+  'Tokens',
+  'Cost',
+  'Projects',
+  'Breakdowns',
+  'License & Adoption',
+  'Governance',
+  'Hours Saved',
+  'Hours Saved ROI',
+  'Engagement Scoring',
+];
+
+// Titles contain spaces and "&", which are not valid in an HTML id, so every
+// section id is built from a slug of its title.
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+// Every collapsible block on the page, so "Expand all" can open them in one go.
+const ALL_COLLAPSIBLE_IDS = [
+  'section-sources',
+  'section-reference',
+  'section-catalog',
+  'schema-usage',
+  'schema-hours',
+  'schema-dev',
+  ...FORMULA_CATEGORIES.map((c) => `ref-${slug(c.title)}`),
+  ...CATALOG_CATEGORIES.map((c) => `cat-${slug(c)}`),
+];
+
+// Open on first load: the three sections and the Quick Reference cards. The big
+// schema tables and the catalog groups start collapsed so the page opens as a
+// scannable outline rather than one long scroll.
+const DEFAULT_OPEN_IDS = ['section-sources', 'section-reference', 'section-catalog', ...FORMULA_CATEGORIES.map((c) => `ref-${slug(c.title)}`)];
+
+function matchesTerm(item: MetricDerivationItem, term: string): boolean {
+  const t = term.trim().toLowerCase();
+  if (!t) return true;
+  return (
+    item.name.toLowerCase().includes(t) ||
+    item.csvField.toLowerCase().includes(t) ||
+    item.formula.toLowerCase().includes(t) ||
+    item.notes.toLowerCase().includes(t)
+  );
+}
+
+function withIds(prev: Set<string>, ids: string[]): Set<string> {
+  const next = new Set(prev);
+  ids.forEach((id) => next.add(id));
+  return next;
+}
+
+function SchemaTable({
+  rows,
+  accentClass,
+}: {
+  rows: { column: string; fieldName: string; description: string; dataType: string }[];
+  accentClass: string;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs text-left border-collapse">
+        <thead>
+          <tr className="border-b border-ey-border/80 text-ey-muted bg-ey-black/40">
+            <th className="p-2.5 font-semibold">CSV Column Name</th>
+            <th className="p-2.5 font-semibold">Internal Field</th>
+            <th className="p-2.5 font-semibold">Data Type</th>
+            <th className="p-2.5 font-semibold">Description & Usage</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-ey-border/40 text-ey-light font-mono text-[11px]">
+          {rows.map((row) => (
+            <tr key={row.fieldName} className="hover:bg-ey-black/30 transition">
+              <td className={`p-2.5 font-medium ${accentClass}`}>{row.column}</td>
+              <td className="p-2.5 text-cyan-300">{row.fieldName}</td>
+              <td className="p-2.5 text-ey-muted">{row.dataType}</td>
+              <td className="p-2.5 text-ey-muted font-sans text-xs">{row.description}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ExportSchemaButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-black bg-ey-yellow hover:bg-ey-yellow-hover px-2.5 py-1.5 rounded-lg transition shrink-0"
+    >
+      <Download className="w-3.5 h-3.5" />
+      Export to CSV
+    </button>
+  );
+}
+
+function MetricCard({
+  item,
+  copied,
+  onCopy,
+}: {
+  item: MetricDerivationItem;
+  copied: boolean;
+  onCopy: (text: string) => void;
+}) {
+  return (
+    <div className="bg-ey-black/60 border border-ey-border/80 rounded-xl p-4 space-y-3 hover:border-ey-yellow/40 transition">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm font-bold text-ey-light">{item.name}</span>
+        <button
+          onClick={() => onCopy(item.formula)}
+          className="flex items-center space-x-1 text-[11px] text-ey-muted hover:text-ey-yellow transition"
+          title="Copy Formula"
+        >
+          {copied ? (
+            <>
+              <Check className="w-3 h-3 text-emerald-400" />
+              <span className="text-emerald-400 font-semibold">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy className="w-3 h-3" />
+              <span>Copy Formula</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+        <div className="space-y-1">
+          <span className="text-[10px] font-semibold text-ey-muted uppercase">CSV Input Field</span>
+          <div className="font-mono text-[11px] text-cyan-300 bg-ey-card p-2 rounded border border-ey-border/60">{item.csvField}</div>
+        </div>
+        <div className="space-y-1">
+          <span className="text-[10px] font-semibold text-ey-muted uppercase">Mathematical Formula</span>
+          <div className="font-mono text-[11px] text-ey-yellow bg-ey-card p-2 rounded border border-ey-border/60">{item.formula}</div>
+        </div>
+      </div>
+
+      <div className="bg-ey-card/80 p-3 rounded-lg border border-ey-border/60 space-y-2 text-xs">
+        <div className="flex items-center space-x-1.5 text-[11px] font-semibold text-ey-light">
+          <Calculator className="w-3.5 h-3.5 text-ey-yellow" />
+          <span>Worked Calculation Example</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px] font-mono">
+          <div>
+            <span className="text-ey-muted block text-[10px]">Sample Input:</span>
+            <span className="text-ey-light">{item.sampleInput}</span>
+          </div>
+          <div>
+            <span className="text-ey-muted block text-[10px]">Calculation:</span>
+            <span className="text-cyan-300">{item.workedCalculation}</span>
+          </div>
+          <div>
+            <span className="text-ey-muted block text-[10px]">Derived Output:</span>
+            <span className="text-emerald-400 font-bold">{item.derivedOutput}</span>
+          </div>
+        </div>
+        <p className="text-[11px] text-ey-muted italic border-t border-ey-border/40 pt-1.5 mt-1">Note: {item.notes}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function MetricsDerivationPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedFormula, setCopiedFormula] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set(DEFAULT_OPEN_IDS));
 
-  const categories = ['All', 'Tokens', 'Cost', 'Projects', 'Breakdowns', 'License & Adoption', 'Governance', 'Hours Saved'];
+  const toggle = (id: string) =>
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const expandAll = () => setOpenIds(new Set(ALL_COLLAPSIBLE_IDS));
+  const collapseAll = () => setOpenIds(new Set());
 
-  const filteredMetrics = METRICS_DERIVATION_LIST.filter((item) => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.csvField.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.formula.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.notes.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Opens the section (if closed) and brings it into view.
+  const jumpTo = (id: string) => {
+    setOpenIds((prev) => withIds(prev, [id]));
+    setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
+
+  // Searching or picking a category opens the catalog groups that have results,
+  // so matches are visible without clicking each group open.
+  const openMatchingGroups = (term: string, category: string) => {
+    if (!term.trim() && category === 'All') return;
+    const ids = CATALOG_CATEGORIES.filter(
+      (c) => (category === 'All' || c === category) && METRICS_DERIVATION_LIST.some((i) => i.category === c && matchesTerm(i, term))
+    ).map((c) => `cat-${slug(c)}`);
+    setOpenIds((prev) => withIds(prev, ['section-catalog', ...ids]));
+  };
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    openMatchingGroups(value, selectedCategory);
+  };
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    openMatchingGroups(searchTerm, category);
+  };
+
+  const catalogGroups = CATALOG_CATEGORIES.filter((c) => selectedCategory === 'All' || c === selectedCategory)
+    .map((category) => ({
+      category,
+      items: METRICS_DERIVATION_LIST.filter((i) => i.category === category && matchesTerm(i, searchTerm)),
+    }))
+    .filter((g) => g.items.length > 0);
+  const matchCount = catalogGroups.reduce((n, g) => n + g.items.length, 0);
+
+  const formulaCount = FORMULA_CATEGORIES.reduce((n, c) => n + c.formulas.length, 0);
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -464,9 +852,6 @@ export default function MetricsDerivationPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleExportSchemaToCsv = () => exportSchemaToCsv(CSV_SCHEMA, 'ai_usage_data_schema.csv');
-  const handleExportHoursSavedSchemaToCsv = () => exportSchemaToCsv(HOURS_SAVED_CSV_SCHEMA, 'hours_saved_schema.csv');
-
   return (
     <div className="p-6 space-y-6 w-full text-ey-light">
       {/* Header Banner */}
@@ -479,9 +864,7 @@ export default function MetricsDerivationPage() {
             <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-ey-light">
-              GitHub Copilot Metrics Derivation Guide
-            </h1>
+            <h1 className="text-xl font-bold tracking-tight text-ey-light">GitHub Copilot Metrics Derivation Guide</h1>
             <p className="text-xs text-ey-muted mt-0.5">
               Complete catalog of exact formulas, CSV input field mappings, and step-by-step worked calculations for all metrics
             </p>
@@ -491,7 +874,7 @@ export default function MetricsDerivationPage() {
         {/* Quick Data Badges */}
         <div className="flex flex-wrap gap-2 pt-2">
           <span className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-ey-black/60 border border-ey-border text-ey-yellow flex items-center gap-1.5">
-            <Database className="w-3 h-3" /> Input Dataset: ai_usage_data.csv (monthly-grained)
+            <Database className="w-3 h-3" /> Input Dataset: ai_usage_data.csv (monthly-grained, master)
           </span>
           <span className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-ey-black/60 border border-ey-border text-cyan-400">
             Consumption Field: GenAI Tool Consumption (Usage rows only)
@@ -502,152 +885,183 @@ export default function MetricsDerivationPage() {
           <span className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-ey-black/60 border border-ey-border text-amber-400 flex items-center gap-1.5">
             <Clock3 className="w-3 h-3" /> Input Dataset: actuals-planned-overall-*.csv (Engagement × Tool-grained)
           </span>
+          <span className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-ey-black/60 border border-ey-border text-lime-400 flex items-center gap-1.5">
+            <Layers className="w-3 h-3" /> Input Dataset: dev-hours-timesheet.csv (mock, Engagement-grained)
+          </span>
+          <span className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-ey-black/60 border border-ey-border text-orange-400 flex items-center gap-1.5">
+            <Target className="w-3 h-3" /> Engagement Scoring: 6 dimensions, 100 pts
+          </span>
         </div>
       </div>
 
-      {/* CSV Input Schema Reference Section */}
-      <div className="bg-ey-card border border-ey-border rounded-xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Database className="w-4 h-4 text-ey-yellow" />
-            <h2 className="text-sm font-bold uppercase tracking-wider text-ey-light">
-              CSV Input Data Schema Mapping (`ai_usage_data.csv`)
-            </h2>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-ey-muted font-mono">{CSV_SCHEMA.filter((c) => !c.column.startsWith('—')).length} CSV Columns + {CSV_SCHEMA.filter((c) => c.column.startsWith('—')).length} Derived Fields • Single Source of Truth</span>
+      {/* Section navigation + expand / collapse everything */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-ey-card border border-ey-border rounded-xl px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-ey-muted">Jump to</span>
+          {[
+            { id: 'section-sources', label: 'Data Sources' },
+            { id: 'section-reference', label: 'Formula Quick Reference' },
+            { id: 'section-catalog', label: 'Metric Catalog' },
+          ].map((s) => (
             <button
-              onClick={handleExportSchemaToCsv}
-              className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-black bg-ey-yellow hover:bg-ey-yellow-hover px-2.5 py-1.5 rounded-lg transition shrink-0"
+              key={s.id}
+              onClick={() => jumpTo(s.id)}
+              className="px-2.5 py-1 text-xs font-medium rounded-md bg-ey-black/60 border border-ey-border text-ey-muted hover:text-ey-yellow hover:border-ey-yellow/50 transition"
             >
-              <Download className="w-3.5 h-3.5" />
-              Export to CSV
+              {s.label}
             </button>
-          </div>
+          ))}
         </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left border-collapse">
-            <thead>
-              <tr className="border-b border-ey-border/80 text-ey-muted bg-ey-black/40">
-                <th className="p-2.5 font-semibold">CSV Column Name</th>
-                <th className="p-2.5 font-semibold">Internal Field</th>
-                <th className="p-2.5 font-semibold">Data Type</th>
-                <th className="p-2.5 font-semibold">Description & Usage</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ey-border/40 text-ey-light font-mono text-[11px]">
-              {CSV_SCHEMA.map((row) => (
-                <tr key={row.fieldName} className="hover:bg-ey-black/30 transition">
-                  <td className="p-2.5 text-ey-yellow font-medium">{row.column}</td>
-                  <td className="p-2.5 text-cyan-300">{row.fieldName}</td>
-                  <td className="p-2.5 text-ey-muted">{row.dataType}</td>
-                  <td className="p-2.5 text-ey-muted font-sans text-xs">{row.description}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={expandAll}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-ey-black/60 border border-ey-border text-ey-light hover:border-ey-yellow/50 transition"
+          >
+            <ChevronsUpDown className="w-3.5 h-3.5 text-ey-yellow" />
+            Expand all
+          </button>
+          <button
+            onClick={collapseAll}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-ey-black/60 border border-ey-border text-ey-light hover:border-ey-yellow/50 transition"
+          >
+            <ChevronsDownUp className="w-3.5 h-3.5 text-ey-yellow" />
+            Collapse all
+          </button>
         </div>
       </div>
 
-      {/* Hours Saved CSV Input Schema Reference Section */}
-      <div className="bg-ey-card border border-ey-border rounded-xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Clock3 className="w-4 h-4 text-amber-400" />
-            <h2 className="text-sm font-bold uppercase tracking-wider text-ey-light">
-              CSV Input Data Schema Mapping (`actuals-planned-overall-*.csv`)
-            </h2>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-ey-muted font-mono">{HOURS_SAVED_CSV_SCHEMA.length} Named Columns + Open-Ended Month Columns • Joined by (Engagement Code, AI Tool)</span>
-            <button
-              onClick={handleExportHoursSavedSchemaToCsv}
-              className="flex items-center gap-1.5 text-[11px] font-semibold text-ey-black bg-ey-yellow hover:bg-ey-yellow-hover px-2.5 py-1.5 rounded-lg transition shrink-0"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export to CSV
-            </button>
-          </div>
-        </div>
-        <p className="text-[11px] text-ey-muted -mt-2">
-          A separate, supplementary data source — not metered telemetry. Columns are matched by header NAME, not position, so extra fields the real file carries beyond these are simply ignored rather than breaking the parser.
+      {/* Section 1: Data Sources & Input Schemas */}
+      <CollapsibleSection
+        id="section-sources"
+        title="Data Sources & Input Schemas"
+        icon={Database}
+        meta="3 datasets"
+        open={openIds.has('section-sources')}
+        onToggle={() => toggle('section-sources')}
+      >
+        <p className="text-[11px] text-ey-muted">
+          Everything on this page is derived from three inputs. <span className="text-ey-light font-semibold">ai_usage_data.csv</span> is the master: it
+          supplies usage, licences and cost, and it is the list of valid Engagement Codes. The Hours Saved file and the dev-hours timesheet are joined onto it
+          by Engagement Code, never merged into it.
         </p>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left border-collapse">
-            <thead>
-              <tr className="border-b border-ey-border/80 text-ey-muted bg-ey-black/40">
-                <th className="p-2.5 font-semibold">CSV Column Name</th>
-                <th className="p-2.5 font-semibold">Internal Field</th>
-                <th className="p-2.5 font-semibold">Data Type</th>
-                <th className="p-2.5 font-semibold">Description & Usage</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ey-border/40 text-ey-light font-mono text-[11px]">
-              {HOURS_SAVED_CSV_SCHEMA.map((row) => (
-                <tr key={row.fieldName} className="hover:bg-ey-black/30 transition">
-                  <td className="p-2.5 text-amber-400 font-medium">{row.column}</td>
-                  <td className="p-2.5 text-cyan-300">{row.fieldName}</td>
-                  <td className="p-2.5 text-ey-muted">{row.dataType}</td>
-                  <td className="p-2.5 text-ey-muted font-sans text-xs">{row.description}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+        <CollapsibleSection
+          variant="sub"
+          id="schema-usage"
+          title="ai_usage_data.csv — Metered Usage & Licences (master)"
+          icon={Database}
+          meta={`${CSV_SCHEMA.filter((c) => !c.column.startsWith('—')).length} columns + ${CSV_SCHEMA.filter((c) => c.column.startsWith('—')).length} derived`}
+          actions={<ExportSchemaButton onClick={() => exportSchemaToCsv(CSV_SCHEMA, 'ai_usage_data_schema.csv')} />}
+          open={openIds.has('schema-usage')}
+          onToggle={() => toggle('schema-usage')}
+        >
+          <SchemaTable rows={CSV_SCHEMA} accentClass="text-ey-yellow" />
+        </CollapsibleSection>
 
-      {/* Formula Category Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {FORMULA_CATEGORIES.map((cat) => {
-          const IconComp = cat.icon;
-          return (
-            <div key={cat.title} className="bg-ey-card border border-ey-border rounded-xl p-5 space-y-3">
-              <div className="flex items-center space-x-2">
-                <IconComp className={`w-4 h-4 ${cat.color}`} />
-                <h3 className="text-xs font-bold text-ey-light uppercase tracking-wider">{cat.title}</h3>
-              </div>
-              <div className="space-y-2">
-                {cat.formulas.map((f) => (
-                  <div key={f.name} className="p-2.5 bg-ey-black/60 rounded-lg border border-ey-border/60 text-xs">
-                    <div className="font-semibold text-ey-light mb-1">{f.name}</div>
-                    <div className="font-mono text-[11px] text-ey-yellow bg-ey-black p-1.5 rounded border border-ey-border/40 overflow-x-auto">
-                      {f.formula}
+        <CollapsibleSection
+          variant="sub"
+          id="schema-hours"
+          title="actuals-planned-overall-*.csv — Hours Saved"
+          icon={Clock3}
+          iconClassName="text-amber-400"
+          meta={`${HOURS_SAVED_CSV_SCHEMA.length} named columns + open-ended months`}
+          actions={<ExportSchemaButton onClick={() => exportSchemaToCsv(HOURS_SAVED_CSV_SCHEMA, 'hours_saved_schema.csv')} />}
+          open={openIds.has('schema-hours')}
+          onToggle={() => toggle('schema-hours')}
+        >
+          <p className="text-[11px] text-ey-muted">
+            A separate, supplementary data source — not metered telemetry — joined by (Engagement Code, AI Tool). Columns are matched by header NAME, not
+            position, so extra fields in the real file are simply ignored. Quoted (RFC 4180) fields, including embedded commas, are parsed correctly.
+          </p>
+          <SchemaTable rows={HOURS_SAVED_CSV_SCHEMA} accentClass="text-amber-400" />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          variant="sub"
+          id="schema-dev"
+          title="dev-hours-timesheet.csv — Developer Hours (mock)"
+          icon={Layers}
+          iconClassName="text-lime-400"
+          meta={`${DEV_HOURS_CSV_SCHEMA.length} fields • generated, not an export`}
+          actions={<ExportSchemaButton onClick={() => exportSchemaToCsv(DEV_HOURS_CSV_SCHEMA, 'dev_hours_schema.csv')} />}
+          open={openIds.has('schema-dev')}
+          onToggle={() => toggle('schema-dev')}
+        >
+          <p className="text-[11px] text-ey-muted">
+            Not an external export: generated by <span className="font-mono text-ey-light">scripts/generateDevHoursCsv.js</span> (run automatically before{' '}
+            <span className="font-mono">dev</span> and <span className="font-mono">build</span>, or via <span className="font-mono">npm run generate-dev-hours</span>)
+            from ai_usage_data.csv&apos;s own Engagement Codes. It is a stand-in until a real developer-timesheet feed exists, and supplies the human-effort half of
+            Total Investment.
+          </p>
+          <SchemaTable rows={DEV_HOURS_CSV_SCHEMA} accentClass="text-lime-400" />
+        </CollapsibleSection>
+      </CollapsibleSection>
+
+      {/* Section 2: Formula Quick Reference */}
+      <CollapsibleSection
+        id="section-reference"
+        title="Formula Quick Reference"
+        icon={Calculator}
+        meta={`${FORMULA_CATEGORIES.length} groups • ${formulaCount} formulas`}
+        open={openIds.has('section-reference')}
+        onToggle={() => toggle('section-reference')}
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+          {FORMULA_CATEGORIES.map((cat) => {
+            const id = `ref-${slug(cat.title)}`;
+            return (
+              <CollapsibleSection
+                key={cat.title}
+                variant="sub"
+                id={id}
+                title={cat.title}
+                icon={cat.icon}
+                iconClassName={cat.color}
+                meta={`${cat.formulas.length}`}
+                open={openIds.has(id)}
+                onToggle={() => toggle(id)}
+              >
+                <div className="space-y-2">
+                  {cat.formulas.map((f) => (
+                    <div key={f.name} className="p-2.5 bg-ey-black/60 rounded-lg border border-ey-border/60 text-xs">
+                      <div className="font-semibold text-ey-light mb-1">{f.name}</div>
+                      <div className="font-mono text-[11px] text-ey-yellow bg-ey-black p-1.5 rounded border border-ey-border/40 overflow-x-auto">{f.formula}</div>
+                      <div className="text-[10px] text-ey-muted mt-1 font-mono">Ex: {f.example}</div>
                     </div>
-                    <div className="text-[10px] text-ey-muted mt-1 font-mono">Ex: {f.example}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                  ))}
+                </div>
+              </CollapsibleSection>
+            );
+          })}
+        </div>
+      </CollapsibleSection>
 
-      {/* Interactive Catalog Section */}
-      <div className="bg-ey-card border border-ey-border rounded-xl p-5 space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-bold uppercase tracking-wider text-ey-light flex items-center gap-2">
-              <Calculator className="w-4 h-4 text-ey-yellow" />
-              Detailed Metric Derivation Catalog
-            </h2>
-            <p className="text-xs text-ey-muted mt-0.5">
-              Filter by category or search by CSV field, formula, or metric name
-            </p>
-          </div>
+      {/* Section 3: Detailed Metric Derivation Catalog */}
+      <CollapsibleSection
+        id="section-catalog"
+        title="Detailed Metric Derivation Catalog"
+        icon={Calculator}
+        meta={`${CATALOG_CATEGORIES.length} groups • ${METRICS_DERIVATION_LIST.length} metrics`}
+        open={openIds.has('section-catalog')}
+        onToggle={() => toggle('section-catalog')}
+      >
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <p className="text-xs text-ey-muted">
+            Filter by group or search by CSV field, formula, or metric name
+            {(searchTerm.trim() || selectedCategory !== 'All') && (
+              <span className="text-ey-yellow font-semibold"> — {matchCount} match{matchCount === 1 ? '' : 'es'}</span>
+            )}
+          </p>
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Category Filter Pills */}
-            <div className="flex items-center bg-ey-black/80 p-0.5 rounded-lg border border-ey-border/80">
-              {categories.map((cat) => (
+            <div className="flex flex-wrap items-center bg-ey-black/80 p-0.5 rounded-lg border border-ey-border/80">
+              {['All', ...CATALOG_CATEGORIES].map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => setSelectedCategory(cat)}
+                  onClick={() => handleCategoryChange(cat)}
                   className={`px-2.5 py-1 text-xs font-medium rounded-md transition ${
-                    selectedCategory === cat
-                      ? 'bg-ey-yellow text-ey-black font-bold shadow-sm'
-                      : 'text-ey-muted hover:text-ey-light'
+                    selectedCategory === cat ? 'bg-ey-yellow text-ey-black font-bold shadow-sm' : 'text-ey-muted hover:text-ey-light'
                   }`}
                 >
                   {cat}
@@ -662,96 +1076,41 @@ export default function MetricsDerivationPage() {
                 type="text"
                 placeholder="Search formulas..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="w-full bg-ey-black border border-ey-border text-ey-light text-xs rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:border-ey-yellow"
               />
             </div>
           </div>
         </div>
 
-        {/* Metric Derivation List */}
-        <div className="space-y-3">
-          {filteredMetrics.length === 0 ? (
-            <div className="text-center py-10 text-ey-muted text-xs">
-              No metric derivations found matching "{searchTerm}".
-            </div>
-          ) : (
-            filteredMetrics.map((item) => (
-              <div
-                key={item.name}
-                className="bg-ey-black/60 border border-ey-border/80 rounded-xl p-4 space-y-3 hover:border-ey-yellow/40 transition"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm font-bold text-ey-light">{item.name}</span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-ey-yellow/10 text-ey-yellow border border-ey-yellow/30">
-                      {item.category}
-                    </span>
+        {catalogGroups.length === 0 ? (
+          <div className="text-center py-10 text-ey-muted text-xs">No metric derivations found matching &quot;{searchTerm}&quot;.</div>
+        ) : (
+          <div className="space-y-3">
+            {catalogGroups.map(({ category, items }) => {
+              const id = `cat-${slug(category)}`;
+              return (
+                <CollapsibleSection
+                  key={category}
+                  variant="sub"
+                  id={id}
+                  title={category}
+                  icon={Layers}
+                  meta={`${items.length} metric${items.length === 1 ? '' : 's'}`}
+                  open={openIds.has(id)}
+                  onToggle={() => toggle(id)}
+                >
+                  <div className="space-y-3">
+                    {items.map((item) => (
+                      <MetricCard key={item.name} item={item} copied={copiedFormula === item.formula} onCopy={handleCopy} />
+                    ))}
                   </div>
-                  <button
-                    onClick={() => handleCopy(item.formula)}
-                    className="flex items-center space-x-1 text-[11px] text-ey-muted hover:text-ey-yellow transition"
-                    title="Copy Formula"
-                  >
-                    {copiedFormula === item.formula ? (
-                      <>
-                        <Check className="w-3 h-3 text-emerald-400" />
-                        <span className="text-emerald-400 font-semibold">Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3 h-3" />
-                        <span>Copy Formula</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-semibold text-ey-muted uppercase">CSV Input Field</span>
-                    <div className="font-mono text-[11px] text-cyan-300 bg-ey-card p-2 rounded border border-ey-border/60">
-                      {item.csvField}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-semibold text-ey-muted uppercase">Mathematical Formula</span>
-                    <div className="font-mono text-[11px] text-ey-yellow bg-ey-card p-2 rounded border border-ey-border/60">
-                      {item.formula}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Worked Calculation Details */}
-                <div className="bg-ey-card/80 p-3 rounded-lg border border-ey-border/60 space-y-2 text-xs">
-                  <div className="flex items-center space-x-1.5 text-[11px] font-semibold text-ey-light">
-                    <Calculator className="w-3.5 h-3.5 text-ey-yellow" />
-                    <span>Worked Calculation Example</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px] font-mono">
-                    <div>
-                      <span className="text-ey-muted block text-[10px]">Sample Input:</span>
-                      <span className="text-ey-light">{item.sampleInput}</span>
-                    </div>
-                    <div>
-                      <span className="text-ey-muted block text-[10px]">Calculation:</span>
-                      <span className="text-cyan-300">{item.workedCalculation}</span>
-                    </div>
-                    <div>
-                      <span className="text-ey-muted block text-[10px]">Derived Output:</span>
-                      <span className="text-emerald-400 font-bold">{item.derivedOutput}</span>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-ey-muted italic border-t border-ey-border/40 pt-1.5 mt-1">
-                    Note: {item.notes}
-                  </p>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+                </CollapsibleSection>
+              );
+            })}
+          </div>
+        )}
+      </CollapsibleSection>
     </div>
   );
 }
