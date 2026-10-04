@@ -109,7 +109,7 @@ export function EngagementHoursSavedPanel({ rows, engagementCode, devHourRate }:
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {rows.map((r) => {
+        {rows.map((r, rowIdx) => {
           const status = realizationStyle(r.realizationPercent);
           const roiEligibleHours = computeRoiEligibleHours(r.sumOfMonthlyHrs, r.approvedTotalHrs);
           const hoursSavedValueUsd = computeHoursSavedValueUsd(roiEligibleHours, devHourRate);
@@ -122,7 +122,9 @@ export function EngagementHoursSavedPanel({ rows, engagementCode, devHourRate }:
             (m) => r.monthlyHours[m] > 0 || r.monthlyCost[m] !== null
           );
           return (
-            <div key={r.aiTool} className="bg-ey-black/60 border border-ey-border/80 rounded-xl p-4 space-y-3">
+            // aiTool alone isn't unique: two rows for one engagement can share it (e.g. a
+            // non-canonical name like "m365 copilot" kept as-is), so the row index breaks ties.
+            <div key={`${r.aiTool}:::${r.assetName}:::${rowIdx}`} className="bg-ey-black/60 border border-ey-border/80 rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-bold text-ey-light">{TOOL_LABELS[r.aiTool] || r.assetName}</span>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${status.bg} ${status.text} ${status.border}`}>
