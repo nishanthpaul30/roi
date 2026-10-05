@@ -32,7 +32,6 @@ export interface EngagementHoursSaved {
   pendingApprovalHrs: number;
   monthlyHours: Record<string, number>;
   sumOfMonthlyHrs: number;
-  realizationPercent: number;
   // AI tool cost for this exact (Engagement, Tool) pair -- not the whole
   // engagement's cost across every tool -- so it's directly comparable to
   // the hours this same tool saved on this same engagement.
@@ -139,7 +138,6 @@ export function joinHoursSavedToEngagements(
       pendingApprovalHrs: h.pendingApprovalHrs,
       monthlyHours: h.monthlyHours,
       sumOfMonthlyHrs: h.sumOfMonthlyHrs,
-      realizationPercent: h.realizationPercent,
       cost,
       tokens,
       userCount,

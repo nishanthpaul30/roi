@@ -155,7 +155,6 @@ export interface TokenCostSummary {
     pendingApprovalHrs: number;
     monthlyHours: Record<string, number>;
     sumOfMonthlyHrs: number;
-    realizationPercent: number;
     cost: number | null;
     tokens: number | null;
     userCount: number | null;

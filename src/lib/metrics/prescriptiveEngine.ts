@@ -210,14 +210,14 @@ export function generatePrescriptiveInferences(
     actionableInsight:
       hoursSavedRows.length > 0
         ? roiPercent !== null && roiPercent < 0
-          ? `Open Engagement Analytics to see which engagements are furthest behind on realization, and whether tool spend or dev-hour investment is the larger driver before expanding adoption further.`
+          ? `Open Engagement Analytics to see which engagements have the lowest ROI, and whether tool spend or dev-hour investment is the larger driver before expanding adoption further.`
           : `Open Engagement Analytics to see which engagements and tools are delivering the strongest ROI, and prioritize expanding those patterns.`
         : 'Add Hours Saved tracking data to surface this inference.',
     benefitOutcome:
       hoursSavedRows.length > 0
         ? netImpact >= 0
           ? `Hours saved currently outweigh total investment by ${fmtCost(netImpact)}, a net positive return on the AI tooling + developer time invested.`
-          : `Total investment currently exceeds the value of hours saved by ${fmtCost(Math.abs(netImpact))} -- a signal to review scope or realization before committing further spend.`
+          : `Total investment currently exceeds the value of hours saved by ${fmtCost(Math.abs(netImpact))} -- a signal to review scope before committing further spend.`
         : 'Tracking this once Hours Saved data is available will quantify AI adoption ROI directly.',
   };
 

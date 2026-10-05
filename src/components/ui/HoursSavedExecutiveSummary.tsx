@@ -27,7 +27,6 @@ export function HoursSavedExecutiveSummary({ rows, devHourRate }: HoursSavedExec
     const totalHoursSaved = rows.reduce((s, r) => s + r.sumOfMonthlyHrs, 0);
     const totalPendingHrs = rows.reduce((s, r) => s + r.pendingApprovalHrs, 0);
     const totalCost = rows.reduce((s, r) => s + (r.cost ?? 0), 0);
-    const overallRealizationPercent = totalApprovedHrs > 0 ? (totalHoursSaved / totalApprovedHrs) * 100 : 0;
     const blendedCostPerHourSaved = totalHoursSaved > 0 ? totalCost / totalHoursSaved : null;
     // Capped per row (not on the portfolio total) so one row overshooting
     // its own approved target can't borrow "room" from another that undershot.
@@ -46,19 +45,11 @@ export function HoursSavedExecutiveSummary({ rows, devHourRate }: HoursSavedExec
     const totalInvestmentUsd = computeTotalInvestmentUsd(totalCost, totalDevCostUsd);
     const blendedRoiPercent = computeRoiPercent(totalHoursSavedValueUsd, totalInvestmentUsd);
 
-    let onAbove = 0, onTrack = 0, behind = 0;
-    for (const r of rows) {
-      if (r.realizationPercent >= 100) onAbove++;
-      else if (r.realizationPercent >= 75) onTrack++;
-      else behind++;
-    }
-
     return {
       totalApprovedHrs,
       totalHoursSaved,
       totalPendingHrs,
       totalCost,
-      overallRealizationPercent,
       blendedCostPerHourSaved,
       totalHoursSavedValueUsd,
       totalRoiEligibleHours,
@@ -66,18 +57,12 @@ export function HoursSavedExecutiveSummary({ rows, devHourRate }: HoursSavedExec
       totalDevCostUsd,
       totalInvestmentUsd,
       blendedRoiPercent,
-      onAbove,
-      onTrack,
-      behind,
-      total: rows.length,
     };
   }, [rows, devHourRate]);
 
   const fmtExact = (v: number) => `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const fmtHrs = (v: number) => v.toLocaleString(undefined, { maximumFractionDigits: 1 });
 
-  const realizationColor =
-    stats.overallRealizationPercent >= 100 ? 'text-emerald-300' : stats.overallRealizationPercent >= 75 ? 'text-ey-yellow' : 'text-rose-300';
   const roiColor =
     stats.blendedRoiPercent === null ? 'text-ey-muted' : stats.blendedRoiPercent >= 100 ? 'text-emerald-300' : stats.blendedRoiPercent >= 0 ? 'text-ey-yellow' : 'text-rose-300';
 
@@ -90,14 +75,12 @@ export function HoursSavedExecutiveSummary({ rows, devHourRate }: HoursSavedExec
             <InfoTooltip>
               <span className="font-semibold text-ey-yellow block mb-1">How this is calculated</span>
               Hours Saved = sum of each tracked Engagement &times; Tool pair&apos;s actual hours saved so far = <span className="font-mono">{fmtHrs(stats.totalHoursSaved)} hrs</span>.<br />
-              Approved = sum of each pair&apos;s approved target = <span className="font-mono">{fmtHrs(stats.totalApprovedHrs)} hrs</span>.<br />
-              Realization % = Hours Saved &divide; Approved &times; 100 = <span className="font-mono">{fmtHrs(stats.totalHoursSaved)} &divide; {fmtHrs(stats.totalApprovedHrs)} &times; 100 = {stats.overallRealizationPercent.toFixed(1)}%</span>
+              Approved = sum of each pair&apos;s approved target = <span className="font-mono">{fmtHrs(stats.totalApprovedHrs)} hrs</span>.
             </InfoTooltip>
           </div>
           <p className="text-xl font-extrabold text-ey-light font-mono mt-1">
             {fmtNum(stats.totalHoursSaved)} <span className="text-sm text-ey-muted font-normal">/ {fmtNum(stats.totalApprovedHrs)}</span>
           </p>
-          <p className={`text-[11px] font-semibold mt-0.5 ${realizationColor}`}>{stats.overallRealizationPercent.toFixed(1)}% realized, portfolio-wide</p>
         </div>
 
         <div className="bg-ey-black/60 border border-ey-border/80 rounded-xl p-4">
@@ -156,28 +139,11 @@ export function HoursSavedExecutiveSummary({ rows, devHourRate }: HoursSavedExec
             <InfoTooltip>
               <span className="font-semibold text-ey-yellow block mb-1">How this is calculated</span>
               Sum of &quot;Pending Approval (Submitted)&quot; hours across every tracked Engagement &times; Tool pair = <span className="font-mono">{fmtHrs(stats.totalPendingHrs)} hrs</span>.<br />
-              Submitted for sign-off but not yet locked into the approved target, so it&apos;s excluded from Realization %.
+              Submitted for sign-off but not yet locked into the approved target, so it&apos;s not counted in Hours Saved or ROI.
             </InfoTooltip>
           </div>
           <p className="text-xl font-extrabold text-ey-light font-mono mt-1">{fmtNum(stats.totalPendingHrs)} hrs</p>
           <p className="text-[11px] text-ey-muted mt-0.5">Submitted, not yet locked into target</p>
-        </div>
-      </div>
-
-      {/* Health distribution -- where the portfolio's risk actually sits */}
-      <div className="bg-ey-black/60 border border-ey-border/80 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-[10px] text-ey-muted uppercase tracking-wider">Realization Status, Across All {stats.total} Pairs</p>
-          <p className="text-[11px] text-ey-muted font-mono">
-            <span className="text-emerald-300 font-bold">{stats.onAbove}</span> above &middot;{' '}
-            <span className="text-ey-yellow font-bold">{stats.onTrack}</span> on track &middot;{' '}
-            <span className="text-rose-300 font-bold">{stats.behind}</span> behind
-          </p>
-        </div>
-        <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-ey-card">
-          {stats.onAbove > 0 && <div className="h-full bg-emerald-400" style={{ width: `${(stats.onAbove / stats.total) * 100}%` }} />}
-          {stats.onTrack > 0 && <div className="h-full bg-ey-yellow" style={{ width: `${(stats.onTrack / stats.total) * 100}%` }} />}
-          {stats.behind > 0 && <div className="h-full bg-rose-400" style={{ width: `${(stats.behind / stats.total) * 100}%` }} />}
         </div>
       </div>
     </div>

@@ -25,11 +25,6 @@ const TOOL_LABELS: Record<string, string> = {
   cursor: 'Cursor AI',
 };
 
-function realizationStyle(pct: number) {
-  if (pct >= 100) return { label: 'On/Above Target', bg: 'bg-emerald-500/15', text: 'text-emerald-300', border: 'border-emerald-500/30' };
-  if (pct >= 75) return { label: 'On Track', bg: 'bg-ey-yellow/15', text: 'text-ey-yellow', border: 'border-ey-yellow/30' };
-  return { label: 'Behind Target', bg: 'bg-rose-500/15', text: 'text-rose-300', border: 'border-rose-500/30' };
-}
 
 // ROI = (value of hours saved at the chosen dev-hour rate - tool cost) / tool cost * 100.
 // Positive means the hours saved are worth more than the tool spend.
@@ -69,13 +64,6 @@ const COLUMNS: ColumnDef[] = [
     align: 'right',
     tooltipAlign: 'left',
     info: 'All monthly hours recorded to date, added together. Future months stay at 0 until they arrive.',
-  },
-  {
-    label: 'Realization',
-    sortKey: 'realizationPercent',
-    align: 'right',
-    tooltipAlign: 'right',
-    info: 'Hours Saved ÷ Approved Hrs × 100. Badge: 100% or more = On/Above Target, 75% or more = On Track, below 75% = Behind Target.',
   },
   {
     label: 'Tool Cost',
@@ -158,7 +146,6 @@ interface EngagementGroup {
   totalApprovedHrs: number;
   totalHoursSaved: number;
   totalCost: number;
-  realizationPercent: number;
   costPerHourSaved: number | null;
   hoursSavedValueUsd: number;
   devHoursSpent: number;
@@ -211,7 +198,6 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
           totalApprovedHrs,
           totalHoursSaved,
           totalCost,
-          realizationPercent: totalApprovedHrs > 0 ? Number(((totalHoursSaved / totalApprovedHrs) * 100).toFixed(1)) : 0,
           costPerHourSaved: totalHoursSaved > 0 ? Number((totalCost / totalHoursSaved).toFixed(2)) : null,
           hoursSavedValueUsd,
           devHoursSpent,
@@ -239,7 +225,6 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
     engagementCode: (g) => g.engagementCode,
     totalApprovedHrs: (g) => g.totalApprovedHrs,
     totalHoursSaved: (g) => g.totalHoursSaved,
-    realizationPercent: (g) => g.realizationPercent,
     totalCost: (g) => g.totalCost,
     costPerHourSaved: (g) => g.costPerHourSaved,
     devHoursSpent: (g) => g.devHoursSpent,
@@ -301,12 +286,11 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
           <tbody className="divide-y divide-ey-border">
             {paginatedGroups.length === 0 ? (
               <tr>
-                <td colSpan={8}className="px-4 py-8 text-center text-ey-muted">No matching engagements or tools.</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-ey-muted">No matching engagements or tools.</td>
               </tr>
             ) : (
               paginatedGroups.map((g) => {
                 const isOpen = expanded.has(g.engagementCode) || !!search.trim();
-                const status = realizationStyle(g.realizationPercent);
                 return (
                   <Fragment key={g.engagementCode}>
                     <tr
@@ -332,11 +316,6 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
                       </td>
                       <td className="px-4 py-3 text-right">{fmtNum(g.totalApprovedHrs)}</td>
                       <td className="px-4 py-3 text-right font-bold">{fmtNum(g.totalHoursSaved)}</td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${status.bg} ${status.text} ${status.border}`}>
-                          {g.realizationPercent}%
-                        </span>
-                      </td>
                       <td className="px-4 py-3 text-right font-bold">{fmtCost(g.totalCost)}</td>
                       <td className="px-4 py-3 text-right font-bold text-ey-yellow">
                         {g.costPerHourSaved !== null ? fmtCost(g.costPerHourSaved) : '—'}
@@ -351,7 +330,6 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
 
                     {isOpen &&
                       g.tools.map((t, toolIdx) => {
-                        const tStatus = realizationStyle(t.realizationPercent);
                         const tRoiEligibleHours = computeRoiEligibleHours(t.sumOfMonthlyHrs, t.approvedTotalHrs);
                         const tHoursSavedValueUsd = computeHoursSavedValueUsd(tRoiEligibleHours, devHourRate);
                         const tRoiPercent = computeRoiPercent(tHoursSavedValueUsd, t.cost);
@@ -367,11 +345,6 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
                             </td>
                             <td className="px-4 py-2.5 text-right text-ey-muted">{t.approvedTotalHrs}</td>
                             <td className="px-4 py-2.5 text-right text-ey-muted">{t.sumOfMonthlyHrs}</td>
-                            <td className="px-4 py-2.5 text-right">
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${tStatus.bg} ${tStatus.text} ${tStatus.border}`}>
-                                {t.realizationPercent}%
-                              </span>
-                            </td>
                             <td className="px-4 py-2.5 text-right text-ey-muted">{t.cost !== null ? fmtCost(t.cost) : '—'}</td>
                             <td className="px-4 py-2.5 text-right font-semibold text-ey-yellow">
                               {t.costPerHourSaved !== null ? fmtCost(t.costPerHourSaved) : '—'}

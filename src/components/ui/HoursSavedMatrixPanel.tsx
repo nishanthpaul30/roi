@@ -25,7 +25,7 @@ const TOOL_LABELS: Record<string, string> = {
   cursor: 'Cursor AI',
 };
 
-type Metric = 'costPerHourSaved' | 'sumOfMonthlyHrs' | 'realizationPercent' | 'cost' | 'roiPercent';
+type Metric = 'costPerHourSaved' | 'sumOfMonthlyHrs' | 'cost' | 'roiPercent';
 
 const METRIC_CONFIG: Record<
   Metric,
@@ -44,13 +44,6 @@ const METRIC_CONFIG: Record<
     lowerIsBetter: false,
     colorCode: false,
     calculation: () => 'Hours Saved = all monthly hours recorded to date, added together, for each engagement and tool.',
-  },
-  realizationPercent: {
-    label: 'Realization %',
-    format: (v) => `${v.toFixed(0)}%`,
-    lowerIsBetter: false,
-    colorCode: true,
-    calculation: () => 'Realization % = Hours Saved ÷ Approved Hrs × 100, for each engagement and tool.',
   },
   cost: {
     label: 'Tool Cost',

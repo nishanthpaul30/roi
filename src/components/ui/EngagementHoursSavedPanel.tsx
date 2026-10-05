@@ -23,12 +23,6 @@ const TOOL_LABELS: Record<string, string> = {
   cursor: 'Cursor AI',
 };
 
-function realizationStyle(pct: number) {
-  if (pct >= 100) return { label: 'On/Above Target', bg: 'bg-emerald-500/15', text: 'text-emerald-300', border: 'border-emerald-500/30' };
-  if (pct >= 75) return { label: 'On Track', bg: 'bg-ey-yellow/15', text: 'text-ey-yellow', border: 'border-ey-yellow/30' };
-  return { label: 'Behind Target', bg: 'bg-rose-500/15', text: 'text-rose-300', border: 'border-rose-500/30' };
-}
-
 // ROI = (value of hours saved at the chosen dev-hour rate - tool cost) / tool cost * 100.
 function roiColor(pct: number): string {
   if (pct >= 100) return 'text-emerald-300';
@@ -110,7 +104,6 @@ export function EngagementHoursSavedPanel({ rows, engagementCode, devHourRate }:
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {rows.map((r, rowIdx) => {
-          const status = realizationStyle(r.realizationPercent);
           const roiEligibleHours = computeRoiEligibleHours(r.sumOfMonthlyHrs, r.approvedTotalHrs);
           const hoursSavedValueUsd = computeHoursSavedValueUsd(roiEligibleHours, devHourRate);
           const roiPercent = computeRoiPercent(hoursSavedValueUsd, r.cost);
@@ -127,9 +120,6 @@ export function EngagementHoursSavedPanel({ rows, engagementCode, devHourRate }:
             <div key={`${r.aiTool}:::${r.assetName}:::${rowIdx}`} className="bg-ey-black/60 border border-ey-border/80 rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-bold text-ey-light">{TOOL_LABELS[r.aiTool] || r.assetName}</span>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${status.bg} ${status.text} ${status.border}`}>
-                  {status.label}
-                </span>
               </div>
 
               <div className="grid grid-cols-3 gap-3 text-xs">
@@ -138,7 +128,6 @@ export function EngagementHoursSavedPanel({ rows, engagementCode, devHourRate }:
                   <p className="font-bold text-ey-light">
                     {r.sumOfMonthlyHrs} <span className="text-ey-muted font-normal">/ {r.approvedTotalHrs} approved</span>
                   </p>
-                  <p className={`text-[10px] font-semibold ${status.text}`}>{r.realizationPercent}% realized</p>
                   {r.pendingApprovalHrs > 0 && (
                     <p className="text-[10px] text-amber-300 mt-0.5">+{r.pendingApprovalHrs} hrs pending approval</p>
                   )}

@@ -69,8 +69,7 @@ export interface CsvUsageRow {
  * expected to sum to — the two are independently sourced. pendingApprovalHrs
  * is a separate, not-yet-approved figure (hours submitted for sign-off but
  * not locked into the business case yet) — it's never added into
- * approvedTotalHrs or used in realizationPercent, both of which stay based
- * on what's actually approved. Month columns are detected by name (any
+ * approvedTotalHrs, which stays based on what's actually approved. Month columns are detected by name (any
  * header matching a month abbreviation, e.g. "jul"), wherever they fall in
  * the file, and are resolved to real calendar months via the current fiscal
  * year (see hoursSaved.ts's monthLabelToMonthId) — the relation to
@@ -85,5 +84,4 @@ export interface HoursSavedRow {
   pendingApprovalHrs: number;          // "Pending Approval (Submitted)" column — submitted but not yet approved; informational only, 0 if the column is absent
   monthlyHours: Record<string, number>; // One entry per detected month column, keyed by its own header text, e.g. { jul: 62, aug: 58 }
   sumOfMonthlyHrs: number;             // Derived: sum of monthlyHours' values
-  realizationPercent: number;          // Derived: sumOfMonthlyHrs / approvedTotalHrs * 100 (0 when approvedTotalHrs is 0) -- based on approved hours only, pendingApprovalHrs is never included
 }

@@ -222,7 +222,6 @@ export function parseRawHoursSavedText(raw: string): HoursSavedRow[] {
       pendingApprovalHrs,
       monthlyHours,
       sumOfMonthlyHrs,
-      realizationPercent: approvedTotalHrs > 0 ? Number(((sumOfMonthlyHrs / approvedTotalHrs) * 100).toFixed(1)) : 0,
     });
   }
 
