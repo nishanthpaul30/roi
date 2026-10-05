@@ -8,6 +8,7 @@ import 'server-only';
 import { RAW_HOURS_SAVED_DATA } from './rawHoursSavedData';
 import type { HoursSavedRow } from './csvTypes';
 import { splitCsvLine } from './csvParse';
+import { anonymizeEngagementCode, anonymizeEnabled } from './anonymize';
 
 export type { HoursSavedRow } from './csvTypes';
 
@@ -192,7 +193,7 @@ export function parseRawHoursSavedText(raw: string): HoursSavedRow[] {
     // than silently emptied.
     const rawEngagementCode = get(engagementCodeIdx);
     const engagementCodeMatch = rawEngagementCode.match(/^[A-Za-z]-\d+/);
-    const engagementCode = engagementCodeMatch ? engagementCodeMatch[0] : rawEngagementCode;
+    const engagementCode = anonymizeEngagementCode(engagementCodeMatch ? engagementCodeMatch[0] : rawEngagementCode);
     const assetName = get(assetNameIdx);
     const approvedTotalHrs = parseFloat(get(approvedIdx)) || 0;
     const pendingApprovalHrs = parseFloat(get(pendingApprovalIdx)) || 0;
@@ -210,7 +211,7 @@ export function parseRawHoursSavedText(raw: string): HoursSavedRow[] {
       // Log the first few rows in full so you can see exactly how each raw
       // value got transformed -- compare engagementCode/aiTool here against
       // what you'd expect to join against in ai_usage_data.csv.
-      console.log(`[HoursSaved] row ${i}: raw Engagement Code="${rawEngagementCode}" -> engagementCode="${engagementCode}" | raw Asset Name="${assetName}" -> aiTool="${aiTool}" | approvedTotalHrs=${approvedTotalHrs}`);
+      console.log(`[HoursSaved] row ${i}: raw Engagement Code="${anonymizeEnabled ? '(hidden: anonymized)' : rawEngagementCode}" -> engagementCode="${engagementCode}" | raw Asset Name="${assetName}" -> aiTool="${aiTool}" | approvedTotalHrs=${approvedTotalHrs}`);
     }
 
     rows.push({

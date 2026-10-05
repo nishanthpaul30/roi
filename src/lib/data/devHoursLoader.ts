@@ -5,6 +5,7 @@ import 'server-only';
 
 import { RAW_DEV_HOURS_DATA } from './rawDevHoursData';
 import { splitCsvLine } from './csvParse';
+import { anonymizeEngagementCode } from './anonymize';
 
 export interface DevHoursRow {
   engagementCode: string;
@@ -93,7 +94,7 @@ export function parseRawDevHoursText(raw: string): DevHoursRow[] {
   const rows: DevHoursRow[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cols = splitCsvLine(lines[i]);
-    const engagementCode = (cols[engagementCodeIdx] || '').trim();
+    const engagementCode = anonymizeEngagementCode((cols[engagementCodeIdx] || '').trim());
     if (!engagementCode) continue;
 
     const monthlyDevHours: Record<string, number> = {};
