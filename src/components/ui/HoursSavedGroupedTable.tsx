@@ -64,13 +64,6 @@ const COLUMNS: ColumnDef[] = [
     info: "The approved target from the Hours Saved file (Approved (Actual)), summed across the engagement's tools.",
   },
   {
-    label: 'Pending',
-    sortKey: 'totalPendingHrs',
-    align: 'right',
-    tooltipAlign: 'left',
-    info: 'Hours submitted for sign-off but not yet approved. They are not counted in Realization or ROI.',
-  },
-  {
     label: 'Hours Saved',
     sortKey: 'totalHoursSaved',
     align: 'right',
@@ -163,7 +156,6 @@ interface EngagementGroup {
   engagementCode: string;
   tools: HoursSavedRow[];
   totalApprovedHrs: number;
-  totalPendingHrs: number;
   totalHoursSaved: number;
   totalCost: number;
   realizationPercent: number;
@@ -200,7 +192,6 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
     return Array.from(map.entries())
       .map(([engagementCode, tools]) => {
         const totalApprovedHrs = tools.reduce((s, t) => s + t.approvedTotalHrs, 0);
-        const totalPendingHrs = tools.reduce((s, t) => s + t.pendingApprovalHrs, 0);
         const totalHoursSaved = tools.reduce((s, t) => s + t.sumOfMonthlyHrs, 0);
         const totalCost = tools.reduce((s, t) => s + (t.cost ?? 0), 0);
         // Capped per tool (not on the engagement total) so one tool
@@ -218,7 +209,6 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
           engagementCode,
           tools: [...tools].sort((a, b) => (TOOL_LABELS[a.aiTool] || a.assetName).localeCompare(TOOL_LABELS[b.aiTool] || b.assetName)),
           totalApprovedHrs,
-          totalPendingHrs,
           totalHoursSaved,
           totalCost,
           realizationPercent: totalApprovedHrs > 0 ? Number(((totalHoursSaved / totalApprovedHrs) * 100).toFixed(1)) : 0,
@@ -248,7 +238,6 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
   const { sortKey, sortDir, sortedRows: sortedGroups, handleSort } = useTableSort(filteredGroups, {
     engagementCode: (g) => g.engagementCode,
     totalApprovedHrs: (g) => g.totalApprovedHrs,
-    totalPendingHrs: (g) => g.totalPendingHrs,
     totalHoursSaved: (g) => g.totalHoursSaved,
     realizationPercent: (g) => g.realizationPercent,
     totalCost: (g) => g.totalCost,
@@ -312,7 +301,7 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
           <tbody className="divide-y divide-ey-border">
             {paginatedGroups.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-ey-muted">No matching engagements or tools.</td>
+                <td colSpan={8}className="px-4 py-8 text-center text-ey-muted">No matching engagements or tools.</td>
               </tr>
             ) : (
               paginatedGroups.map((g) => {
@@ -342,9 +331,6 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
                         <span className="ml-2 text-[10px] text-ey-muted font-normal">({g.tools.length} tool{g.tools.length === 1 ? '' : 's'})</span>
                       </td>
                       <td className="px-4 py-3 text-right">{fmtNum(g.totalApprovedHrs)}</td>
-                      <td className="px-4 py-3 text-right">
-                        {g.totalPendingHrs > 0 ? <span className="text-amber-300">{fmtNum(g.totalPendingHrs)}</span> : <span className="text-ey-muted">—</span>}
-                      </td>
                       <td className="px-4 py-3 text-right font-bold">{fmtNum(g.totalHoursSaved)}</td>
                       <td className="px-4 py-3 text-right">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${status.bg} ${status.text} ${status.border}`}>
@@ -380,9 +366,6 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
                               {TOOL_LABELS[t.aiTool] || t.assetName}
                             </td>
                             <td className="px-4 py-2.5 text-right text-ey-muted">{t.approvedTotalHrs}</td>
-                            <td className="px-4 py-2.5 text-right">
-                              {t.pendingApprovalHrs > 0 ? <span className="text-amber-300">{t.pendingApprovalHrs}</span> : <span className="text-ey-muted">—</span>}
-                            </td>
                             <td className="px-4 py-2.5 text-right text-ey-muted">{t.sumOfMonthlyHrs}</td>
                             <td className="px-4 py-2.5 text-right">
                               <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${tStatus.bg} ${tStatus.text} ${tStatus.border}`}>
