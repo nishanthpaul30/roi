@@ -169,6 +169,12 @@ function EngagementScoring() {
     Developing: `Engagements scoring ${tiers.developing}% up to (but not including) ${tiers.performing}% of the points available to them.`,
     'At Risk': `Engagements scoring below ${tiers.developing}% of the points available to them.`,
   };
+  // Worked-out formula per dimension for the table header tooltips.
+  const dimensionFormula: Record<ScoreDimensionId, string> = {
+    financial: `Points = ${SCORE_DIMENSIONS[0].maxPoints} × min(ratio ÷ ${SCORING_CONFIG.financial.targetBenefitCostRatio}, 1), where ratio = value of hours saved ÷ tool cost`,
+    productivity: `Points = ${SCORE_DIMENSIONS[1].maxPoints} × min(hours saved ÷ approved hours, 1)`,
+    adoption: `Points = ${SCORE_DIMENSIONS[2].maxPoints} × (${SCORING_CONFIG.adoption.activationWeight} × activation + ${SCORING_CONFIG.adoption.consistencyWeight} × consistency)`,
+  };
 
   return (
     <div className="flex-1 flex flex-col">
@@ -443,8 +449,18 @@ function EngagementScoring() {
                 <table className="w-full text-left text-xs font-mono">
                   <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
                     <tr>
-                      <SortableTh label="Engagement" className="px-4 py-3" {...sortProps('projectCode')} />
-                      <th className="px-4 py-3">Tools</th>
+                      <SortableTh
+                        label="Engagement"
+                        className="px-4 py-3"
+                        info="The Engagement Code from ai_usage_data.csv, the master list. Each engagement is scored on its own."
+                        {...sortProps('projectCode')}
+                      />
+                      <th className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          Tools
+                          <InfoTooltip align="left">The AI tools with usage or license activity for this engagement under the current filters.</InfoTooltip>
+                        </div>
+                      </th>
                       {SCORE_DIMENSIONS.map((def) => (
                         <SortableTh
                           key={def.id}
@@ -456,13 +472,52 @@ function EngagementScoring() {
                           }
                           className={`px-3 py-3 text-right ${dimensionFocus === def.id ? 'bg-ey-yellow/10' : ''}`}
                           align="right"
+                          infoWidthClassName="w-72"
+                          info={
+                            <>
+                              <span className="font-semibold text-ey-yellow block mb-1">{def.measures}</span>
+                              {def.rule}
+                              <br />
+                              <span className="font-mono">{dimensionFormula[def.id]}</span>
+                              <br />
+                              <span className="text-ey-muted">Shows — when this engagement has no data for it; it is then left out of the total.</span>
+                            </>
+                          }
                           {...sortProps(def.id)}
                         />
                       ))}
-                      <SortableTh label="Total" className="px-4 py-3 text-right" align="right" {...sortProps('percent')} />
-                      <th className="px-4 py-3">Tier</th>
-                      <SortableTh label="Scored" className="px-4 py-3 text-right" align="right" {...sortProps('completeness')} />
-                      <SortableTh label="Cost" className="px-4 py-3 text-right" align="right" {...sortProps('totalCost')} />
+                      <SortableTh
+                        label="Total"
+                        className="px-4 py-3 text-right"
+                        align="right"
+                        infoWidthClassName="w-64"
+                        info="Sum of the dimension points that could be scored, shown against the points available to this engagement. Dimensions with no data are left out of both, so the available points can be less than 100."
+                        {...sortProps('percent')}
+                      />
+                      <th className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          Tier
+                          <InfoTooltip widthClassName="w-64" align="left">
+                            Total ÷ available points: {tiers.leading}%+ Leading, {tiers.performing}%+ Performing, {tiers.developing}%+ Developing, below {tiers.developing}% At Risk.
+                          </InfoTooltip>
+                        </div>
+                      </th>
+                      <SortableTh
+                        label="Scored"
+                        className="px-4 py-3 text-right"
+                        align="right"
+                        infoWidthClassName="w-60"
+                        info={`How many of the ${SCORE_DIMENSIONS.length} dimensions had data for this engagement. A low count means the tier rests on fewer measures.`}
+                        {...sortProps('completeness')}
+                      />
+                      <SortableTh
+                        label="Cost"
+                        className="px-4 py-3 text-right"
+                        align="right"
+                        infoWidthClassName="w-60"
+                        info="Total AI tool cost (usage plus license) for this engagement in the selected period."
+                        {...sortProps('totalCost')}
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-ey-border">
