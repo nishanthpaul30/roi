@@ -83,7 +83,7 @@ export function HoursSavedExecutiveSummary({ rows, devHourRate }: HoursSavedExec
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <div className="bg-ey-black/60 border border-ey-border/80 rounded-xl p-4">
           <div className="flex items-start justify-between gap-2">
             <p className="text-[10px] text-ey-muted uppercase tracking-wider">Hours Saved vs. Approved</p>
@@ -161,18 +161,6 @@ export function HoursSavedExecutiveSummary({ rows, devHourRate }: HoursSavedExec
           </div>
           <p className="text-xl font-extrabold text-ey-light font-mono mt-1">{fmtNum(stats.totalPendingHrs)} hrs</p>
           <p className="text-[11px] text-ey-muted mt-0.5">Submitted, not yet locked into target</p>
-        </div>
-
-        <div className="bg-ey-black/60 border border-ey-border/80 rounded-xl p-4">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[10px] text-ey-muted uppercase tracking-wider">Engagements Tracked</p>
-            <InfoTooltip>
-              <span className="font-semibold text-ey-yellow block mb-1">How this is calculated</span>
-              Count of distinct Engagement &times; Tool rows left after the Asset Type = &quot;ai&quot; filter = <span className="font-mono">{stats.total}</span>.
-            </InfoTooltip>
-          </div>
-          <p className="text-xl font-extrabold text-ey-light font-mono mt-1">{stats.total}</p>
-          <p className="text-[11px] text-ey-muted mt-0.5">Engagement &times; Tool pairs with Hours Saved data</p>
         </div>
       </div>
 
