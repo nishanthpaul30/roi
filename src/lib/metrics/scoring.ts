@@ -106,37 +106,9 @@ function scoreAdoption(rows: CsvUsageRow[]): DimensionResult {
   };
 }
 
-/** Strategic Importance: points looked up from the engagement's Invest Type. */
-function scoreStrategic(investType: string): DimensionResult {
-  if (!investType) return blank('strategic', 'No Invest Type recorded for this engagement.');
-  const points = SCORING_CONFIG.strategic.investTypePoints[investType];
-  if (points === undefined) return blank('strategic', `Invest Type "${investType}" has no strategic mapping.`);
-  return {
-    id: 'strategic',
-    score: points,
-    maxPoints: maxPointsOf('strategic'),
-    detail: `Invest Type "${investType}" maps to ${points} of ${maxPointsOf('strategic')} points.`,
-  };
-}
-
 function scoreEngagement(projectCode: string, rows: CsvUsageRow[], tracked: HoursSavedRow[]): EngagementScore {
-  const investType = rows.find((r) => r.engagementInvestType)?.engagementInvestType ?? '';
-
-  // Dimensions without a data source yet stay blank for every engagement.
-  const dimensions: DimensionResult[] = SCORE_DIMENSIONS.map((def) => {
-    switch (def.id) {
-      case 'financial':
-        return scoreFinancial(tracked);
-      case 'productivity':
-        return scoreProductivity(tracked);
-      case 'adoption':
-        return scoreAdoption(rows);
-      case 'strategic':
-        return scoreStrategic(investType);
-      default:
-        return blank(def.id, def.dataNeeded ?? 'No data source yet.');
-    }
-  });
+  // Same order as SCORE_DIMENSIONS.
+  const dimensions: DimensionResult[] = [scoreFinancial(tracked), scoreProductivity(tracked), scoreAdoption(rows)];
 
   const scored = dimensions.filter((d) => d.score !== null);
   const scoredPoints = round1(scored.reduce((s, d) => s + (d.score as number), 0));
@@ -147,7 +119,6 @@ function scoreEngagement(projectCode: string, rows: CsvUsageRow[], tracked: Hour
     projectCode,
     engagementServiceLine: rows[0]?.engagementServiceLine ?? '',
     engagementCompetency: rows[0]?.engagementCompetency ?? '',
-    investType,
     aiTools: Array.from(new Set(rows.map((r) => r.aiTool).filter(Boolean))).sort(),
     totalCost: Number(rows.reduce((s, r) => s + r.cost, 0).toFixed(2)),
     dimensions,

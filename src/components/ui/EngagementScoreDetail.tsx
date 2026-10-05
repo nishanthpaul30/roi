@@ -18,7 +18,7 @@ interface EngagementScoreDetailProps {
 }
 
 /**
- * Side panel with the full six-dimension breakdown for one engagement. A
+ * Side panel with the full per-dimension breakdown for one engagement. A
  * dimension that couldn't be scored is shown as an empty bar with the reason,
  * not as a zero.
  */
@@ -46,7 +46,7 @@ export function EngagementScoreDetail({ score, onClose }: EngagementScoreDetailP
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-ey-yellow font-mono">{score.projectCode}</h2>
             <p className="text-[11px] text-ey-muted mt-0.5">
-              {[score.engagementServiceLine, score.engagementCompetency, score.investType && `${score.investType} invest`]
+              {[score.engagementServiceLine, score.engagementCompetency]
                 .filter(Boolean)
                 .join(' · ') || '—'}
             </p>
@@ -89,7 +89,8 @@ export function EngagementScoreDetail({ score, onClose }: EngagementScoreDetailP
 
         <div className="space-y-4">
           {score.dimensions.map((d) => {
-            const def = SCORE_DIMENSIONS.find((x) => x.id === d.id)!;
+            const def = SCORE_DIMENSIONS.find((x) => x.id === d.id);
+            if (!def) return null;
             return (
               <div key={d.id} className="space-y-1.5">
                 <div className="flex items-baseline justify-between gap-2">

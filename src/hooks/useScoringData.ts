@@ -27,6 +27,8 @@ export function useScoringData(filters: GlobalFilterState) {
   const key = useMemo(() => {
     if (!filters.startDate) return null;
     return new URLSearchParams({
+      // Bump when the scoring model changes so browsers/CDNs drop responses cached under the old one.
+      v: '3dim-40-30-30',
       startDate: filters.startDate,
       endDate: filters.endDate,
       aiTool: filters.aiTool,

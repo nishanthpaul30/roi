@@ -4,13 +4,13 @@
  * same labels/weights/rules the server scores against, without importing any
  * server-side code.
  *
- * Six dimensions, 100 points total. A dimension with no data behind it is
+ * Three dimensions, 100 points total (Financial 40, Productivity 30, Adoption 30). A dimension with no data behind it is
  * returned as `score: null` (shown blank) -- never as 0 -- and is left out of
  * both the total and the tier, which is based on the percentage of points
  * actually available to that engagement.
  */
 
-export type ScoreDimensionId = 'financial' | 'productivity' | 'adoption' | 'revenue' | 'quality' | 'strategic';
+export type ScoreDimensionId = 'financial' | 'productivity' | 'adoption';
 export type ScoreTier = 'Leading' | 'Performing' | 'Developing' | 'At Risk';
 
 export interface ScoreDimensionDef {
@@ -29,46 +29,23 @@ export const SCORE_DIMENSIONS: ScoreDimensionDef[] = [
   {
     id: 'financial',
     label: 'Financial Value',
-    maxPoints: 30,
+    maxPoints: 40,
     measures: 'Benefits compared with tool cost',
     rule: 'Benefit-to-cost ratio = value of hours saved (capped at approved hours, at the blended $/dev-hr rate) ÷ tool cost for the tracked tools. Full points at or above the target ratio, scaled linearly below it.',
   },
   {
     id: 'productivity',
     label: 'Productivity Gain',
-    maxPoints: 20,
+    maxPoints: 30,
     measures: 'Time and effort improvement',
     rule: 'Hours saved ÷ approved hours, capped at 100%.',
   },
   {
     id: 'adoption',
     label: 'Adoption & Utilization',
-    maxPoints: 20,
+    maxPoints: 30,
     measures: 'Actual usage of available licenses',
     rule: 'Half from seat activation (licensed seats with any usage ÷ licensed seats), half from consistency (average share of licensed months in which each seat was actually used).',
-  },
-  {
-    id: 'revenue',
-    label: 'Incremental Revenue',
-    maxPoints: 15,
-    measures: 'New revenue attributable to the tool',
-    rule: 'Not scored yet.',
-    dataNeeded: 'Revenue or margin by engagement and month (Finance/PMO), plus a rule for what counts as AI-attributable.',
-  },
-  {
-    id: 'quality',
-    label: 'Quality & Risk',
-    maxPoints: 10,
-    measures: 'Quality improvement and risk reduction',
-    rule: 'Not scored yet.',
-    dataNeeded: 'Review defect or rework rates, suggestion-acceptance telemetry, and compliance events (policy violations, data-loss alerts, security incidents).',
-  },
-  {
-    id: 'strategic',
-    label: 'Strategic Importance',
-    maxPoints: 5,
-    measures: 'Strategic relevance and scalability',
-    rule: "Points mapped from the engagement's Invest Type (see SCORING_CONFIG.strategic). The mapping is a placeholder for leadership to set.",
   },
 ];
 
@@ -81,10 +58,6 @@ export const SCORING_CONFIG = {
     /** Split of the Adoption points between seat activation and consistency. Must sum to 1. */
     activationWeight: 0.5,
     consistencyWeight: 0.5,
-  },
-  strategic: {
-    /** Points per Engagement Invest Type, out of the dimension's 5. */
-    investTypePoints: { Growth: 5, Innovation: 4, Efficiency: 3, Sustain: 2 } as Record<string, number>,
   },
   /** Minimum percentage of available points for each tier; below `developing` is At Risk. */
   tiers: { leading: 80, performing: 60, developing: 40 },
@@ -112,11 +85,10 @@ export interface EngagementScore {
   projectCode: string;
   engagementServiceLine: string;
   engagementCompetency: string;
-  investType: string;
   aiTools: string[];
   /** Total cost (usage + license) for this engagement in the selected period. */
   totalCost: number;
-  /** Always all six dimensions, in SCORE_DIMENSIONS order. */
+  /** Always every dimension, in SCORE_DIMENSIONS order. */
   dimensions: DimensionResult[];
   scoredPoints: number;
   /** Sum of maxPoints over the dimensions that could be scored. */

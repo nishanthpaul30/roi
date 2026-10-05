@@ -81,15 +81,9 @@ function EngagementScoring() {
   const summary = useMemo(() => {
     const tierCounts: Record<ScoreTier, number> = { Leading: 0, Performing: 0, Developing: 0, 'At Risk': 0 };
     let unscorable = 0;
-    let percentSum = 0;
-    let percentN = 0;
     for (const s of scores) {
       if (s.tier) tierCounts[s.tier]++;
       else unscorable++;
-      if (s.percent !== null) {
-        percentSum += s.percent;
-        percentN++;
-      }
     }
     const dimensions = SCORE_DIMENSIONS.map((def) => {
       const scored = scores.map((s) => dimOf(s, def.id).score).filter((v): v is number => v !== null);
@@ -99,7 +93,7 @@ function EngagementScoring() {
         avg: scored.length > 0 ? scored.reduce((a, b) => a + b, 0) / scored.length : null,
       };
     });
-    return { tierCounts, unscorable, avgPercent: percentN > 0 ? percentSum / percentN : null, dimensions };
+    return { tierCounts, unscorable, dimensions };
   }, [scores]);
 
   const tableRows = useMemo(() => {
@@ -116,9 +110,6 @@ function EngagementScoring() {
     financial: (s) => dimOf(s, 'financial').score,
     productivity: (s) => dimOf(s, 'productivity').score,
     adoption: (s) => dimOf(s, 'adoption').score,
-    revenue: (s) => dimOf(s, 'revenue').score,
-    quality: (s) => dimOf(s, 'quality').score,
-    strategic: (s) => dimOf(s, 'strategic').score,
     percent: (s) => s.percent,
     completeness: (s) => s.scoredDimensionCount,
     totalCost: (s) => s.totalCost,
@@ -190,26 +181,19 @@ function EngagementScoring() {
             Engagement Scoring
           </h1>
           <p className="text-xs text-ey-muted mt-1 max-w-3xl">
-            Each engagement is scored out of 100 across six dimensions. A dimension with no data behind it is shown blank &mdash; not
+            Each engagement is scored out of 100 across three dimensions. A dimension with no data behind it is shown blank &mdash; not
             zero &mdash; and left out of the total, so the tier reflects the percentage of the points actually available to that
             engagement.
           </p>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <StatTile
             label="Engagements"
             value={scores.length}
             subtitle="in selected scope"
-            tooltip="Distinct Engagement Codes with usage or license activity under the current filters. Each is scored on up to six dimensions."
+            tooltip="Distinct Engagement Codes with usage or license activity under the current filters. Each is scored on up to three dimensions."
             tooltipAlign="left"
-            loading={loading}
-          />
-          <StatTile
-            label="Avg Score"
-            value={summary.avgPercent === null ? '—' : `${summary.avgPercent.toFixed(0)}%`}
-            subtitle="of available points"
-            tooltip="Average of each engagement's score as a percentage of the points that could be scored for it. Engagements with nothing scoreable are left out."
             loading={loading}
           />
           {TIER_ORDER.map((tier) => (
