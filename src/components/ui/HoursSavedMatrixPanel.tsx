@@ -27,12 +27,46 @@ const TOOL_LABELS: Record<string, string> = {
 
 type Metric = 'costPerHourSaved' | 'sumOfMonthlyHrs' | 'realizationPercent' | 'cost' | 'roiPercent';
 
-const METRIC_CONFIG: Record<Metric, { label: string; format: (v: number) => string; lowerIsBetter: boolean; colorCode: boolean }> = {
-  costPerHourSaved: { label: '$ / Hour Saved', format: (v) => fmtCost(v), lowerIsBetter: true, colorCode: true },
-  sumOfMonthlyHrs: { label: 'Hours Saved', format: (v) => fmtNum(v), lowerIsBetter: false, colorCode: false },
-  realizationPercent: { label: 'Realization %', format: (v) => `${v.toFixed(0)}%`, lowerIsBetter: false, colorCode: true },
-  cost: { label: 'Tool Cost', format: (v) => fmtCost(v), lowerIsBetter: false, colorCode: false },
-  roiPercent: { label: 'ROI %', format: (v) => `${v.toFixed(0)}%`, lowerIsBetter: false, colorCode: true },
+const METRIC_CONFIG: Record<
+  Metric,
+  { label: string; format: (v: number) => string; lowerIsBetter: boolean; colorCode: boolean; calculation: (devHourRate: number) => string }
+> = {
+  costPerHourSaved: {
+    label: '$ / Hour Saved',
+    format: (v) => fmtCost(v),
+    lowerIsBetter: true,
+    colorCode: true,
+    calculation: () => '$ / Hour Saved = Tool Cost ÷ Hours Saved, for each engagement and tool.',
+  },
+  sumOfMonthlyHrs: {
+    label: 'Hours Saved',
+    format: (v) => fmtNum(v),
+    lowerIsBetter: false,
+    colorCode: false,
+    calculation: () => 'Hours Saved = all monthly hours recorded to date, added together, for each engagement and tool.',
+  },
+  realizationPercent: {
+    label: 'Realization %',
+    format: (v) => `${v.toFixed(0)}%`,
+    lowerIsBetter: false,
+    colorCode: true,
+    calculation: () => 'Realization % = Hours Saved ÷ Approved Hrs × 100, for each engagement and tool.',
+  },
+  cost: {
+    label: 'Tool Cost',
+    format: (v) => fmtCost(v),
+    lowerIsBetter: false,
+    colorCode: false,
+    calculation: () => 'Tool Cost = usage + licence cost for the same engagement and tool, for the selected period.',
+  },
+  roiPercent: {
+    label: 'ROI %',
+    format: (v) => `${v.toFixed(0)}%`,
+    lowerIsBetter: false,
+    colorCode: true,
+    calculation: (rate) =>
+      `ROI % = (Value of Hours Saved − Tool Cost) ÷ Tool Cost × 100, where Value = Hours Saved (capped at Approved Hrs) × $${rate}/hr. Tool cost only: dev hours are not included in matrix cells.`,
+  },
 };
 
 // roiPercent is never read directly off a row: it's recomputed here against
@@ -204,6 +238,10 @@ export function HoursSavedMatrixPanel({ rows, onSelectEngagement, devHourRate }:
           />
         </div>
       </div>
+      <p className="text-xs text-ey-light -mt-1">
+        <span className="font-semibold text-ey-yellow">Calculation: </span>
+        {config.calculation(devHourRate)}
+      </p>
       <p className="text-[10px] text-ey-muted -mt-1">
         Click Engagement Code to sort alphabetically, or a tool column to rank engagements by that tool&apos;s {config.label.toLowerCase()}.
       </p>

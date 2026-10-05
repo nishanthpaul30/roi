@@ -1,11 +1,10 @@
 'use client';
 
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, Search, ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import type { TokenCostSummary } from '@/lib/metrics/types';
 import { formatCompactCurrency as fmtCost, formatCompactNumber as fmtNum } from '@/lib/format';
 import { useTableSort } from '@/lib/useTableSort';
-import { SortableTh } from '@/components/ui/SortableTh';
 import { computeHoursSavedValueUsd, computeRoiPercent, computeDevCostUsd, computeTotalInvestmentUsd, computeRoiEligibleHours } from '@/lib/metrics/roiCalc';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
@@ -38,6 +37,126 @@ function roiColor(pct: number): string {
   if (pct >= 100) return 'text-emerald-300';
   if (pct >= 0) return 'text-ey-yellow';
   return 'text-rose-300';
+}
+
+interface ColumnDef {
+  label: string;
+  sortKey: string;
+  align: 'left' | 'right';
+  /** Which edge the info popup is pinned to; left-side columns open it rightward so it isn't clipped. */
+  tooltipAlign: 'left' | 'right';
+  info: ReactNode;
+}
+
+const COLUMNS: ColumnDef[] = [
+  {
+    label: 'Engagement Code / Tool',
+    sortKey: 'engagementCode',
+    align: 'left',
+    tooltipAlign: 'left',
+    info: 'The engagement, with how many tools it uses. Click the arrow to expand its tool rows, or click a row for the full breakdown.',
+  },
+  {
+    label: 'Approved Hrs',
+    sortKey: 'totalApprovedHrs',
+    align: 'right',
+    tooltipAlign: 'left',
+    info: "The approved target from the Hours Saved file (Approved (Actual)), summed across the engagement's tools.",
+  },
+  {
+    label: 'Pending',
+    sortKey: 'totalPendingHrs',
+    align: 'right',
+    tooltipAlign: 'left',
+    info: 'Hours submitted for sign-off but not yet approved. They are not counted in Realization or ROI.',
+  },
+  {
+    label: 'Hours Saved',
+    sortKey: 'totalHoursSaved',
+    align: 'right',
+    tooltipAlign: 'left',
+    info: 'All monthly hours recorded to date, added together. Future months stay at 0 until they arrive.',
+  },
+  {
+    label: 'Realization',
+    sortKey: 'realizationPercent',
+    align: 'right',
+    tooltipAlign: 'right',
+    info: 'Hours Saved ÷ Approved Hrs × 100. Badge: 100% or more = On/Above Target, 75% or more = On Track, below 75% = Behind Target.',
+  },
+  {
+    label: 'Tool Cost',
+    sortKey: 'totalCost',
+    align: 'right',
+    tooltipAlign: 'right',
+    info: "Usage + licence cost for the same engagement and tools in ai_usage_data.csv, for the selected period.",
+  },
+  {
+    label: '$ / Hour Saved',
+    sortKey: 'costPerHourSaved',
+    align: 'right',
+    tooltipAlign: 'right',
+    info: 'Tool Cost ÷ Hours Saved. The engagement row adds up cost and hours first, then divides once.',
+  },
+  {
+    label: 'Dev Hours',
+    sortKey: 'devHoursSpent',
+    align: 'right',
+    tooltipAlign: 'right',
+    info: 'Developer hours clocked on the engagement (mock timesheet), counted once per engagement. Tool rows show n/a because the timesheet has no per-tool split.',
+  },
+  {
+    label: 'ROI %',
+    sortKey: 'roiPercent',
+    align: 'right',
+    tooltipAlign: 'right',
+    info: (
+      <>
+        <span className="font-semibold text-ey-yellow block mb-1">Total Investment ROI</span>
+        At the engagement row: (Value of Hours Saved &minus; Total Investment) &divide; Total Investment &times; 100, where Total
+        Investment = AI Tool Cost + (Dev Hours &times; $/dev-hr). Dev hours come from the mock timesheet data (see Dev Hours column)
+        and apply per engagement, not per tool. Hours Saved here is capped at each tool&apos;s Approved Hrs &mdash; hours recorded
+        beyond what&apos;s approved don&apos;t count toward value yet. Tool rows show ROI against tool cost only.
+      </>
+    ),
+  },
+];
+
+function HeaderCell({
+  col,
+  activeKey,
+  direction,
+  onSort,
+}: {
+  col: ColumnDef;
+  activeKey: string | null;
+  direction: 'asc' | 'desc';
+  onSort: (key: string) => void;
+}) {
+  const active = activeKey === col.sortKey;
+  const right = col.align === 'right';
+  return (
+    <th className={`px-4 py-3 ${right ? 'text-right' : ''}`}>
+      <div className={`flex items-center gap-1.5 ${right ? 'justify-end' : ''}`}>
+        <button
+          type="button"
+          onClick={() => onSort(col.sortKey)}
+          title={`Sort by ${col.label}`}
+          className={`flex items-center gap-1 hover:text-ey-light transition ${right ? 'flex-row-reverse' : ''} ${active ? 'text-ey-yellow' : ''}`}
+        >
+          <span>{col.label}</span>
+          {active ? (
+            direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+          ) : (
+            <ArrowUpDown className="w-3 h-3 opacity-50" />
+          )}
+        </button>
+        <InfoTooltip widthClassName="w-60" align={col.tooltipAlign}>
+          {col.info}
+        </InfoTooltip>
+      </div>
+    </th>
+  );
 }
 
 interface EngagementGroup {
@@ -179,89 +298,15 @@ export function HoursSavedGroupedTable({ rows, onSelectEngagement, devHourRate }
         <table className="w-full text-left text-xs font-mono">
           <thead className="bg-ey-black/70 text-ey-muted uppercase tracking-wider border-b border-ey-border">
             <tr>
-              <SortableTh label="Engagement Code / Tool" sortKey="engagementCode" activeKey={sortKey} direction={sortDir} onSort={handleSortAndResetPage} className="px-4 py-3" />
-              <SortableTh
-                label="Approved Hrs"
-                sortKey="totalApprovedHrs"
-                activeKey={sortKey}
-                direction={sortDir}
-                onSort={handleSortAndResetPage}
-                className="px-4 py-3 text-right"
-                align="right"
-              />
-              <SortableTh
-                label="Pending"
-                sortKey="totalPendingHrs"
-                activeKey={sortKey}
-                direction={sortDir}
-                onSort={handleSortAndResetPage}
-                className="px-4 py-3 text-right"
-                align="right"
-              />
-              <SortableTh
-                label="Hours Saved"
-                sortKey="totalHoursSaved"
-                activeKey={sortKey}
-                direction={sortDir}
-                onSort={handleSortAndResetPage}
-                className="px-4 py-3 text-right"
-                align="right"
-              />
-              <SortableTh
-                label="Realization"
-                sortKey="realizationPercent"
-                activeKey={sortKey}
-                direction={sortDir}
-                onSort={handleSortAndResetPage}
-                className="px-4 py-3 text-right"
-                align="right"
-              />
-              <SortableTh
-                label="Tool Cost"
-                sortKey="totalCost"
-                activeKey={sortKey}
-                direction={sortDir}
-                onSort={handleSortAndResetPage}
-                className="px-4 py-3 text-right"
-                align="right"
-              />
-              <SortableTh
-                label="$ / Hour Saved"
-                sortKey="costPerHourSaved"
-                activeKey={sortKey}
-                direction={sortDir}
-                onSort={handleSortAndResetPage}
-                className="px-4 py-3 text-right"
-                align="right"
-              />
-              <SortableTh
-                label="Dev Hours"
-                sortKey="devHoursSpent"
-                activeKey={sortKey}
-                direction={sortDir}
-                onSort={handleSortAndResetPage}
-                className="px-4 py-3 text-right"
-                align="right"
-              />
-              <th className="px-4 py-3 text-right">
-                <div className="flex items-center justify-end gap-1.5">
-                  <button
-                    onClick={() => handleSortAndResetPage('roiPercent')}
-                    className={`flex items-center flex-row-reverse space-x-1 space-x-reverse hover:text-ey-light transition ${sortKey === 'roiPercent' ? 'text-ey-yellow' : ''}`}
-                  >
-                    <span>ROI %</span>
-                    {sortKey === 'roiPercent' ? (
-                      sortDir === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                    ) : (
-                      <ArrowUpDown className="w-3 h-3 opacity-50" />
-                    )}
-                  </button>
-                  <InfoTooltip widthClassName="w-60">
-                    <span className="font-semibold text-ey-yellow block mb-1">Total Investment ROI</span>
-                    At the engagement row: (Value of Hours Saved &minus; Total Investment) &divide; Total Investment &times; 100, where Total Investment = AI Tool Cost + (Dev Hours &times; $/dev-hr). Dev hours come from the mock timesheet data (see Dev Hours column) and apply per engagement, not per tool. Hours Saved here is capped at each tool&apos;s Approved Hrs &mdash; hours recorded beyond what&apos;s approved don&apos;t count toward value yet.
-                  </InfoTooltip>
-                </div>
-              </th>
+              {COLUMNS.map((col) => (
+                <HeaderCell
+                  key={col.sortKey}
+                  col={col}
+                  activeKey={sortKey}
+                  direction={sortDir}
+                  onSort={handleSortAndResetPage}
+                />
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-ey-border">
