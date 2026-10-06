@@ -1,35 +1,21 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useTableSort } from '@/lib/useTableSort';
 import { SortableTh } from '@/components/ui/SortableTh';
 import {
   ArrowLeft,
   ChevronRight,
-  ShieldCheck,
-  ShieldAlert,
-  Coins,
-  DollarSign,
-  Zap,
-  Users,
   Search,
-  Filter,
   FileSpreadsheet,
   CheckCircle2,
-  AlertCircle,
   Briefcase,
-  Building,
   Building2,
   Globe2,
   ArrowUpRight,
-  TrendingDown,
-  TrendingUp,
   X,
   Download,
-  Calendar,
   Layers,
-  Database,
-  Info,
 } from 'lucide-react';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { TokenCostSummary, UserCapacityRow, GlobalFilterState } from '@/lib/metrics/types';
@@ -102,7 +88,7 @@ export function RoiDrilldownView({ target, summary, onBack, parentTitle = 'ROI D
   // Search & Pagination State for Level 3 Core Records
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(10);
   const [toolFilter, setToolFilter] = useState<string>('all');
   const [billableFilter, setBillableFilter] = useState<string>('all');
 

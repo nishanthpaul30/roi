@@ -13,12 +13,11 @@ import {
   AlertTriangle,
   Clock3,
 } from 'lucide-react';
-import { TokenCostSummary, GlobalFilterState } from '@/lib/metrics/types';
+import { TokenCostSummary } from '@/lib/metrics/types';
 import { generatePrescriptiveInferences, PrescriptiveInference } from '@/lib/metrics/prescriptiveEngine';
 
 interface ExecutiveInferencesPanelProps {
   summary?: TokenCostSummary;
-  filters?: GlobalFilterState;
   onSelectInference?: (inferenceId: string) => void;
 }
 
@@ -31,7 +30,7 @@ const INFERENCE_ICONS: Record<string, React.ComponentType<{ className?: string }
   non_billable_overrun: AlertTriangle,
 };
 
-export function ExecutiveInferencesPanel({ summary, filters, onSelectInference }: ExecutiveInferencesPanelProps) {
+export function ExecutiveInferencesPanel({ summary, onSelectInference }: ExecutiveInferencesPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   if (!summary) return null;

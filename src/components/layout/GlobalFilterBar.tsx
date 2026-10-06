@@ -27,7 +27,6 @@ interface FilterOptions {
 interface GlobalFilterBarProps {
   filters: GlobalFilterState;
   onFilterChange: (newFilters: GlobalFilterState) => void;
-  onExportCsv?: () => void;
   filterOptions?: FilterOptions;
   /** When true, every control here is inert and greyed out — the page has its
    * own local filters instead and these shared ones must not affect what it
@@ -52,7 +51,6 @@ const labelClass = 'flex items-center gap-1 text-[10px] text-ey-muted font-semib
 export function GlobalFilterBar({
   filters,
   onFilterChange,
-  onExportCsv,
   filterOptions,
   disabled = false,
   disabledMessage,

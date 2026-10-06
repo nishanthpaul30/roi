@@ -6,7 +6,6 @@ import { SortableTh } from '@/components/ui/SortableTh';
 import {
   ArrowLeft,
   ChevronRight,
-  TrendingUp,
   AlertTriangle,
   UserCheck,
   UserX,
@@ -16,19 +15,11 @@ import {
   Sparkles,
   FileSpreadsheet,
   Search,
-  Filter,
   CheckCircle2,
   Download,
-  Calendar,
-  ExternalLink,
   RefreshCw,
-  DollarSign,
-  PieChart as PieChartIcon,
   X,
   Eye,
-  Check,
-  Award,
-  Briefcase,
   BadgeDollarSign,
   ChevronUp,
   ChevronDown,
@@ -168,9 +159,6 @@ export function ExecutiveInferenceDrilldownView({
     }
   }, [initialEntity]);
 
-  // Pre-hierarchy facet selection: habitual_retention picks a cohort before
-  // handing off to the mandated hierarchy navigator.
-  const [selectedCohortFacet, setSelectedCohortFacet] = useState<'embedded' | 'regular' | 'occasional' | null>(null);
   // Dormant Seats Action Ledger: which Service Line row (if any) is expanded
   // to show its individual dormant employees.
   const [expandedDormantServiceLine, setExpandedDormantServiceLine] = useState<string | null>(null);
@@ -184,7 +172,7 @@ export function ExecutiveInferenceDrilldownView({
   // Level 4 Search, Pagination & Modal Record Inspector State
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(10);
   const [inspectingRecord, setInspectingRecord] = useState<CsvUsageRow | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   // hours_saved_roi: dev-hour rate for the embedded HoursSavedOverviewPanel,
@@ -527,40 +515,11 @@ export function ExecutiveInferenceDrilldownView({
   const top20Spend = useMemo(() => top20Users.reduce((sum, u) => sum + u.totalCost, 0), [top20Users]);
   const top20SpendPercent = totalOrgSpend > 0 ? ((top20Spend / totalOrgSpend) * 100).toFixed(1) : '69.1';
 
-  // Compute Month-by-Month Spend
-  const monthlySpend = useMemo(() => {
-    const map = new Map<string, { month: string; cost: number; tokens: number; rowCount: number }>();
-    for (const r of usageRows) {
-      const m = r.monthYear || 'Unknown';
-      if (!map.has(m)) {
-        map.set(m, { month: m, cost: 0, tokens: 0, rowCount: 0 });
-      }
-      const item = map.get(m)!;
-      item.cost += r.cost;
-      item.tokens += r.tokenConsumption;
-      item.rowCount += 1;
-    }
-    return Array.from(map.values());
-  }, [usageRows]);
-
-  // Compute Habitual Cohorts. With no day-level Activity Date, "habitual" is
-  // redefined from active-days-per-active-month to active-months-out-of-the-
-  // selected-window (thresholds re-picked accordingly: 90%+/60%+ of the
-  // window's months), matching the same redesign in roi.ts's userEngagementCohorts.
+  // Months in the selected window: the denominator for the habitual-user ratio. With no
+  // day-level Activity Date, "habitual" is redefined from active-days-per-active-month to
+  // active-months-out-of-the-selected-window (thresholds re-picked accordingly: 90%+/60%+
+  // of the window's months), matching the same redesign in roi.ts's userEngagementCohorts.
   const totalMonthsInWindow = useMemo(() => new Set(allRows.map((r) => r.monthId)).size || 1, [allRows]);
-  const userCohorts = useMemo(() => {
-    const embedded: typeof activeUserList = [];
-    const regular: typeof activeUserList = [];
-    const occasional: typeof activeUserList = [];
-
-    for (const u of activeUserList) {
-      const activeMonthRatio = u.activeMonths.size / totalMonthsInWindow;
-      if (activeMonthRatio >= 0.9) embedded.push(u);
-      else if (activeMonthRatio >= 0.6) regular.push(u);
-      else occasional.push(u);
-    }
-    return { embedded, regular, occasional };
-  }, [activeUserList, totalMonthsInWindow]);
 
   // Engagement Code Breakdown
   const projectCodeBreakdown = useMemo(() => {
@@ -591,37 +550,6 @@ export function ExecutiveInferenceDrilldownView({
       if (r.billableFlag === 'True') p.billableTokens += r.tokenConsumption || 0;
       if (r.userMail) p.users.add(r.userMail);
       p.rowCount += 1;
-    }
-    return Array.from(map.values()).sort((a, b) => b.cost - a.cost);
-  }, [usageRows]);
-
-  // Regional & Service Line Breakdown
-  const regionBreakdown = useMemo(() => {
-    const map = new Map<string, { region: string; cost: number; tokens: number; users: Set<string> }>();
-    for (const r of usageRows) {
-      const reg = r.superRegion || 'Other';
-      if (!map.has(reg)) {
-        map.set(reg, { region: reg, cost: 0, tokens: 0, users: new Set<string>() });
-      }
-      const item = map.get(reg)!;
-      item.cost += r.cost;
-      item.tokens += r.tokenConsumption;
-      if (r.userMail) item.users.add(r.userMail);
-    }
-    return Array.from(map.values()).sort((a, b) => b.cost - a.cost);
-  }, [usageRows]);
-
-  const countryBreakdown = useMemo(() => {
-    const map = new Map<string, { country: string; cost: number; tokens: number; users: Set<string> }>();
-    for (const r of usageRows) {
-      const c = r.country || 'Unknown';
-      if (!map.has(c)) {
-        map.set(c, { country: c, cost: 0, tokens: 0, users: new Set<string>() });
-      }
-      const item = map.get(c)!;
-      item.cost += r.cost;
-      item.tokens += r.tokenConsumption;
-      if (r.userMail) item.users.add(r.userMail);
     }
     return Array.from(map.values()).sort((a, b) => b.cost - a.cost);
   }, [usageRows]);
@@ -1050,7 +978,6 @@ export function ExecutiveInferenceDrilldownView({
   };
 
   const currentMeta = inferencesMeta[inferenceId] || inferencesMeta.license_reclamation;
-  const IconComponent = currentMeta.icon;
 
   // Level 4 Granular Rows Filtered to the Selected Entity / Dimension
   const granularRows = useMemo(() => {

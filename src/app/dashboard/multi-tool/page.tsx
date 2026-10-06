@@ -5,7 +5,6 @@ import { useMetricsData } from '@/hooks/useMetricsData';
 import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { MultiToolComparisonPanel } from '@/components/ui/MultiToolComparisonPanel';
 import { ExecutiveInferenceDrilldownView } from '@/components/ui/ExecutiveInferenceDrilldownView';
-import { Layers } from 'lucide-react';
 
 // Relocated here from the Executive Overview page — the "Deep Dive" and
 // per-tool / per-user click paths still open the same multi_tool_comparison

@@ -7,10 +7,10 @@ import { KpiCard } from '@/components/ui/KpiCard';
 import { ExecutiveInferencesPanel } from '@/components/ui/ExecutiveInferencesPanel';
 import { ExecutiveMetricDrilldownView } from '@/components/ui/ExecutiveMetricDrilldownView';
 import { ExecutiveInferenceDrilldownView } from '@/components/ui/ExecutiveInferenceDrilldownView';
-import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
+import { DrilldownMetricData } from '@/components/ui/drilldownTypes';
 import { ExecutivePrintTemplate } from '@/components/reports/ExecutivePrintTemplate';
 import { Sparkles, Printer } from 'lucide-react';
-import { formatCompactCurrency, formatCompactNumber } from '@/lib/format';
+import { formatCompactCurrency } from '@/lib/format';
 import { UserCapacityRow } from '@/lib/metrics/types';
 
 export default function ExecutiveOverviewPage() {
@@ -42,10 +42,6 @@ export default function ExecutiveOverviewPage() {
     requestAnimationFrame(() => {
       window.scrollTo({ top: savedScrollY.current, behavior: 'instant' });
     });
-  };
-
-  const handleExportCsv = () => {
-    window.location.href = `/api/metrics/export?type=daily&startDate=${filters.startDate}&endDate=${filters.endDate}`;
   };
 
   const openDrilldown = (id: DrilldownMetricData['id']) => {
@@ -147,7 +143,6 @@ export default function ExecutiveOverviewPage() {
       <GlobalFilterBar
         filters={filters}
         onFilterChange={setFilters}
-        onExportCsv={handleExportCsv}
         filterOptions={data?.filterOptions}
       />
 
@@ -222,7 +217,6 @@ export default function ExecutiveOverviewPage() {
                   delta={data.metrics.aiAdoptionRate.summary}
                   formatType="percentage"
                   description="Active users ÷ total licensed roster × 100."
-                  comparisonLabel="vs prev period"
                   meta={`${data.tokenCostSummary?.activeUserCount ?? 0} of ${data.tokenCostSummary?.totalRosterUserCount ?? 0} resources · ${data.tokenCostSummary?.byAiTool?.length ?? 0} tools`}
                   onClick={() => openDrilldown('ai_adoption')}
                 />
@@ -232,7 +226,6 @@ export default function ExecutiveOverviewPage() {
                   delta={data.metrics.cost.summary}
                   formatType="currency"
                   description="Usage Cost + License Cost, summed across all entries in the period."
-                  comparisonLabel="vs prev period"
                   meta={`${data.tokenCostSummary?.activeUserCount ?? 0} active users · ${data.tokenCostSummary?.inactiveUserCount ?? 0} inactive users`}
                   onClick={() => openDrilldown('total_investment')}
                 />
@@ -242,7 +235,6 @@ export default function ExecutiveOverviewPage() {
                   delta={data.metrics.avgMonthlyCost.summary}
                   formatType="currency"
                   description="Total spend per calendar month, averaged across months in the period."
-                  comparisonLabel="vs prev period"
                   meta={`${data.tokenCostSummary?.monthlyTrend?.length ?? 0} months tracked · ${formatCompactCurrency(data.metrics.cost.summary.current || 0)} total AI cost`}
                   onClick={() => openDrilldown('avg_monthly_cost')}
                 />
@@ -252,7 +244,6 @@ export default function ExecutiveOverviewPage() {
                   delta={data.metrics.costPerActiveUser?.summary}
                   formatType="currency"
                   description="Total spend ÷ number of active users (users with usage > 0)."
-                  comparisonLabel="vs prev period"
                   meta={`${data.tokenCostSummary?.activeUserCount ?? 0} active users · Across ${data.tokenCostSummary?.byServiceLine?.length ?? 0} service lines`}
                   onClick={() => openDrilldown('cost_per_user')}
                 />
@@ -261,7 +252,6 @@ export default function ExecutiveOverviewPage() {
               {/* Executive Strategic Leadership Inferences Panel */}
               <ExecutiveInferencesPanel
                 summary={data.tokenCostSummary}
-                filters={filters}
                 onSelectInference={(infId) => {
                   savedScrollY.current = window.scrollY;
                   setInferenceInitialEntity(null);

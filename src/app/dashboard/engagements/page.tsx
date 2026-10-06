@@ -7,7 +7,7 @@ import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { useRawRows } from '@/hooks/useRawRows';
-import { Briefcase, ChevronRight, RotateCcw, X, Info } from 'lucide-react';
+import { Briefcase, ChevronRight, RotateCcw, X } from 'lucide-react';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 import { summarize, type Level, type PathEntry } from '@/lib/hierarchyDrilldown';
 import { EngagementCodeRankingsPanel } from '@/components/ui/EngagementCodeRankingsPanel';

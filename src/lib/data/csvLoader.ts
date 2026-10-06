@@ -5,7 +5,7 @@
 import 'server-only';
 
 import { RAW_CSV_DATA } from './rawCsvData';
-import type { CalculationMethod, CsvUsageRow } from './csvTypes';
+import type { CsvUsageRow } from './csvTypes';
 import { anonymizeEngagementCode } from './anonymize';
 
 export type { CalculationMethod, CsvUsageRow } from './csvTypes';

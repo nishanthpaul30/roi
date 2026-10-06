@@ -9,7 +9,6 @@ interface KpiCardProps {
   unit?: string;
   formatType?: 'number' | 'percentage' | 'currency' | 'duration' | 'compact';
   description?: string;
-  comparisonLabel?: string;
   onClick?: () => void;
   // Minimal supporting context shown bottom-right of the card, e.g. "399 active · 97 inactive"
   meta?: string;
@@ -29,7 +28,6 @@ export function KpiCard({
   unit = '',
   formatType = 'number',
   description,
-  comparisonLabel = 'vs prev period',
   onClick,
   meta,
   valueOverride,
@@ -37,7 +35,7 @@ export function KpiCard({
 }: KpiCardProps) {
   if (!delta) return null;
 
-  const { current, previous, absoluteDelta, percentageDelta, percentagePointDelta, trend, isRateMetric, previousDataAvailable = true } = delta;
+  const { current, previous, absoluteDelta, percentageDelta, percentagePointDelta, trend, previousDataAvailable = true } = delta;
 
   const formatVal = (val: number) => {
     if (formatType === 'currency') return formatCompactCurrency(val);

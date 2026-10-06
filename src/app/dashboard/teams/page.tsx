@@ -268,7 +268,6 @@ export default function OrgAndRegionalPage() {
                   chartMetric="cost"
                   chartMetricLabel="Total Cost ($)"
                   onParentClick={(id) => {
-                    const sl = serviceLines.find((s: any) => s.serviceLine === id);
                     openDrilldown({
                       type: 'service_line',
                       id,
