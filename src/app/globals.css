@@ -4,7 +4,7 @@
   --background: #121217;
   --foreground: #F4F4F6;
 
-  /* EY Dark Theme Color Palette (Default) */
+  /* Dark Theme Color Palette (Default) */
   --ey-yellow: #FFE600;
   --ey-yellow-hover: #E6CF00;
   --ey-black: #121217;
@@ -19,7 +19,7 @@ html.light, body.light {
   --background: #F4F5F7;
   --foreground: #0F172A;
 
-  /* EY Light Theme Color Palette */
+  /* Light Theme Color Palette */
   --ey-yellow: #D6C100;
   --ey-yellow-hover: #B8A600;
   --ey-black: #F4F5F7;
