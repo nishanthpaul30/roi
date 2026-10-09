@@ -5,7 +5,8 @@
 import 'server-only';
 
 import { RAW_CSV_DATA } from './rawCsvData';
-import type { CalculationMethod, CsvUsageRow } from './csvTypes';
+import type { CsvUsageRow } from './csvTypes';
+import { anonymizeEngagementCode } from './anonymize';
 
 export type { CalculationMethod, CsvUsageRow } from './csvTypes';
 
@@ -139,7 +140,7 @@ export function parseRawCsvText(raw: string): CsvUsageRow[] {
     // column doesn't parse as a date (e.g. a malformed or legacy-format row).
     const year = monthDate ? monthDate.year : parseFiscalYearFallback(fiscalYear);
     const month = monthDate ? monthDate.month : parseMonth(get(COL.month));
-    const projectCode = get(COL.projectCode);
+    const projectCode = anonymizeEngagementCode(get(COL.projectCode));
     // Billability is a convention on the Engagement Code itself, not a
     // separate source column: E-XXXXXX is an external/billable engagement,
     // I-XXXXXX is internal/non-billable.

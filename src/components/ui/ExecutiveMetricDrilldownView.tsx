@@ -16,9 +16,6 @@ import {
 import {
   ArrowLeft,
   Zap,
-  DollarSign,
-  Users,
-  Coins,
   Building2,
   Globe2,
   Layers,
@@ -27,17 +24,14 @@ import {
   AlertCircle,
   Search,
   ChevronRight,
-  Filter,
   FileSpreadsheet,
   ArrowUpRight,
-  Database,
-  Calendar,
   BarChart3,
   Table2,
   X,
 } from 'lucide-react';
 import { MetricChart } from '@/components/ui/MetricChart';
-import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
+import { DrilldownMetricData } from '@/components/ui/drilldownTypes';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { GlobalFilterState } from '@/lib/metrics/types';
 import { useRawRows } from '@/hooks/useRawRows';
@@ -124,14 +118,14 @@ function ctNonCtSegmentDisplay(metricId: string, segment: { cost: number; tokens
 }
 
 export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitle = 'Overview' }: ExecutiveMetricDrilldownViewProps) {
-  const { id, title, subtitle, currentValue, deltaText, trend, series, summaryData } = data;
+  const { id, title, subtitle, currentValue, series, summaryData } = data;
 
   // Level 3 Deep-Dive Sub-Drilldown State
   const [subDrilldown, setSubDrilldown] = useState<SubDrilldownState | null>(null);
   const [toolView, setToolView] = useState<'chart' | 'table'>('chart');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(10);
   const [inspectingRow, setInspectingRow] = useState<CsvUsageRow | null>(null);
 
   // Pre-hierarchy facet selection: clicking a tool/service line/region/engagement code
@@ -258,7 +252,6 @@ export function ExecutiveMetricDrilldownView({ data, onBack, filters, parentTitl
   const byCtNonCt = (summaryData?.byCtNonCt || []).filter((c: any) => c.ctNonCt === 'CT' || c.ctNonCt === 'Non-CT');
   const byRegion = summaryData?.byManagementRegion || [];
   const byServiceLine = summaryData?.byServiceLine || [];
-  const topUsers = summaryData?.topUsers || [];
   const byProjectCode = summaryData?.byProjectCode || [];
 
   // Rows currently in scope for the trend chart: the org-wide filtered set, narrowed

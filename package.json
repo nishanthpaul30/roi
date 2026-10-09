@@ -3,17 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/generateDevHoursCsv.js",
     "dev": "next dev",
+    "prebuild": "node scripts/generateDevHoursCsv.js",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "embed-csv": "node scripts/embedCsv.js"
+    "embed-csv": "node scripts/embedCsv.js",
+    "generate-dev-hours": "node scripts/generateDevHoursCsv.js"
   },
   "dependencies": {
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.43.0",
-    "next": "16.3.4",
+    "next": "^16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-simple-maps": "^5.0.3",
@@ -27,8 +29,6 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
     "typescript": "^5"

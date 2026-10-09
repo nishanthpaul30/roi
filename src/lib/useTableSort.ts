@@ -39,5 +39,12 @@ export function useTableSort<T>(rows: T[], accessors: Record<string, (row: T) =>
     }
   };
 
-  return { sortKey, sortDir, sortedRows, handleSort };
+  // Programmatic sort (e.g. a drilldown that wants rows ranked by a column);
+  // pass a null key to go back to the rows' incoming order.
+  const setSort = (key: string | null, dir: SortDirection = 'asc') => {
+    setSortKey(key);
+    setSortDir(dir);
+  };
+
+  return { sortKey, sortDir, sortedRows, handleSort, setSort };
 }

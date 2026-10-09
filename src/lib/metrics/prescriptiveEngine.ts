@@ -1,6 +1,14 @@
 import { TokenCostSummary, UserCapacityRow } from '@/lib/metrics/types';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
-import { formatCompactCurrency as fmtCost } from '@/lib/format';
+import { formatCompactCurrency as fmtCost, formatCompactNumber as fmtNum } from '@/lib/format';
+import {
+  DEFAULT_DEV_HOUR_RATE_USD,
+  computeHoursSavedValueUsd,
+  computeRoiPercent,
+  computeRoiEligibleHours,
+  computeDevCostUsd,
+  computeTotalInvestmentUsd,
+} from '@/lib/metrics/roiCalc';
 
 export interface PrescriptiveInference {
   id: string;
@@ -29,8 +37,6 @@ export function generatePrescriptiveInferences(
   if (!summary) return [];
 
   const totalCost = summary.totalCost || 0;
-  const activeUserCount = summary.activeUserCount || 0;
-  const avgLicenseCostPerSeat = activeUserCount > 0 ? summary.totalLicenseCost / activeUserCount : 100;
 
   // Whether the current filter selection resolves to exactly one calendar
   // month. Dollar figures below (license cost, spend, etc.) are sums over
@@ -161,33 +167,58 @@ export function generatePrescriptiveInferences(
   };
 
   // ---------------------------------------------------------------------------
-  // 5. HABITUAL RETENTION & HEALTH
+  // 5. HOURS SAVED ROI — value of hours saved vs. total engagement investment
   // ---------------------------------------------------------------------------
-  const cohorts = summary.userEngagementCohorts;
-  const embeddedPct = cohorts ? cohorts.embeddedPercent : 50;
-  const regularPct = cohorts ? cohorts.regularPercent : 30;
-  const occasionalPct = cohorts ? cohorts.occasionalPercent : 15;
-  const dropoutPct = cohorts ? cohorts.dropoutPercent : 5;
-  const dropoutCount = cohorts ? cohorts.dropoutCount : 0;
-  const occasionalCount = cohorts ? cohorts.occasionalCount : 0;
-  const atRiskSeats = dropoutCount + occasionalCount;
-  const atRiskLicenseCost = Math.round(atRiskSeats * avgLicenseCostPerSeat);
-  const annualizedAtRisk = atRiskLicenseCost * 12;
+  // Same math as the Engagement Analytics Hours Saved panel (see
+  // lib/metrics/roiCalc.ts): Hours Saved is capped at each row's Approved
+  // Hrs (hours recorded beyond the approved target aren't locked into the
+  // business case yet), and Total Investment = AI tool cost + the dollar
+  // value of developer hours clocked (mock timesheet data, deduped per
+  // engagement so a multi-tool engagement's dev hours aren't counted once
+  // per tool). Uses the default $/dev-hr rate -- this summary card has no
+  // adjustable-rate control of its own.
+  const hoursSavedRows = summary.hoursSavedByEngagement || [];
+  const roiToolCost = hoursSavedRows.reduce((s, r) => s + (r.cost ?? 0), 0);
+  const roiDevHoursByEngagement = new Map<string, number>();
+  for (const r of hoursSavedRows) {
+    if (!roiDevHoursByEngagement.has(r.projectCode)) roiDevHoursByEngagement.set(r.projectCode, r.devHoursSpent);
+  }
+  const roiTotalDevHours = Array.from(roiDevHoursByEngagement.values()).reduce((s, v) => s + v, 0);
+  const roiEligibleHours = hoursSavedRows.reduce(
+    (s, r) => s + computeRoiEligibleHours(r.sumOfMonthlyHrs, r.approvedTotalHrs),
+    0
+  );
+  const roiHoursSavedValueUsd = computeHoursSavedValueUsd(roiEligibleHours, DEFAULT_DEV_HOUR_RATE_USD);
+  const roiDevCostUsd = computeDevCostUsd(roiTotalDevHours, DEFAULT_DEV_HOUR_RATE_USD);
+  const roiTotalInvestmentUsd = computeTotalInvestmentUsd(roiToolCost, roiDevCostUsd);
+  const roiPercent = computeRoiPercent(roiHoursSavedValueUsd, roiTotalInvestmentUsd);
+  const engagementCount = roiDevHoursByEngagement.size;
+  const netImpact = roiHoursSavedValueUsd - roiTotalInvestmentUsd;
 
-  const retentionInference: PrescriptiveInference = {
-    id: 'habitual_retention',
-    title: 'Habitual User Retention & Health',
-    tag: 'Adoption Health',
-    tagColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    leverageScore: annualizedAtRisk * 0.5,
-    stat: `${fmtPct(embeddedPct + regularPct)} Regular-or-Better Usage`,
-    statSub: `${fmtPct(embeddedPct)} Embedded · ${fmtPct(regularPct)} Regular · ${fmtPct(occasionalPct)} Occasional`,
-    finding: `Across active licenses: ${fmtPct(embeddedPct)} are Embedded (active in ≥90% of periods), ${fmtPct(regularPct)} Regular (≥60%), and ${fmtPct(occasionalPct)} Occasional (≥25%). However, ${dropoutCount} users (${fmtPct(dropoutPct)}) show signs of disengagement.`,
+  const hoursSavedRoiInference: PrescriptiveInference = {
+    id: 'hours_saved_roi',
+    title: 'Hours Saved ROI',
+    tag: 'AI Investment ROI',
+    tagColor: netImpact >= 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+    leverageScore: Math.abs(netImpact) * 12,
+    stat: hoursSavedRows.length > 0 && roiPercent !== null ? `${roiPercent >= 0 ? '+' : ''}${roiPercent.toFixed(0)}% ROI` : 'No Hours Saved Data',
+    statSub: hoursSavedRows.length > 0 ? `${fmtCost(roiHoursSavedValueUsd)} value vs ${fmtCost(roiTotalInvestmentUsd)} invested` : `${engagementCount} engagements tracked`,
+    finding:
+      hoursSavedRows.length > 0
+        ? `Across ${engagementCount} tracked engagements, ${fmtNum(roiEligibleHours)} approved hours saved are worth ${fmtCost(roiHoursSavedValueUsd)} at the blended $${DEFAULT_DEV_HOUR_RATE_USD}/dev-hr rate, against a Total Investment of ${fmtCost(roiTotalInvestmentUsd)} (${fmtCost(roiToolCost)} AI tool cost for just these ${engagementCount} engagements, not the org-wide Total AI Investment card, + ${fmtCost(roiDevCostUsd)} dev hours cost).`
+        : 'No Hours Saved data is currently tracked for the selected filters.',
     actionableInsight:
-      dropoutPct > 15
-        ? `Investigate onboarding friction in the ${dropoutCount}-user Dropout cohort before expanding license commitments. Deploy targeted coaching to convert Occasional users to Regular.`
-        : 'Active user cohorts demonstrate strong habitual retention. Transition focus from basic onboarding to specialized advanced prompt engineering.',
-    benefitOutcome: `Protects up to ${fmtCost(atRiskLicenseCost)}${moSuffix} in license spend from customer churn, while compounding organizational productivity as users move from occasional to embedded workflows.`,
+      hoursSavedRows.length > 0
+        ? roiPercent !== null && roiPercent < 0
+          ? `Open Engagement Analytics to see which engagements have the lowest ROI, and whether tool spend or dev-hour investment is the larger driver before expanding adoption further.`
+          : `Open Engagement Analytics to see which engagements and tools are delivering the strongest ROI, and prioritize expanding those patterns.`
+        : 'Add Hours Saved tracking data to surface this inference.',
+    benefitOutcome:
+      hoursSavedRows.length > 0
+        ? netImpact >= 0
+          ? `Hours saved currently outweigh total investment by ${fmtCost(netImpact)}, a net positive return on the AI tooling + developer time invested.`
+          : `Total investment currently exceeds the value of hours saved by ${fmtCost(Math.abs(netImpact))} -- a signal to review scope before committing further spend.`
+        : 'Tracking this once Hours Saved data is available will quantify AI adoption ROI directly.',
   };
 
   // ---------------------------------------------------------------------------
@@ -324,16 +355,15 @@ export function generatePrescriptiveInferences(
 
   // ---------------------------------------------------------------------------
   // Compile inferences array with License Reclamation Intelligence pinned
-  // first (#1); the remaining strategic cards are sorted dynamically by
-  // financial leverage score.
+  // first (#1) and Hours Saved ROI pinned second (#2); the remaining
+  // strategic cards are sorted dynamically by financial leverage score.
   // ---------------------------------------------------------------------------
   const otherInferences = [
     billabilityInference,
     paretoInference,
-    retentionInference,
     toolOverlapInference,
     nonBillableOverrunInference,
   ].sort((a, b) => b.leverageScore - a.leverageScore);
 
-  return [reclamationInference, ...otherInferences];
+  return [reclamationInference, hoursSavedRoiInference, ...otherInferences];
 }

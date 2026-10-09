@@ -7,7 +7,7 @@ import { DataTable, Column } from '@/components/ui/DataTable';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { useRawRows } from '@/hooks/useRawRows';
 import Link from 'next/link';
-import { GitBranch, ChevronRight, RotateCcw, TableProperties, Globe2, Briefcase, Info } from 'lucide-react';
+import { GitBranch, ChevronRight, RotateCcw, TableProperties, Globe2, Briefcase } from 'lucide-react';
 import { GeoHierarchyMap } from '@/components/ui/GeoHierarchyMap';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 import { summarize, type Level, type PathEntry } from '@/lib/hierarchyDrilldown';

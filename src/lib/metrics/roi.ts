@@ -1,6 +1,7 @@
 import { loadCsvData, dateStringToMonthId, CsvUsageRow } from '../data/csvLoader';
 import { GlobalFilterState, TokenCostSummary, MonthlyTrendPoint } from './types';
 import { getPreviousDateRange, hasPreviousPeriodData } from './engine';
+import { joinHoursSavedToEngagements } from './hoursSaved';
 
 function filterRows(rows: CsvUsageRow[], filters: GlobalFilterState, sDate: string, eDate: string): CsvUsageRow[] {
   const startMonthId = dateStringToMonthId(sDate);
@@ -588,6 +589,13 @@ export async function calculateTokenCostSummary(
     };
   }).sort((a, b) => b.cost - a.cost);
 
+  // Hours Saved (actuals-planned-overall-*.csv), joined onto byProjectCode by Engagement
+  // Code -- a separate, non-metered data source (see EngagementHoursSaved's
+  // doc comment), kept out of every cost/token aggregate above. allRows (not
+  // the date-filtered spendRows) is passed as the master Engagement Code
+  // validity list, so a code's validity doesn't change as the date filter does.
+  const hoursSavedByEngagement = joinHoursSavedToEngagements(spendRows, allRows);
+
   // Monthly Trend breakdown (Year / Month columns) with per-AI-tool cost split
   const byMonthMap = groupBy(spendRows, r => String(r.monthId));
   const monthlyTrend = Array.from(byMonthMap.entries())
@@ -690,6 +698,7 @@ export async function calculateTokenCostSummary(
     nonBillableSpend,
     billableSpendPercent,
     byProjectCode,
+    hoursSavedByEngagement,
     monthlyTrend,
     userEngagementCohorts,
     totalRosterUserCount,

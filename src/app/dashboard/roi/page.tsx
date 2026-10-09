@@ -10,7 +10,7 @@ import { ProjectBillabilityPanel } from '@/components/ui/ProjectBillabilityPanel
 import { UserThresholdDrilldownView } from '@/components/ui/UserThresholdDrilldownView';
 import { RoiDrilldownView, RoiDrilldownTarget } from '@/components/ui/RoiDrilldownView';
 import { ExecutiveMetricDrilldownView } from '@/components/ui/ExecutiveMetricDrilldownView';
-import { DrilldownMetricData } from '@/components/ui/MetricDrilldownModal';
+import { DrilldownMetricData } from '@/components/ui/drilldownTypes';
 import { ExecutivePrintTemplate } from '@/components/reports/ExecutivePrintTemplate';
 import { Coins } from 'lucide-react';
 import { TokenCostSummary } from '@/lib/metrics/types';
@@ -133,7 +133,6 @@ export default function RoiPage() {
                 unit="tokens"
                 formatType="compact"
                 description="SUM(GenAI Tool Consumption) across all Usage entries in the period."
-                comparisonLabel="vs prev period"
                 meta={`${summary.byAiTool?.length ?? 0} AI tools · $${summary.costPer1kTokens.toFixed(4)} per 1K tokens`}
                 onClick={openTokenDrilldown}
               />

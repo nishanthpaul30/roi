@@ -40,7 +40,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
       <div className="border-b-2 border-slate-900 pb-5 flex items-start justify-between">
         <div className="space-y-1">
           <div className="inline-flex items-center space-x-2 bg-slate-900 text-yellow-400 text-xs font-black px-3 py-1 rounded-md uppercase tracking-wider shadow-sm">
-            <span>EY Analytics</span>
+            <span>AI Analytics</span>
             <span className="text-white">|</span>
             <span className="text-white">Enterprise AI Telemetry</span>
           </div>
@@ -232,7 +232,7 @@ export function ExecutivePrintTemplate({ data, filters }: ExecutivePrintTemplate
 
       {/* Executive Footer */}
       <div className="border-t border-slate-300 pt-4 flex items-center justify-between text-[10px] text-slate-500 font-mono">
-        <span>Generated via EY Enterprise AI Analytics Platform</span>
+        <span>Generated via Enterprise AI Analytics Platform</span>
         <span className="font-bold text-slate-700">CONFIDENTIAL — FOR INTERNAL C-SUITE &amp; BOARD USE ONLY</span>
       </div>
     </div>

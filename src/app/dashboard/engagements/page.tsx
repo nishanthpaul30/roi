@@ -7,12 +7,18 @@ import { GlobalFilterBar } from '@/components/layout/GlobalFilterBar';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import type { CsvUsageRow } from '@/lib/data/csvTypes';
 import { useRawRows } from '@/hooks/useRawRows';
-import { Briefcase, ChevronRight, RotateCcw, X, Info } from 'lucide-react';
+import { Briefcase, ChevronRight, RotateCcw, X } from 'lucide-react';
 import { formatCompactCurrency as fmtCost, formatCompactNumber } from '@/lib/format';
 import { summarize, type Level, type PathEntry } from '@/lib/hierarchyDrilldown';
 import { EngagementCodeRankingsPanel } from '@/components/ui/EngagementCodeRankingsPanel';
 import { StatTile } from '@/components/ui/StatTile';
 import { GroupsTable } from '@/components/ui/GroupsTable';
+import { EngagementHoursSavedPanel } from '@/components/ui/EngagementHoursSavedPanel';
+import { HoursSavedOverviewPanel } from '@/components/ui/HoursSavedOverviewPanel';
+import type { TokenCostSummary } from '@/lib/metrics/types';
+import { DEFAULT_DEV_HOUR_RATE_USD } from '@/lib/metrics/roiCalc';
+
+type EngagementHoursSavedRow = NonNullable<TokenCostSummary['hoursSavedByEngagement']>[number];
 
 // The engagement-side hierarchy, picked up where the org hierarchy (CT/Non-CT ->
 // Country -> Service Line -> Sub-Service Line 1 -> Sub-Service Line 2 -> Users)
@@ -34,6 +40,10 @@ function EngagementAnalytics() {
 
   const userParam = (searchParams.get('user') || '').toLowerCase().trim();
   const [path, setPath] = useState<PathEntry[]>([]);
+  // Shared between the overview (Matrix/Table) and the per-engagement
+  // drilldown, so adjusting it anywhere updates ROI consistently everywhere
+  // Hours Saved is shown -- see lib/metrics/roiCalc.ts.
+  const [devHourRate, setDevHourRate] = useState<number>(DEFAULT_DEV_HOUR_RATE_USD);
 
   // Arriving from a different user's row has to restart the drilldown — the
   // engagement path from the previous user rarely exists under the new one.
@@ -90,6 +100,17 @@ function EngagementAnalytics() {
     [pathRows]
   );
 
+  // Hours Saved (actuals-planned-overall-*.csv) is keyed by Engagement Code, not by the
+  // Super Region / Service Line / Competency levels below it -- so it's
+  // scoped to whichever Engagement Code was picked at Level 1, and stays
+  // visible through every deeper level of that same engagement's path.
+  const selectedEngagementCode = path[0]?.value;
+  const allHoursSavedRows: EngagementHoursSavedRow[] = data?.tokenCostSummary?.hoursSavedByEngagement || [];
+  const hoursSavedRows = useMemo(
+    () => allHoursSavedRows.filter((r) => r.projectCode === selectedEngagementCode),
+    [allHoursSavedRows, selectedEngagementCode]
+  );
+
   const rawColumns: Column<CsvUsageRow>[] = [
     { header: 'Month', accessorKey: 'monthYear', cell: (r) => r.monthYear.replace(/_/g, ' ') },
     { header: 'User', accessorKey: 'displayName' },
@@ -115,6 +136,20 @@ function EngagementAnalytics() {
             Line &rarr; Sub-Service Line &rarr; Competency.
           </p>
         </div>
+
+        {/* Hours Saved & Cost Efficiency — shown on the main screen itself,
+            before any drilldown, since it's a headline feature and
+            shouldn't be hidden behind navigating into a specific engagement.
+            Hidden once scoped to a single user, since Hours Saved isn't
+            tracked at the user level. */}
+        {path.length === 0 && !userParam && (
+          <HoursSavedOverviewPanel
+            rows={data?.tokenCostSummary?.hoursSavedByEngagement || []}
+            onSelectEngagement={(code) => selectValue('engagementCode', 'projectCode', 'Engagement Code', code)}
+            devHourRate={devHourRate}
+            onDevHourRateChange={setDevHourRate}
+          />
+        )}
 
         {/* User scope chip — present when arriving from a user row */}
         {userParam && (
@@ -200,6 +235,10 @@ function EngagementAnalytics() {
             loading={rowsLoading}
           />
         </div>
+
+        {selectedEngagementCode && (
+          <EngagementHoursSavedPanel rows={hoursSavedRows} engagementCode={selectedEngagementCode} devHourRate={devHourRate} />
+        )}
 
         {rowsLoading ? (
           <div className="h-64 flex items-center justify-center text-ey-muted text-sm animate-pulse">
